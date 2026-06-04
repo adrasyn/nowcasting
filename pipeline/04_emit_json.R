@@ -16,6 +16,9 @@ library(lubridate)
 library(readr)
 library(tidyr)
 
+# Bias-aware empirical CI bands (replaces the old hardcoded +/-0.7%/+/-1.4%).
+source(if (file.exists("ci_bands.R")) "ci_bands.R" else "pipeline/ci_bands.R")
+
 #### Indicator name mapping (R wide-column → website JSON id) ####
 # The R pipeline uses one naming convention; the JSON contract uses another.
 # Keep this in lock-step with src/lib/types.ts and data/indicators.json.
@@ -296,6 +299,12 @@ emit_json <- function(target_dir, nowcast, master, vintage_info) {
     as.integer(as.numeric(difftime(prev_release, next_release, units = "days")))
   } else NA_integer_
 
+  # Bias-aware empirical CI bands from the latest validated backtest.
+  ci <- load_ci_params()
+  prev_level_now <- ci_prev_level(point_value, qoq_growth_pct)
+  b68 <- ci_level_band(qoq_growth_pct, prev_level_now, ci$qoq_bias_pp, ci$qoq_sd_pp, ci$z_68)
+  b95 <- ci_level_band(qoq_growth_pct, prev_level_now, ci$qoq_bias_pp, ci$qoq_sd_pp, ci$z_95)
+
   # --- 1. latest.json ---
   latest_obj <- list(
     generated_at          = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
@@ -306,10 +315,10 @@ emit_json <- function(target_dir, nowcast, master, vintage_info) {
       gdp_chain_volume_millions = point_value,
       qoq_growth_pct            = qoq_growth_pct,
       yoy_growth_pct            = yoy_growth_pct,
-      ci_68_low                 = round(point_value * 0.993),
-      ci_68_high                = round(point_value * 1.007),
-      ci_95_low                 = round(point_value * 0.986),
-      ci_95_high                = round(point_value * 1.014)
+      ci_68_low                 = b68$low,
+      ci_68_high                = b68$high,
+      ci_95_low                 = b95$low,
+      ci_95_high                = b95$high
     ),
     latest_actual = list(
       quarter                   = latest_actual_quarter,
@@ -346,17 +355,19 @@ emit_json <- function(target_dir, nowcast, master, vintage_info) {
           rd <- gdp_release_date(q)
           if (inherits(rd, "Date")) as.character(rd) else NA_character_
         }, character(1))),
-        days_until_release = as.integer(as.numeric(difftime(run_date_d, release_d, units = "days")))
+        days_until_release = as.integer(as.numeric(difftime(run_date_d, release_d, units = "days"))),
+        qg_v     = as.numeric(qoq_growth),
+        prev_lvl = ci_prev_level(as.numeric(nowcast_value), qg_v)
       ) |>
       transmute(
         run_date          = format(run_date_d, "%Y-%m-%d"),
         target_quarter,
         point             = round(as.numeric(nowcast_value)),
-        qoq_growth_pct    = round(as.numeric(qoq_growth), 2),
-        ci_68_low         = round(as.numeric(nowcast_value) * 0.993),
-        ci_68_high        = round(as.numeric(nowcast_value) * 1.007),
-        ci_95_low         = round(as.numeric(nowcast_value) * 0.986),
-        ci_95_high        = round(as.numeric(nowcast_value) * 1.014),
+        qoq_growth_pct    = round(qg_v, 2),
+        ci_68_low         = ci_level_band(qg_v, prev_lvl, ci$qoq_bias_pp, ci$qoq_sd_pp, ci$z_68)$low,
+        ci_68_high        = ci_level_band(qg_v, prev_lvl, ci$qoq_bias_pp, ci$qoq_sd_pp, ci$z_68)$high,
+        ci_95_low         = ci_level_band(qg_v, prev_lvl, ci$qoq_bias_pp, ci$qoq_sd_pp, ci$z_95)$low,
+        ci_95_high        = ci_level_band(qg_v, prev_lvl, ci$qoq_bias_pp, ci$qoq_sd_pp, ci$z_95)$high,
         data_through      = format(as.Date(data_as_of_date), "%Y-%m"),
         days_until_release
       )

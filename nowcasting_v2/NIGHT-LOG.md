@@ -64,3 +64,10 @@
 
 ## STOPPING POINT (autonomous build complete)
 - Phases 0-4 + 6-backtest done. Phase 5 (emit/site) NOT started — it's pre-cutover plumbing; cutover is user-gated and the competitive-enough call is now the user's nuanced decision. Awaiting user direction (accept v2 / pursue the gap-closing levers / hold).
+
+## Option 2 / Lever C — data+MAI quality — DONE (gap is NOT data-bound)
+- Retail `rt` diagnosed: not a bug, genuinely noisy (pre-COVID corr 0.057). **household_spending (A130200584T, MHSI) = 0.291, 5x better → added & SELECTED into MAI** (rt not selected).
+- building_app (A422070J) added (free ABS) — weak, not selected. motor_vehicles SKIPPED (FCAI fixtures too sparse: 2 months only; honest, not fabricated).
+- New MAI: pre-COVID corr 0.306 (was 0.30; 86% of RBA 0.355; gate PASS). 31-series panel, 12 selected (household_spending displaced retail).
+- **Re-backtest: gap barely moved** — post-COVID RMSE 0.513 (was 0.522) vs v1 0.340. BUT v2 full-sample 0.457 vs v1 1.871, and **2026 Q1 held-out v2 +0.475 (err +0.20) vs v1 +0.797 (err +0.52)** — v2 much closer to actual +0.274.
+- **KEY DIAGNOSIS:** post-COVID gap = systematic POSITIVE bias (v2 over-predicts 2022-24), a calibration/intercept issue, NOT predictor coverage. pre-COVID corr is capacity-bound at the RBA ceiling. → pivot Lever A to a bias/intercept correction (+ full U-MIDAS test); don't chase more data.

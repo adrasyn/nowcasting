@@ -5,8 +5,10 @@
 "ue","ABS_6202.0","A84423050A","t2","FALSE","H","Unemployment","OK",NA,TRUE
 "ud","ABS_6202.0","A85255719L","t2","FALSE","H","Underemployment","OK",NA,TRUE
 "hours","ABS_6202.0","A84426277X","t2","TRUE","H","Hours worked","OK",NA,TRUE
-"rt","ABS_8501.0","A3348585R","t2","TRUE","H","Retail Sales","OK",NA,TRUE
+"rt","ABS_8501.0","A3348585R","t2","TRUE","H","Retail Sales","OK","pre-COVID corr w/ GDP growth only +0.06 (full +0.21); genuinely weak proxy. Kept but household_spending is the stronger consumption series.",TRUE
+"household_spending","ABS_5682.0","A130200584T","t2","TRUE","H","Household Spending (MHSI total, CP, SA)","OK","Monthly Household Spending Indicator total. 2012-07+. pre-COVID corr w/ GDP growth +0.29 vs rt +0.06.",TRUE
 "export","ABS_5368.0","A2718577A","t2","TRUE","H","Exports","OK",NA,TRUE
+"building_app","ABS_8731.0","A422070J","t2","TRUE","H","Building Approvals (total dwelling units, SA)","OK","Total number of dwelling units approved. 2000-01+. RBA mai_info res_ba codes (t2,tlog). pre-COVID corr w/ GDP growth +0.04 (full +0.25); leading housing-investment partial.",TRUE
 "credit","RBA_D2","DLCACN+DLCACSFN","t2","TRUE","F","Total Credit","OK",NA,TRUE
 "credit_housing","RBA_D2","DLCACOHN+DLCACIHN","t2","TRUE","F","Housing Credit","OK",NA,TRUE
 "credit_business","RBA_D2","DLCACBN+DLCACSFBN","t2","TRUE","F","Business Credit","OK",NA,TRUE
@@ -28,6 +30,7 @@
 "nab_cu","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Capacity Utilisation","PARTIAL","38 obs 2023-02..2026-04, 1 gap (2023-07, letter-spaced PDF). Per cent.",TRUE
 "anz_ads","ANZ-Indeed Australian Job Ads media-release PDF (page-2 data table)",NA,"t2","TRUE","S","ANZ-Indeed Job Ads (SA index 2019=100)","OK","63 obs 2021-01..2026-03, no gaps. Seasonally adjusted index level from PDF table. Live discovery of newer PDF failed (ANZ landing page JS-rendered); fixture current to Mar-2026. tcode/tlog from paper anz_ads.",TRUE
 "anz_sent","ANZ-Roy Morgan Consumer Confidence monthly-ratings table (roymorgan.com HTML)",NA,"t1","FALSE","S","ANZ-Roy Morgan Consumer Confidence","OK","576 obs 1973-03..2026-05, no gaps post-2000 (63 gaps are 1981-86 irregular-survey era). Footnote markers (** # *) stripped. May-2026 (66.5) is an incomplete-month average (** flag).",TRUE
+"motor_vehicles","ABS_9314.0 + FCAI",NA,"t2","TRUE","H","New Motor Vehicle Sales","MISSING","SKIPPED per time/fragility budget. ABS 9314.0 legacy SA total discontinued ~2017 (fixture abs9314_*.xls covers to Nov-2017); post-2018 FCAI press-release HTML fixtures contain only 2 monthly totals (Apr+May 2026) -- far too sparse to splice a 2000-2026 monthly series and self-SA via X-13. Fixtures recovered to tests/fixtures/ for future work. Did not fabricate.",FALSE
 "house_prices","ABS/CoreLogic",NA,"t2","TRUE","H","House prices","MISSING","RPPI discontinued 2021",FALSE
 "asx200","market",NA,"t2","TRUE","F","ASX200","MISSING","no free CSV",FALSE
 "ivi","JSA",NA,"t2","TRUE","S","Internet Vacancy Index","MISSING","host firewalled",FALSE

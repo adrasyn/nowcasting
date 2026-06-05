@@ -71,11 +71,11 @@ analyze_v2_vs_v1 <- function(
   v1_cm <- v1_pc[v1_pc$target_quarter %in% common_q, , drop = FALSE]
 
   tbl <- bind_rows(
-    .metrics(v2f,  "v2 (29-series MAI->QA-UMIDAS)", "full-sample"),
+    .metrics(v2f,  "v2 (31-series MAI->QA-UMIDAS)", "full-sample"),
     .metrics(v1f,  "v1 (13-series DFM r=3)",        "full-sample"),
-    .metrics(v2_pc, "v2 (29-series MAI->QA-UMIDAS)", "post-COVID (>=2022Q1)"),
+    .metrics(v2_pc, "v2 (31-series MAI->QA-UMIDAS)", "post-COVID (>=2022Q1)"),
     .metrics(v1_pc, "v1 (13-series DFM r=3)",        "post-COVID (>=2022Q1)"),
-    .metrics(v2_cm, "v2 (29-series MAI->QA-UMIDAS)", "post-COVID COMMON quarters"),
+    .metrics(v2_cm, "v2 (31-series MAI->QA-UMIDAS)", "post-COVID COMMON quarters"),
     .metrics(v1_cm, "v1 (13-series DFM r=3)",        "post-COVID COMMON quarters")
   )
 

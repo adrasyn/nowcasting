@@ -50,7 +50,7 @@ suppressMessages({
 # ---------------------------------------------------------------------------
 .lag_for_id <- function(id) {
   labour <- c("emp","ft_emp","pt_emp","ue","ud","hours")
-  abs_act <- c("rt","export")
+  abs_act <- c("rt","export","household_spending","building_app")
   rba_m  <- c("credit","credit_housing","credit_business","credit_card",
               "fcmygbag3","fcmygbag5","fcmygbag10",
               "scrigbag3","scrigbag5","scrigbag10","firmmbab90")

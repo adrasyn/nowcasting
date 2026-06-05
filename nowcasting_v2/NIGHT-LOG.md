@@ -40,3 +40,8 @@
 - **Our MAI: pre-COVID corr 0.301 = 85% of the RBA's own 0.355.** Full-sample 0.56 (> RBA's 0.447, COVID-inflated). Recalibrated gate (PASS if >=85% of RBA benchmark) → **PASS-WITH-NOTE**. Robustness OK (corr full vs no-NAB MAI = 1.000; NAB never selected — long-history series carry the MAI).
 - **DECISION (autonomous, flagged for review):** the 0.6 gate was my heuristic; benchmarked to the RBA's demonstrated ceiling, our MAI is competitive → proceed to Phase 4. The real arbiter remains the Phase-6 backtest vs v1 (competitive-enough).
 - Caveat noted: retail corr suspiciously low (0.06) — possible retail series/transform refinement; building-approvals/vehicles augmentation flagged as a future lift toward RBA parity (not blocking).
+
+## Phase 4 — U-MIDAS nowcast (Stage 2) ✅
+- nowcast_midas.R (QA U-MIDAS, reuses RBA midasr spec) + run_nowcast_v2.R (end-to-end fetch->panel->transform->MAI->MIDAS). test PASS (7 checks).
+- **First v2 nowcast: 2026 Q2 +0.811% QoQ (level 704,809).** Model QA-UMIDAS, 226-qtr fit. (Targets Q2 because our data already has the Q1 actual from the 2026-06-03 release; v1's +0.77% was Q1 run 2026-06-02 — different quarters.)
+- jt=0 live-edge (no within-quarter MAI yet) handled via random-walk extrapolation of the contemporaneous quarter-average (logged). No CI yet (se=FALSE) — Phase 5 adds empirical bias-aware bands from the v2 backtest.

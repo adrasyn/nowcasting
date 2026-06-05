@@ -71,3 +71,10 @@
 - New MAI: pre-COVID corr 0.306 (was 0.30; 86% of RBA 0.355; gate PASS). 31-series panel, 12 selected (household_spending displaced retail).
 - **Re-backtest: gap barely moved** — post-COVID RMSE 0.513 (was 0.522) vs v1 0.340. BUT v2 full-sample 0.457 vs v1 1.871, and **2026 Q1 held-out v2 +0.475 (err +0.20) vs v1 +0.797 (err +0.52)** — v2 much closer to actual +0.274.
 - **KEY DIAGNOSIS:** post-COVID gap = systematic POSITIVE bias (v2 over-predicts 2022-24), a calibration/intercept issue, NOT predictor coverage. pre-COVID corr is capacity-bound at the RBA ceiling. → pivot Lever A to a bias/intercept correction (+ full U-MIDAS test); don't chase more data.
+
+## Option 2 / Lever A — bias correction + full U-MIDAS — DONE (no clean win)
+- Bias decomposition (post-COVID): mean error +0.331pp = **41.8% of RMSE²**; variance floor **0.391pp** > v1's 0.340 → even oracle de-biasing can't beat v1.
+- Real-time intercept correction (roll4/roll8, no look-ahead, applied to both): v2-QA roll8 → post-COVID 0.415 (nails Q1: −0.007) BUT hit drops 94→76%; still > v1 0.340. Correction is **v2-specific** (HURTS v1 0.34→0.40 — v1 already low-bias).
+- Full U-MIDAS (MAI-UM-M*): helps post-COVID (0.434) but WRECKS full-sample (0.93) + Q1 (+0.57) — RBA right that QA is more robust. Not adopted.
+- **Verdict: keep raw QA default** (full-sample 0.457, Q1 err +0.20, hit 94.7%). No lever reaches v1's post-COVID 0.340 without sacrificing v2's full-sample/Q1/hit edge. **Post-COVID gap is ~58% irreducible variance** — v1's direct DFM is intrinsically tighter in calm quarters.
+- Code: nowcast_midas.R +model=c("qa","umidas") (qa default, unchanged path); backtest_v2.R +model param; bias_correction_analysis.R (new). Defaults preserved.

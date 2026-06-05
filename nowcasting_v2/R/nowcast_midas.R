@@ -68,7 +68,9 @@ suppressMessages({
 #   target_quarter, qoq_growth, nowcast_level, model, n_obs,
 #   plus n_months_in_quarter (jt) and prev_level for transparency.
 ####################################################################################################
-nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL) {
+nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
+                          model = c("qa", "umidas")) {
+  model <- match.arg(model)
 
   mt <- 3L                          # months per quarter (high-freq ratio)
 
@@ -164,31 +166,60 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL) {
   if (length(x_est) != mt * length(y_est))
     stop("nowcast_midas(): length(x_est) != 3*length(y_est) after windowing.\n", call. = FALSE)
 
-  # ---- QA U-MIDAS: fit + nowcast (RBA Recursive_Nowcast lines 226-233) ----
-  # In-sample quarter-averages of the MAI, with one lag (k=0:1) to mirror a
-  # U-MIDAS with flat coefficients over the within-quarter months.
-  xm_est <- rowMeans(mls(x = x_est, k = 0L:2L, m = mt), na.rm = TRUE)
-  qa_md <- midas_r(formula = y_est ~ mls(x = xm_est, k = 0L:1L, m = 1L),
-                   data = list(y_est = y_est, xm_est = xm_est), start = NULL)
+  if (identical(model, "qa")) {
+    # ---- QA U-MIDAS: fit + nowcast (RBA Recursive_Nowcast lines 226-233) ----
+    # In-sample quarter-averages of the MAI, with one lag (k=0:1) to mirror a
+    # U-MIDAS with flat coefficients over the within-quarter months.
+    xm_est <- rowMeans(mls(x = x_est, k = 0L:2L, m = mt), na.rm = TRUE)
+    qa_md <- midas_r(formula = y_est ~ mls(x = xm_est, k = 0L:1L, m = 1L),
+                     data = list(y_est = y_est, xm_est = xm_est), start = NULL)
 
-  # Partial-quarter average for the target quarter (the live edge). When jt == 0
-  # there is no within-quarter MAI yet, so extrapolate with the last observed
-  # quarter-average (random-walk-in-level); see note above.
-  if (jt >= 1L) {
-    nxm <- mean(target_months$value, na.rm = TRUE)
+    # Partial-quarter average for the target quarter (the live edge). When jt == 0
+    # there is no within-quarter MAI yet, so extrapolate with the last observed
+    # quarter-average (random-walk-in-level); see note above.
+    if (jt >= 1L) {
+      nxm <- mean(target_months$value, na.rm = TRUE)
+    } else {
+      nxm <- as.numeric(tail(xm_est, 1L))
+      cat(sprintf("nowcast_midas(): jt=0 (no MAI months yet for %s); using last observed quarter-average %.4f as contemporaneous input (random-walk extrapolation).\n",
+                  .quarter_name(target_q), nxm))
+    }
+    qa_fc <- forecast(object = qa_md, newdata = list(xm_est = c(nxm)),
+                      se = FALSE, method = "static", add_ts_info = FALSE)
+    qoq_growth <- as.numeric(qa_fc$mean)
+    fit_md <- qa_md
+    model_name <- "QA-UMIDAS"
   } else {
-    nxm <- as.numeric(tail(xm_est, 1L))
-    cat(sprintf("nowcast_midas(): jt=0 (no MAI months yet for %s); using last observed quarter-average %.4f as contemporaneous input (random-walk extrapolation).\n",
-                .quarter_name(target_q), nxm))
+    # ---- Full unrestricted U-MIDAS (RBA Recursive_Nowcast lines 206-221) ----
+    # Separate within-quarter monthly coefficients + lags. RBA spec: k = (k1-jt):k2
+    # with k1=3 (begin lag), k2=5 (end lag). jt = within-quarter MAI months known.
+    # x_new = the partial-quarter monthly MAI values, padded to 3 with NA.
+    k1 <- 3L; k2 <- 5L
+    jtf <- if (jt >= 1L) jt else 0L
+    um_md <- midas_r(formula = y_est ~ mls(x = x_est, k = (k1 - jtf):k2, m = mt),
+                     start = NULL)
+    if (jtf >= 1L) {
+      x_new <- as.numeric(target_months$value)
+    } else {
+      # jt==0: no within-quarter data; pure 1-step-ahead. RW-extrapolate the
+      # contemporaneous month from the last observed monthly MAI value.
+      x_new <- numeric(0)
+      cat(sprintf("nowcast_midas(): jt=0 (no MAI months yet for %s); U-MIDAS uses k=(k1):k2 with no within-quarter input (1-step-ahead).\n",
+                  .quarter_name(target_q)))
+    }
+    um_fc <- forecast(object = um_md,
+                      newdata = list(x_est = c(x_new,
+                                     rep_len(NA_real_, mt - jtf))),
+                      se = FALSE, method = "static", add_ts_info = FALSE)
+    qoq_growth <- as.numeric(um_fc$mean)
+    fit_md <- um_md
+    model_name <- "UMIDAS-full"
   }
-  qa_fc <- forecast(object = qa_md, newdata = list(xm_est = c(nxm)),
-                    se = FALSE, method = "static", add_ts_info = FALSE)
-  qoq_growth <- as.numeric(qa_fc$mean)
 
   if (!is.finite(qoq_growth))
-    stop("nowcast_midas(): QA nowcast is not finite.\n", call. = FALSE)
+    stop("nowcast_midas(): nowcast is not finite.\n", call. = FALSE)
 
-  n_obs <- length(na.omit(predict(qa_md)))
+  n_obs <- length(na.omit(predict(fit_md)))
 
   # ---- Implied level ----
   nowcast_level <- if (!is.null(prev_level) && is.finite(prev_level)) {
@@ -201,7 +232,7 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL) {
     target_quarter      = .quarter_name(target_q),
     qoq_growth          = qoq_growth,
     nowcast_level       = nowcast_level,
-    model               = "QA-UMIDAS",
+    model               = model_name,
     n_obs               = n_obs,
     n_months_in_quarter = jt,
     prev_level          = if (is.null(prev_level)) NA_real_ else prev_level,

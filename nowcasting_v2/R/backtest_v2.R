@@ -111,7 +111,9 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
                         out_csv        = "cache/backtest_v2/backtest_results.csv",
                         start_year     = 2012L,
                         gdp_lag        = 60L,
+                        model          = c("qa", "umidas"),
                         verbose        = TRUE) {
+  model <- match.arg(model)
 
   t0 <- Sys.time()
   wide_full <- readRDS(panel_rds)
@@ -184,7 +186,8 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
       mai <- mai_res$mai
 
       # 4. nowcast the target quarter as-of this date
-      nc <- nowcast_midas(mai = mai, gdp_growth = gdp_t, as_of = as_of)
+      nc <- nowcast_midas(mai = mai, gdp_growth = gdp_t, as_of = as_of,
+                          model = model)
 
       list(mai = mai, nc = nc, n_sel = length(mai_res$diagnostics$selected),
            sel = paste(mai_res$diagnostics$selected, collapse = "|"))

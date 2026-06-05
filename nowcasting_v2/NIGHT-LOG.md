@@ -88,3 +88,11 @@
 - All 3 levers fail to make v2 competitive-enough on post-COVID QoQ RMSE (v2 ~0.51 vs v1 0.34, 1.5x): C (data) at RBA ceiling; A (calibration/model) variance floor 0.39>0.34 + costs hit/full-sample; B (cadence) flat.
 - **v1's direct-to-GDP DFM is intrinsically tighter in calm quarters.** v2's value is real but ELSEWHERE: full-sample 0.46 vs 1.87 (4x, COVID robustness), 2026 Q1 held-out +0.48 vs +0.80 (actual +0.27), hit tied, + the MAI as a product.
 - Decision for user (competitive-enough bar = within-noise + value): v2 NOT within-noise on calm precision but adds clear value. → ship v2 for robustness+MAI / keep v1 for precision / HYBRID (ship the MAI as a new indicator alongside v1; or ensemble). Recommend hybrid (MAI is low-risk high-value standalone).
+
+## Real-deflation experiment (MHSI by CPI) — DONE: correct but not the lever
+- Deflator: ABS CPI (6401.0) quarterly -> interpolated monthly (cpi_monthly.csv). real_MHSI = nominal/CPI. household_spending.csv now = REAL (nominal kept as household_spending_nominal.csv).
+- 2024 consumption: nominal 3-mo +0.82% -> real +0.19% (huge change in the INPUT).
+- **v2:** post-COVID RMSE 0.513 -> **0.508** (negligible); 2024 Q1 still 1.28. household_spending IS selected but MAI is labour-dominated.
+- **v1 (measured, NOT applied to prod):** post-COVID RMSE 0.340 -> **0.328** (~3.5% win); 2024 Q1 nowcast 0.70->0.70 (unchanged). Results: cache/v1_real_experiment/v1_real_r3_backtest.csv.
+- **Conclusion:** deflation is the correct treatment for the consumption input + a small genuine win for v1, but it does NOT fix the 2024 spikes in either model — those are the LABOUR-vs-output decoupling (both DFMs weight consumption modestly). **Confirms by elimination that the demand-survey block (Cowork hunt) is the real fix.**
+- RECOMMEND: (a) adopt real household_spending in v1 production (small, correct, free — pending user go); (b) keep real MHSI in v2 (harmless/correct); (c) prioritise the survey-data Cowork hunt.

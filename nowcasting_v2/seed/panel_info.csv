@@ -6,7 +6,7 @@
 "ud","ABS_6202.0","A85255719L","t2","FALSE","H","Underemployment","OK",NA,TRUE
 "hours","ABS_6202.0","A84426277X","t2","TRUE","H","Hours worked","OK",NA,TRUE
 "rt","ABS_8501.0","A3348585R","t2","TRUE","H","Retail Sales","OK","pre-COVID corr w/ GDP growth only +0.06 (full +0.21); genuinely weak proxy. Kept but household_spending is the stronger consumption series.",TRUE
-"household_spending","ABS_5682.0","A130200584T","t2","TRUE","H","Household Spending (MHSI total, CP, SA)","OK","Monthly Household Spending Indicator total. 2012-07+. pre-COVID corr w/ GDP growth +0.29 vs rt +0.06.",TRUE
+"household_spending","ABS_5682.0","A130200584T","t2","TRUE","H","Household Spending (MHSI total, CP, SA) -- REAL (CPI-deflated)","OK","Monthly Household Spending Indicator total, DEFLATED to real by CPI All-groups (6401.0 Table 17, A2325846C) interpolated to monthly: real=nominal/cpi*100. 2012-07+. Nominal kept at data_raw/household_spending_nominal.csv. Reason: nominal MHSI over-read real GDP during 2024 inflation (2024 mean 3-mo nominal 0.82% vs real 0.19% vs real GDP ~0.4%). pre-COVID corr w/ GDP growth +0.29 (nominal) vs rt +0.06.",TRUE
 "export","ABS_5368.0","A2718577A","t2","TRUE","H","Exports","OK",NA,TRUE
 "building_app","ABS_8731.0","A422070J","t2","TRUE","H","Building Approvals (total dwelling units, SA)","OK","Total number of dwelling units approved. 2000-01+. RBA mai_info res_ba codes (t2,tlog). pre-COVID corr w/ GDP growth +0.04 (full +0.25); leading housing-investment partial.",TRUE
 "credit","RBA_D2","DLCACN+DLCACSFN","t2","TRUE","F","Total Credit","OK",NA,TRUE

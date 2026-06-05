@@ -53,3 +53,14 @@
 - **ROOT CAUSE (subagent-diagnosed): jt=0 on ALL 57 dates.** build_mai trims partial-quarter months → MAI ends at last COMPLETE quarter → nowcast_midas never uses within-quarter ragged-edge info, falls back to RW extrapolation every step. v1 DOES use ragged edge. So v2 was handicapped — not using the monthly-timeliness advantage that IS the MAI/MIDAS rationale. **Highest-leverage fix: extend MAI emission to trailing partial-quarter months (enable jt=1,2).** Also affects production (live MAI ends Q1-complete).
 - Harness bugs fixed in build: as-of grid dropped Q2 dates (short-month overshoot); short-yield DFM crash (<24 obs filter).
 - NEXT: implement the jt fix + re-backtest before any competitive-enough conclusion.
+
+## Phase 6b — jt fix (use within-quarter MAI) — re-measured ✅
+- Fix: build_mai now emits the MAI through the last AVAILABLE month (was: trimmed to last complete quarter); DFM estimation unchanged, only its input window keeps the trailing 1-2 months. nowcast_midas needed NO change (its jt>=1 partial-quarter-mean path now activates). Selection/contract still use complete quarters.
+- n_months_in_quarter across 57 backtest dates: 0 (all) -> 2 (all). Within-quarter ragged edge now used.
+- **NEW v2 vs v1 (post-COVID common, QoQ RMSE/hit):** v2 **0.522pp / 93.8%** vs v1 **0.340pp / 93.8%** (ratio 1.53x, was 2.1x). Full-sample: v2 **0.523 / 94.7%** vs v1 **1.871 / 83.3%** — v2 FAR better. **2026 Q1 held-out: v2 +0.533% (err +0.259) vs v1 +0.797% (err +0.523), actual +0.274% — v2 wins + close to actual.**
+- **Competitive-enough: NO on strict post-COVID RMSE (1.53x v1), but: hit tied, v2 wins full-sample (COVID robustness, per RBA thesis) + wins the Q1-2026 held-out.** Genuine judgment call for the user (matches the chosen "competitive-enough + MAI/COVID value" bar).
+- Residual gap levers (not tuned, future): (a) full U-MIDAS (MAI-UM-M2) vs flat QA; (b) jt capped at 2 at quarter-end (no M3); (c) 11 vs 13 series.
+- test_nowcast_midas PASS (jt=1,2 cases added).
+
+## STOPPING POINT (autonomous build complete)
+- Phases 0-4 + 6-backtest done. Phase 5 (emit/site) NOT started — it's pre-cutover plumbing; cutover is user-gated and the competitive-enough call is now the user's nuanced decision. Awaiting user direction (accept v2 / pursue the gap-closing levers / hold).

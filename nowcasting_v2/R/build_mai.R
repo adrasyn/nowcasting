@@ -49,6 +49,8 @@ build_mai <- function(tfs           = NULL,
                       sel_alpha      = 0.10,    # selection threshold (RBA)
                       iis_alpha      = 0.01,    # COVID dummy significance (RBA)
                       exclude_ids    = character(0),
+                      force_selected = NULL,    # if non-NULL, skip Wald selection and
+                                                # use these ids (intersected w/ available)
                       verbose_dfm    = FALSE) {
 
   if (is.null(tfs)) {
@@ -83,7 +85,18 @@ build_mai <- function(tfs           = NULL,
   q_dates <- gdp$date
   # Build quarter-end month for each quarter-start in our monthly window
   m_end <- max(m_end_candidates)
-  # Trim monthly window to [m_start, m_end]
+  # Full monthly window for the DFM/MAI emission: [m_start, last AVAILABLE month].
+  # This INCLUDES 1-2 trailing partial-quarter months so the emitted MAI carries
+  # the ragged edge that nowcast_midas needs (jt>0). The DFM estimation itself is
+  # unchanged -- qmle_dfm (na_opt="exclude") tolerates the ragged tail and simply
+  # produces factor values for the partial-quarter months as well.
+  m_last <- max(spine)
+  msel_full <- spine >= m_start & spine <= m_last
+  Xm_full   <- as.matrix(tfs[msel_full, ids, drop = FALSE])
+  mdates_full <- spine[msel_full]
+
+  # Complete-quarter block for the targeted-predictor SELECTION + GDP alignment
+  # (the y/x Wald regression must use whole quarters only -> data contract).
   msel <- spine >= m_start & spine <= m_end
   Xm   <- as.matrix(tfs[msel, ids, drop = FALSE])
   mdates <- spine[msel]
@@ -156,15 +169,33 @@ build_mai <- function(tfs           = NULL,
   ranked <- results[order(results[, "Stat"], decreasing = TRUE), , drop = FALSE]
   ranked_sel <- ranked[rownames(ranked) %in% selected, , drop = FALSE]
 
+  # ---- Pseudo-real-time override: fix the targeted-predictor selection ----
+  # When force_selected is supplied (backtest harness), bypass the recursive
+  # Wald selection and use a pre-determined selection (typically the full-sample
+  # selection). Intersect with the ids actually available in this (truncated)
+  # panel so an as-of date that predates a series simply drops it. The Wald
+  # ranks above are still computed and returned for diagnostics.
+  if (!is.null(force_selected)) {
+    forced <- intersect(force_selected, ids)
+    if (length(forced) < 2L) {
+      stop(sprintf("build_mai(): force_selected leaves only %d available series.\n",
+                   length(forced)), call. = FALSE)
+    }
+    selected <- forced
+  }
+
   if (length(selected) < 2L) {
     stop(sprintf("build_mai(): only %d series selected (threshold=%.2f); cannot estimate a factor.\n",
                  length(selected), threshold), call. = FALSE)
   }
 
   # ---- (b) Single dynamic factor on selected transformed panel ----
-  # Use the monthly window (Xm) restricted to selected ids, as a ts freq 12.
-  ybegin <- c(as.integer(format(mdates[1], "%Y")), as.integer(format(mdates[1], "%m")))
-  Ysel <- ts(Xm[, selected, drop = FALSE], start = ybegin, frequency = 12)
+  # Estimate the DFM on the FULL monthly window (Xm_full) so the emitted MAI runs
+  # through the last available month (ragged edge included). The DFM estimation is
+  # unchanged from before -- only its input window now keeps the trailing 1-2
+  # partial-quarter months instead of discarding them.
+  ybegin <- c(as.integer(format(mdates_full[1], "%Y")), as.integer(format(mdates_full[1], "%m")))
+  Ysel <- ts(Xm_full[, selected, drop = FALSE], start = ybegin, frequency = 12)
 
   # PC init (drop NA rows the way the RBA does) -- diagnostic / sign reference
   yna <- remove_na_values(x = Ysel, na_opt = "exclude")
@@ -180,10 +211,10 @@ build_mai <- function(tfs           = NULL,
 
   fac <- dfm$factors[, 1L]
   # Orient the factor so it co-moves positively with mean of selected panel
-  ref <- rowMeans(Xm[, selected, drop = FALSE], na.rm = TRUE)
+  ref <- rowMeans(Xm_full[, selected, drop = FALSE], na.rm = TRUE)
   if (suppressWarnings(cor(fac, ref, use = "complete.obs")) < 0) fac <- -fac
 
-  mai <- data.frame(date = mdates, value = as.numeric(fac))
+  mai <- data.frame(date = mdates_full, value = as.numeric(fac))
 
   # % variance explained by the single factor (PC-based, on balanced block)
   var_explained <- NA_real_
@@ -206,7 +237,7 @@ build_mai <- function(tfs           = NULL,
     dfm_loglik    = dfm$loglik,
     dfm_niter     = dfm$niter,
     pc_var_explained = var_explained,
-    window_month  = range(mdates),
+    window_month  = range(mdates_full),
     excluded_ids  = exclude_ids
   )
 
@@ -224,7 +255,7 @@ build_mai <- function(tfs           = NULL,
 
   cat(sprintf("build_mai(): %d candidates -> %d selected; MAI %s..%s (n=%d); DFM aic=%.1f\n",
               length(ids), length(selected),
-              as.character(min(mdates)), as.character(max(mdates)), nrow(mai),
+              as.character(min(mdates_full)), as.character(max(mdates_full)), nrow(mai),
               dfm$aic))
   invisible(out)
 }

@@ -45,3 +45,11 @@
 - nowcast_midas.R (QA U-MIDAS, reuses RBA midasr spec) + run_nowcast_v2.R (end-to-end fetch->panel->transform->MAI->MIDAS). test PASS (7 checks).
 - **First v2 nowcast: 2026 Q2 +0.811% QoQ (level 704,809).** Model QA-UMIDAS, 226-qtr fit. (Targets Q2 because our data already has the Q1 actual from the 2026-06-03 release; v1's +0.77% was Q1 run 2026-06-02 — different quarters.)
 - jt=0 live-edge (no within-quarter MAI yet) handled via random-walk extrapolation of the contemporaneous quarter-average (logged). No CI yet (se=FALSE) — Phase 5 adds empirical bias-aware bands from the v2 backtest.
+
+## Phase 6 (backtest only) — v2 vs v1 — NOT competitive-enough YET (fixable)
+- backtest_v2.R: 57 quarter-end as-of dates 2012-2026, real-time-ish (per-series publication-lag truncation mirroring v1; targeted selection fixed once, DFM+MIDAS re-estimated recursively). 8.2 min.
+- **Results (post-COVID ≥2022, QoQ RMSE / hit / n):** v2 **0.726pp / 93.8% / 16** vs v1 **0.340pp / 93.8% / 16**. Full-sample: v2 1.638 (BETTER) vs v1 1.871. Q1-2026 held-out: v2 +0.854% vs v1 +0.797% vs actual +0.274%.
+- **Signal: NO** (v2 RMSE 2.1x v1) — BUT hit rate identical, and v2 wins full-sample (COVID robustness, per RBA thesis).
+- **ROOT CAUSE (subagent-diagnosed): jt=0 on ALL 57 dates.** build_mai trims partial-quarter months → MAI ends at last COMPLETE quarter → nowcast_midas never uses within-quarter ragged-edge info, falls back to RW extrapolation every step. v1 DOES use ragged edge. So v2 was handicapped — not using the monthly-timeliness advantage that IS the MAI/MIDAS rationale. **Highest-leverage fix: extend MAI emission to trailing partial-quarter months (enable jt=1,2).** Also affects production (live MAI ends Q1-complete).
+- Harness bugs fixed in build: as-of grid dropped Q2 dates (short-month overshoot); short-yield DFM crash (<24 obs filter).
+- NEXT: implement the jt fix + re-backtest before any competitive-enough conclusion.

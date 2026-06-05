@@ -78,3 +78,13 @@
 - Full U-MIDAS (MAI-UM-M*): helps post-COVID (0.434) but WRECKS full-sample (0.93) + Q1 (+0.57) — RBA right that QA is more robust. Not adopted.
 - **Verdict: keep raw QA default** (full-sample 0.457, Q1 err +0.20, hit 94.7%). No lever reaches v1's post-COVID 0.340 without sacrificing v2's full-sample/Q1/hit edge. **Post-COVID gap is ~58% irreducible variance** — v1's direct DFM is intrinsically tighter in calm quarters.
 - Code: nowcast_midas.R +model=c("qa","umidas") (qa default, unchanged path); backtest_v2.R +model param; bias_correction_analysis.R (new). Defaults preserved.
+
+## Option 2 / Lever B — monthly-cadence backtest — DONE (cadence doesn't help)
+- backtest_v2_monthly.R: v2 nowcast at offsets 0/+60/+90d within each target quarter (n_months_in_quarter 0/1/2/3). Window 2024Q1-2026 (10 quarters — SMALL sample, caveat).
+- **v2 post-COVID RMSE by n_months_in_quarter: 0->0.411, 1->0.491, 2->0.497, 3->0.457.** NOT monotonically improving; even full-quarter (n=3) 0.457 > v1 0.340. Hit 100% (tiny sample). v2's ragged-edge advantage does NOT materialise as within-quarter RMSE improvement.
+- => Cadence/timeliness lever does NOT close the gap either.
+
+## OPTION 2 CONCLUSION — gap is INTRINSIC
+- All 3 levers fail to make v2 competitive-enough on post-COVID QoQ RMSE (v2 ~0.51 vs v1 0.34, 1.5x): C (data) at RBA ceiling; A (calibration/model) variance floor 0.39>0.34 + costs hit/full-sample; B (cadence) flat.
+- **v1's direct-to-GDP DFM is intrinsically tighter in calm quarters.** v2's value is real but ELSEWHERE: full-sample 0.46 vs 1.87 (4x, COVID robustness), 2026 Q1 held-out +0.48 vs +0.80 (actual +0.27), hit tied, + the MAI as a product.
+- Decision for user (competitive-enough bar = within-noise + value): v2 NOT within-noise on calm precision but adds clear value. → ship v2 for robustness+MAI / keep v1 for precision / HYBRID (ship the MAI as a new indicator alongside v1; or ensemble). Recommend hybrid (MAI is low-risk high-value standalone).

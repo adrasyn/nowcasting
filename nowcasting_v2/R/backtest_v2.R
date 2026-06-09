@@ -57,11 +57,16 @@ suppressMessages({
   nab    <- c("nab_conf","nab_cond","nab_trade","nab_profit","nab_emp",
               "nab_forward","nab_stocks","nab_cu")
   anz    <- c("anz_ads","anz_sent")
+  aig    <- c("aig_pmi","aig_pci","aig_psi")   # released ~1st business day of following month
   if (id %in% labour)  return(15L)
   if (id %in% abs_act) return(45L)
   if (id %in% rba_m)   return(30L)
   if (id %in% nab)     return(10L)
   if (id %in% anz)     return(10L)
+  if (id %in% aig)     return(5L)
+  # Westpac consumer sentiment is released MID its own reference month, so it is
+  # available ~15 days BEFORE month-end (negative lag from ref-period-END).
+  if (id == "wmi_sent") return(-15L)
   # default: 30d (RBA-monthly-like)
   30L
 }
@@ -112,6 +117,10 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
                         start_year     = 2012L,
                         gdp_lag        = 60L,
                         model          = c("qa", "umidas"),
+                        exclude_ids    = character(0),   # sweep: drop these from the candidate set
+                        sel_alpha      = 0.10,           # sweep: targeted-predictor selection threshold
+                        dfm_q          = 1L,             # sweep: number of dynamic factors in the MAI
+                        qa_lag         = 0L:1L,          # sweep: QA quarterly lag in nowcast_midas
                         verbose        = TRUE) {
   model <- match.arg(model)
 
@@ -122,9 +131,16 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
   gdp_full <- gdp_full[order(gdp_full$date), ]
 
   # ---- Fix the targeted-predictor selection ONCE on the full sample ----
+  # Build the full-sample tfs FROM THIS BACKTEST'S panel_rds (not the hardcoded
+  # cache/panel_vintage_latest.rds default inside build_mai) so the sweep can vary
+  # the panel. exclude_ids/sel_alpha/dfm_q are honoured here so each variant's
+  # fixed selection is computed on that variant's candidate set.
   if (verbose) cat("Fixing full-sample targeted-predictor selection...\n")
-  full_sel_res <- build_mai(panel_info_csv = panel_info_csv, gdp_csv = gdp_csv,
-                            out_csv = NULL, out_rds = NULL, verbose_dfm = FALSE)
+  tfs_full <- transform_panel(wide_full, panel_info_csv)
+  full_sel_res <- build_mai(tfs = tfs_full, panel_info_csv = panel_info_csv,
+                            gdp_csv = gdp_csv, out_csv = NULL, out_rds = NULL,
+                            exclude_ids = exclude_ids, sel_alpha = sel_alpha,
+                            dfm_q = dfm_q, verbose_dfm = FALSE)
   fixed_selection <- full_sel_res$diagnostics$selected
   cat(sprintf("Fixed selection (%d series): %s\n",
               length(fixed_selection), paste(fixed_selection, collapse = ", ")))
@@ -182,12 +198,14 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
           id %in% names(tfs_t) && sum(!is.na(tfs_t[[id]])) >= 24L, logical(1))]
       mai_res <- build_mai(tfs = tfs_t, panel_info_csv = panel_info_csv,
                            gdp_csv = gdp_csv, out_csv = NULL, out_rds = NULL,
-                           force_selected = sel_t, verbose_dfm = FALSE)
+                           force_selected = sel_t, exclude_ids = exclude_ids,
+                           sel_alpha = sel_alpha, dfm_q = dfm_q,
+                           verbose_dfm = FALSE)
       mai <- mai_res$mai
 
       # 4. nowcast the target quarter as-of this date
       nc <- nowcast_midas(mai = mai, gdp_growth = gdp_t, as_of = as_of,
-                          model = model)
+                          model = model, qa_lag = qa_lag)
 
       list(mai = mai, nc = nc, n_sel = length(mai_res$diagnostics$selected),
            sel = paste(mai_res$diagnostics$selected, collapse = "|"))

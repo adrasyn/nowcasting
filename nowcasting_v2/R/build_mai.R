@@ -51,6 +51,7 @@ build_mai <- function(tfs           = NULL,
                       exclude_ids    = character(0),
                       force_selected = NULL,    # if non-NULL, skip Wald selection and
                                                 # use these ids (intersected w/ available)
+                      dfm_q          = 1L,      # number of dynamic factors (sweep knob; 1 = RBA default)
                       verbose_dfm    = FALSE) {
 
   if (is.null(tfs)) {
@@ -189,6 +190,23 @@ build_mai <- function(tfs           = NULL,
                  length(selected), threshold), call. = FALSE)
   }
 
+  # ---- Trim trailing months with ZERO observed SELECTED series ----
+  # The emission window (Xm_full/mdates_full) keeps the ragged edge so the MAI
+  # runs to the last available month (jt>0 for the nowcast). But a trailing spine
+  # month in which NONE of the *selected* series are observed -- which happens
+  # when the panel spine extends past every selected series because an EXCLUDED
+  # long series (e.g. wmi_sent reaching a later month than the selected set) sets
+  # max(spine) -- leaves an all-NA-among-selected row at the edge. That desyncs
+  # the Kalman gain/mask dimensions in the final smoother (rts_smoother), giving a
+  # non-conformable error. Drop such rows. (Windowing only; no estimation math is
+  # changed. A trailing month with >=1 selected obs is kept, as before.)
+  sel_obs  <- rowSums(!is.na(Xm_full[, selected, drop = FALSE])) > 0L
+  last_obs <- max(which(sel_obs))
+  if (last_obs < length(mdates_full)) {
+    Xm_full     <- Xm_full[seq_len(last_obs), , drop = FALSE]
+    mdates_full <- mdates_full[seq_len(last_obs)]
+  }
+
   # ---- (b) Single dynamic factor on selected transformed panel ----
   # Estimate the DFM on the FULL monthly window (Xm_full) so the emitted MAI runs
   # through the last available month (ragged edge included). The DFM estimation is
@@ -203,8 +221,9 @@ build_mai <- function(tfs           = NULL,
                            scale_opt = FALSE, sign_opt = TRUE, vardec_opt = FALSE),
                  error = function(e) NULL)
 
-  # QMLE DFM (EM tolerates ragged NAs)
-  dfm <- qmle_dfm(x = Ysel, q = 1L, s = 2L, p = 1L,
+  # QMLE DFM (EM tolerates ragged NAs). q = number of dynamic factors (dfm_q,
+  # default 1 = RBA spec); the MAI is always factor 1 (factors[,1] below).
+  dfm <- qmle_dfm(x = Ysel, q = dfm_q, s = 2L, p = 1L,
                   id_opt = "DFM2", na_opt = "exclude", scale_opt = FALSE,
                   sign_opt = FALSE, max_iter = 500L, threshold = 1E-4,
                   check_increased = TRUE, verbose = verbose_dfm)

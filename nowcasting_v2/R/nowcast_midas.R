@@ -69,7 +69,8 @@ suppressMessages({
 #   plus n_months_in_quarter (jt) and prev_level for transparency.
 ####################################################################################################
 nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
-                          model = c("qa", "umidas")) {
+                          model = c("qa", "umidas"),
+                          qa_lag = 0L:1L) {   # QA quarterly lag (sweep knob; 0:1 = default)
   model <- match.arg(model)
 
   mt <- 3L                          # months per quarter (high-freq ratio)
@@ -171,7 +172,7 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
     # In-sample quarter-averages of the MAI, with one lag (k=0:1) to mirror a
     # U-MIDAS with flat coefficients over the within-quarter months.
     xm_est <- rowMeans(mls(x = x_est, k = 0L:2L, m = mt), na.rm = TRUE)
-    qa_md <- midas_r(formula = y_est ~ mls(x = xm_est, k = 0L:1L, m = 1L),
+    qa_md <- midas_r(formula = y_est ~ mls(x = xm_est, k = qa_lag, m = 1L),
                      data = list(y_est = y_est, xm_est = xm_est), start = NULL)
 
     # Partial-quarter average for the target quarter (the live edge). When jt == 0

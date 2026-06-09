@@ -1,36 +1,40 @@
 "id","source","series_id","tcode","tlog","tgroup","longname","status","note","has_csv"
-"emp","ABS_6202.0","A84423043C","t2","TRUE","H","Employment","OK",NA,TRUE
-"ft_emp","ABS_6202.0","A84423041X","t2","TRUE","H","FT Employment","OK",NA,TRUE
-"pt_emp","ABS_6202.0","A84423042A","t2","TRUE","H","PT Employment","OK",NA,TRUE
-"ue","ABS_6202.0","A84423050A","t2","FALSE","H","Unemployment","OK",NA,TRUE
-"ud","ABS_6202.0","A85255719L","t2","FALSE","H","Underemployment","OK",NA,TRUE
-"hours","ABS_6202.0","A84426277X","t2","TRUE","H","Hours worked","OK",NA,TRUE
-"rt","ABS_8501.0","A3348585R","t2","TRUE","H","Retail Sales","OK","pre-COVID corr w/ GDP growth only +0.06 (full +0.21); genuinely weak proxy. Kept but household_spending is the stronger consumption series.",TRUE
-"household_spending","ABS_5682.0","A130200584T","t2","TRUE","H","Household Spending (MHSI total, CP, SA) -- REAL (CPI-deflated)","OK","Monthly Household Spending Indicator total, DEFLATED to real by CPI All-groups (6401.0 Table 17, A2325846C) interpolated to monthly: real=nominal/cpi*100. 2012-07+. Nominal kept at data_raw/household_spending_nominal.csv. Reason: nominal MHSI over-read real GDP during 2024 inflation (2024 mean 3-mo nominal 0.82% vs real 0.19% vs real GDP ~0.4%). pre-COVID corr w/ GDP growth +0.29 (nominal) vs rt +0.06.",TRUE
-"export","ABS_5368.0","A2718577A","t2","TRUE","H","Exports","OK",NA,TRUE
-"building_app","ABS_8731.0","A422070J","t2","TRUE","H","Building Approvals (total dwelling units, SA)","OK","Total number of dwelling units approved. 2000-01+. RBA mai_info res_ba codes (t2,tlog). pre-COVID corr w/ GDP growth +0.04 (full +0.25); leading housing-investment partial.",TRUE
-"credit","RBA_D2","DLCACN+DLCACSFN","t2","TRUE","F","Total Credit","OK",NA,TRUE
-"credit_housing","RBA_D2","DLCACOHN+DLCACIHN","t2","TRUE","F","Housing Credit","OK",NA,TRUE
-"credit_business","RBA_D2","DLCACBN+DLCACSFBN","t2","TRUE","F","Business Credit","OK",NA,TRUE
-"fcmygbag3","RBA_F2.1","FCMYGBAG3","t2","FALSE","F","AGS 3 year","OK",NA,TRUE
-"fcmygbag5","RBA_F2.1","FCMYGBAG5","t2","FALSE","F","AGS 5 year","OK",NA,TRUE
-"fcmygbag10","RBA_F2.1","FCMYGBAG10","t2","FALSE","F","AGS 10 year","OK",NA,TRUE
-"scrigbag3","RBA_derived","FCMYGBAG3-FIRMMBAB90","t1","FALSE","F","Spread (AGS 3yr - BBSW)","OK",NA,TRUE
-"scrigbag5","RBA_derived","FCMYGBAG5-FIRMMBAB90","t1","FALSE","F","Spread (AGS 5yr - BBSW)","OK",NA,TRUE
-"scrigbag10","RBA_derived","FCMYGBAG10-FIRMMBAB90","t1","FALSE","F","Spread (AGS 10yr - BBSW)","OK",NA,TRUE
-"firmmbab90","RBA_F1.1","FIRMMBAB90","t2","FALSE","F","BBSW","OK",NA,TRUE
-"credit_card","RBA_C1","CCCCSTPVSA","t2","TRUE","F","Credit card","OK",NA,TRUE
-"nab_conf","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Business Confidence","OK","39 obs 2023-02..2026-04, no gaps. Net balance. Quarterly appendix primary; clean 2025+ monthly tables fill latest months.",TRUE
-"nab_cond","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Business Conditions","OK","39 obs 2023-02..2026-04, no gaps. Net balance.",TRUE
-"nab_trade","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Trading Conditions","OK","39 obs 2023-02..2026-04, no gaps. Net balance (Trading sub-index).",TRUE
-"nab_profit","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Profitability","OK","39 obs 2023-02..2026-04, no gaps. Net balance.",TRUE
-"nab_emp","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Employment","OK","39 obs 2023-02..2026-04, no gaps. Net balance (NAB employment sub-index).",TRUE
-"nab_forward","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Forward Orders","OK","39 obs 2023-02..2026-04, no gaps. Net balance (appendix 'Orders' row).",TRUE
-"nab_stocks","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Stocks","PARTIAL","36 obs 2023-02..2026-04, 3 gaps (2023-07, 2025-08, 2025-09) where only letter-spaced/bullet PDFs covered the month (stocks not in bullets). Net balance.",TRUE
-"nab_cu","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)",NA,"t1","FALSE","S","NAB Capacity Utilisation","PARTIAL","38 obs 2023-02..2026-04, 1 gap (2023-07, letter-spaced PDF). Per cent.",TRUE
-"anz_ads","ANZ-Indeed Australian Job Ads media-release PDF (page-2 data table)",NA,"t2","TRUE","S","ANZ-Indeed Job Ads (SA index 2019=100)","OK","63 obs 2021-01..2026-03, no gaps. Seasonally adjusted index level from PDF table. Live discovery of newer PDF failed (ANZ landing page JS-rendered); fixture current to Mar-2026. tcode/tlog from paper anz_ads.",TRUE
-"anz_sent","ANZ-Roy Morgan Consumer Confidence monthly-ratings table (roymorgan.com HTML)",NA,"t1","FALSE","S","ANZ-Roy Morgan Consumer Confidence","OK","576 obs 1973-03..2026-05, no gaps post-2000 (63 gaps are 1981-86 irregular-survey era). Footnote markers (** # *) stripped. May-2026 (66.5) is an incomplete-month average (** flag).",TRUE
-"motor_vehicles","ABS_9314.0 + FCAI",NA,"t2","TRUE","H","New Motor Vehicle Sales","MISSING","SKIPPED per time/fragility budget. ABS 9314.0 legacy SA total discontinued ~2017 (fixture abs9314_*.xls covers to Nov-2017); post-2018 FCAI press-release HTML fixtures contain only 2 monthly totals (Apr+May 2026) -- far too sparse to splice a 2000-2026 monthly series and self-SA via X-13. Fixtures recovered to tests/fixtures/ for future work. Did not fabricate.",FALSE
-"house_prices","ABS/CoreLogic",NA,"t2","TRUE","H","House prices","MISSING","RPPI discontinued 2021",FALSE
-"asx200","market",NA,"t2","TRUE","F","ASX200","MISSING","no free CSV",FALSE
-"ivi","JSA",NA,"t2","TRUE","S","Internet Vacancy Index","MISSING","host firewalled",FALSE
+"emp","ABS_6202.0","A84423043C","t2","TRUE","H","Employment","OK","NA","TRUE"
+"ft_emp","ABS_6202.0","A84423041X","t2","TRUE","H","FT Employment","OK","NA","TRUE"
+"pt_emp","ABS_6202.0","A84423042A","t2","TRUE","H","PT Employment","OK","NA","TRUE"
+"ue","ABS_6202.0","A84423050A","t2","FALSE","H","Unemployment","OK","NA","TRUE"
+"ud","ABS_6202.0","A85255719L","t2","FALSE","H","Underemployment","OK","NA","TRUE"
+"hours","ABS_6202.0","A84426277X","t2","TRUE","H","Hours worked","OK","NA","TRUE"
+"rt","ABS_8501.0","A3348585R","t2","TRUE","H","Retail Sales","OK","pre-COVID corr w/ GDP growth only +0.06 (full +0.21); genuinely weak proxy. Kept but household_spending is the stronger consumption series.","TRUE"
+"household_spending","ABS_5682.0","A130200584T","t2","TRUE","H","Household Spending (MHSI total, CP, SA) -- REAL (CPI-deflated)","OK","Monthly Household Spending Indicator total, DEFLATED to real by CPI All-groups (6401.0 Table 17, A2325846C) interpolated to monthly: real=nominal/cpi*100. 2012-07+. Nominal kept at data_raw/household_spending_nominal.csv. Reason: nominal MHSI over-read real GDP during 2024 inflation (2024 mean 3-mo nominal 0.82% vs real 0.19% vs real GDP ~0.4%). pre-COVID corr w/ GDP growth +0.29 (nominal) vs rt +0.06.","TRUE"
+"export","ABS_5368.0","A2718577A","t2","TRUE","H","Exports","OK","NA","TRUE"
+"building_app","ABS_8731.0","A422070J","t2","TRUE","H","Building Approvals (total dwelling units, SA)","OK","Total number of dwelling units approved. 2000-01+. RBA mai_info res_ba codes (t2,tlog). pre-COVID corr w/ GDP growth +0.04 (full +0.25); leading housing-investment partial.","TRUE"
+"credit","RBA_D2","DLCACN+DLCACSFN","t2","TRUE","F","Total Credit","OK","NA","TRUE"
+"credit_housing","RBA_D2","DLCACOHN+DLCACIHN","t2","TRUE","F","Housing Credit","OK","NA","TRUE"
+"credit_business","RBA_D2","DLCACBN+DLCACSFBN","t2","TRUE","F","Business Credit","OK","NA","TRUE"
+"fcmygbag3","RBA_F2.1","FCMYGBAG3","t2","FALSE","F","AGS 3 year","OK","NA","TRUE"
+"fcmygbag5","RBA_F2.1","FCMYGBAG5","t2","FALSE","F","AGS 5 year","OK","NA","TRUE"
+"fcmygbag10","RBA_F2.1","FCMYGBAG10","t2","FALSE","F","AGS 10 year","OK","NA","TRUE"
+"scrigbag3","RBA_derived","FCMYGBAG3-FIRMMBAB90","t1","FALSE","F","Spread (AGS 3yr - BBSW)","OK","NA","TRUE"
+"scrigbag5","RBA_derived","FCMYGBAG5-FIRMMBAB90","t1","FALSE","F","Spread (AGS 5yr - BBSW)","OK","NA","TRUE"
+"scrigbag10","RBA_derived","FCMYGBAG10-FIRMMBAB90","t1","FALSE","F","Spread (AGS 10yr - BBSW)","OK","NA","TRUE"
+"firmmbab90","RBA_F1.1","FIRMMBAB90","t2","FALSE","F","BBSW","OK","NA","TRUE"
+"credit_card","RBA_C1","CCCCSTPVSA","t2","TRUE","F","Credit card","OK","NA","TRUE"
+"nab_conf","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Business Confidence","OK","39 obs 2023-02..2026-04, no gaps. Net balance. Quarterly appendix primary; clean 2025+ monthly tables fill latest months.","TRUE"
+"nab_cond","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Business Conditions","OK","39 obs 2023-02..2026-04, no gaps. Net balance.","TRUE"
+"nab_trade","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Trading Conditions","OK","39 obs 2023-02..2026-04, no gaps. Net balance (Trading sub-index).","TRUE"
+"nab_profit","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Profitability","OK","39 obs 2023-02..2026-04, no gaps. Net balance.","TRUE"
+"nab_emp","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Employment","OK","39 obs 2023-02..2026-04, no gaps. Net balance (NAB employment sub-index).","TRUE"
+"nab_forward","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Forward Orders","OK","39 obs 2023-02..2026-04, no gaps. Net balance (appendix 'Orders' row).","TRUE"
+"nab_stocks","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Stocks","PARTIAL","36 obs 2023-02..2026-04, 3 gaps (2023-07, 2025-08, 2025-09) where only letter-spaced/bullet PDFs covered the month (stocks not in bullets). Net balance.","TRUE"
+"nab_cu","NAB Business Survey (monthly Table 1 + quarterly Data Appendix PDFs)","NA","t1","FALSE","S","NAB Capacity Utilisation","PARTIAL","38 obs 2023-02..2026-04, 1 gap (2023-07, letter-spaced PDF). Per cent.","TRUE"
+"anz_ads","ANZ-Indeed Australian Job Ads media-release PDF (page-2 data table)","NA","t2","TRUE","S","ANZ-Indeed Job Ads (SA index 2019=100)","OK","63 obs 2021-01..2026-03, no gaps. Seasonally adjusted index level from PDF table. Live discovery of newer PDF failed (ANZ landing page JS-rendered); fixture current to Mar-2026. tcode/tlog from paper anz_ads.","TRUE"
+"anz_sent","ANZ-Roy Morgan Consumer Confidence monthly-ratings table (roymorgan.com HTML)","NA","t1","FALSE","S","ANZ-Roy Morgan Consumer Confidence","OK","576 obs 1973-03..2026-05, no gaps post-2000 (63 gaps are 1981-86 irregular-survey era). Footnote markers (** # *) stripped. May-2026 (66.5) is an incomplete-month average (** flag).","TRUE"
+"motor_vehicles","ABS_9314.0 + FCAI","NA","t2","TRUE","H","New Motor Vehicle Sales","MISSING","SKIPPED per time/fragility budget. ABS 9314.0 legacy SA total discontinued ~2017 (fixture abs9314_*.xls covers to Nov-2017); post-2018 FCAI press-release HTML fixtures contain only 2 monthly totals (Apr+May 2026) -- far too sparse to splice a 2000-2026 monthly series and self-SA via X-13. Fixtures recovered to tests/fixtures/ for future work. Did not fabricate.","FALSE"
+"house_prices","ABS/CoreLogic","NA","t2","TRUE","H","House prices","MISSING","RPPI discontinued 2021","FALSE"
+"asx200","market","NA","t2","TRUE","F","ASX200","MISSING","no free CSV","FALSE"
+"ivi","JSA","NA","t2","TRUE","S","Internet Vacancy Index","MISSING","host firewalled","FALSE"
+"aig_pmi","AiG/investing.com PDF (from_james)","","t1","FALSE","S","AiG Manufacturing Index (PMI)","OK","290 obs 2001-05..2026-05. Net balance -100..+100, 0=neutral (NOT old 0-50-100 diffusion; pre-2023 spliced (old-50)*2). t1/level to avoid differencing across the 2023 methodology break.","TRUE"
+"aig_pci","AiG/investing.com PDF (from_james)","","t1","FALSE","S","AiG Construction Index (PCI)","OK","239 obs 2005-09..2026-05. Net balance -100..+100. t1/level (see aig_pmi note re 2023 break).","TRUE"
+"aig_psi","AiG/investing.com PDF (from_james)","","t1","FALSE","S","AiG Services Index (PSI) -- DISCONTINUED","OK","236 obs 2003-02..2022-11 then FROZEN (AiG discontinued PSI). Will never update. Net balance -100..+100. t1/level.","TRUE"
+"wmi_sent","Westpac-MI/investing.com PDF (from_james)","","t1","FALSE","S","Westpac-MI Consumer Sentiment","OK","Index level ~65..125, 100=neutral. data_raw default starts 2008 (pre-2008 reconstructed from sparse anchors, down-weighted). wmi_sent_full.csv carries 1988+. t1/level mirrors anz_sent.","TRUE"

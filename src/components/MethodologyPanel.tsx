@@ -17,19 +17,27 @@ export default function MethodologyPanel() {
       {open && (
         <div className="border border-t-0 border-border-heavy px-4 py-4 text-sm text-border-heavy space-y-3">
           <p>
-            This dashboard displays a nowcast of Australian real GDP growth produced by a Dynamic
-            Factor Model (DFM) with an Expectation-Maximization estimator, following the methodology
-            of the New York Fed Staff Nowcast.
+            This dashboard nowcasts Australian real GDP growth using a Monthly Activity Indicator
+            (MAI) combined with an unrestricted MIDAS regression (U-MIDAS), following the Reserve
+            Bank of Australia&rsquo;s methodology (RDP 2024-04).
           </p>
           <p>
-            The model combines 13 indicators spanning labour, consumer, business, and
-            external sectors. Indicators are released at different times within each month (&ldquo;ragged
-            edge&rdquo;); the Kalman filter naturally handles the missing data. The nowcast updates each
-            week as new data arrives.
+            The MAI is a single monthly activity factor distilled by a dynamic factor model from a
+            broad panel of monthly series &mdash; labour, household spending, trade, credit, financial
+            markets, and business- and consumer-survey indicators. The U-MIDAS step maps the
+            within-quarter MAI to quarterly GDP growth using whatever months have been released so
+            far (the &ldquo;ragged edge&rdquo;). The nowcast updates each week as new data arrives.
           </p>
           <p>
-            Reference: Bok et al. (2018), <em>Macroeconomic Nowcasting and Forecasting with Big Data</em>,
-            FRB NY Staff Report 830. Implementation uses the R <code>nowcasting</code> package.
+            The headline estimate is tuned for precision in normal quarters. A second, more flexible
+            estimate &mdash; the &ldquo;stress&rdquo; view, available from the toggle &mdash; responds
+            faster during volatile periods and large shocks. For continuity, the previous 13-series
+            dynamic factor model (v1) is shown as a comparison line.
+          </p>
+          <p>
+            Confidence bands are empirical: they are derived from the model&rsquo;s own out-of-sample
+            backtest errors, bias-corrected, so they widen or narrow to reflect measured accuracy.
+            Reference: Reserve Bank of Australia, <em>Research Discussion Paper 2024-04</em>.
           </p>
         </div>
       )}

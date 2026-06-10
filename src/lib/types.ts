@@ -99,10 +99,70 @@ export interface Performance {
   errors: AccuracyError[];
 }
 
+// ---- v2 cutover (staged; gated on approval) ----------------------------------
+// A single v2 model estimate (headline = qa_a05 precision, stress = umidas_a20).
+export interface V2Model {
+  model_id: string;
+  model_name: string;
+  target_quarter: string;
+  gdp_chain_volume_millions: number;
+  qoq_growth_pct: number;
+  yoy_growth_pct: number;
+  ci_68_low: number;
+  ci_68_high: number;
+  ci_95_low: number;
+  ci_95_high: number;
+  n_months_in_quarter: number;
+  ci_basis: string;
+  ci_n: number;
+  ci_sd_pp: number;
+  ci_bias_pp: number;
+}
+
+export interface LatestV2 {
+  generated_at: string;
+  schema: string;
+  target_quarter: string;
+  data_through: string;
+  prev_level: { value: number; date: string | null; source: string };
+  models: { headline: V2Model; stress: V2Model };
+  v1_comparison: {
+    model_name: string;
+    target_quarter: string;
+    qoq_growth_pct: number;
+    yoy_growth_pct: number;
+    gdp_chain_volume_millions: number;
+    source: string;
+  } | null;
+  note: string;
+}
+
+export interface Backcast {
+  target_quarter: string;
+  qoq_forecast_pct: number;
+  qoq_actual_pct: number;
+  error_pp: number;
+  direction_correct: boolean;
+  is_backcast: true;
+}
+
+export interface BackcastData {
+  model: string;
+  basis: string;
+  note: string;
+  n: number;
+  mae_pp: number;
+  hit_rate_pct: number;
+  backcasts: Backcast[];
+}
+
 export interface DashboardData {
   latest: LatestNowcast;
   gdp: GdpSeries;
   nowcasts: VintageSeries;
   indicators: IndicatorData;
   performance: Performance;
+  // Staged v2 cutover artifacts (optional — present once the v2 pipeline emits them).
+  latestV2?: LatestV2;
+  backcasts?: BackcastData;
 }

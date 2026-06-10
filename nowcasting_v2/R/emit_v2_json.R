@@ -42,13 +42,20 @@ emit_v2_json <- function(no_fetch = TRUE, repo_root = "..") {
   cat("=== emit_v2_json (staged, non-destructive) ===\n")
 
   # ---- shared inputs ----
-  if (no_fetch && file.exists("cache/panel_vintage_latest.rds")) {
-    cat("[1] panel: cached cache/panel_vintage_latest.rds\n")
-    wide <- readRDS("cache/panel_vintage_latest.rds")
-  } else {
-    cat("[1] panel: build_panel() from data_raw/*.csv\n")
-    wide <- build_panel()
-  }
+  # ALWAYS rebuild the panel from data_raw/ (offline). Do NOT trust a stale
+  # cache/panel_vintage_latest.rds: an earlier baseline cache silently dropped the
+  # Westpac/extended-NAB survey block, which made exclude_ids=AIG a no-op and
+  # produced B0-baseline numbers wearing B3 bands (Fable review B1, 2026-06-11).
+  cat("[1] panel: build_panel() from data_raw/*.csv\n")
+  wide <- build_panel()
+  # Fail loud (project policy): the B3_nab_wmi model REQUIRES the survey block.
+  if (!("wmi_sent" %in% names(wide)))
+    stop("emit_v2_json: panel has no 'wmi_sent' column — survey block missing; refusing to nowcast the baseline panel under B3 bands.")
+  nab_n <- sum(!is.na(wide[["nab_conf"]]))
+  if (nab_n < 120L)
+    stop(sprintf("emit_v2_json: nab_conf has only %d months — looks like the 39-month stub, not the extended B3 series.", nab_n))
+  cat(sprintf("[1] panel OK: %d series; wmi_sent present, extended NAB (n=%d)\n",
+              ncol(wide) - 1L, nab_n))
   tfs <- transform_panel(wide, "seed/panel_info.csv")
   gdp <- read.csv("data_raw/rt_dgdp_qtr.csv")
   # prev_level = realized level of the quarter BEFORE target (the $ anchor for the

@@ -37,7 +37,9 @@ export default function MethodologyPanel() {
           <p>
             Confidence bands are empirical: they are derived from the model&rsquo;s own out-of-sample
             backtest errors, bias-corrected, so they widen or narrow to reflect measured accuracy.
-            Reference: Reserve Bank of Australia, <em>Research Discussion Paper 2024-04</em>.
+            They are calibrated on a limited recent backtest sample and should be read as
+            approximate, not exact. Reference: Reserve Bank of Australia, <em>Research Discussion
+            Paper 2024-04</em>.
           </p>
         </div>
       )}

@@ -1,6 +1,5 @@
 {
   "basis": "post-COVID (target quarter >= 2022-01-01)",
-  "factor_count": 3,
   "n": 17,
   "qoq_bias_pp": 0.1998,
   "qoq_sd_pp": 0.354,
@@ -9,5 +8,7 @@
   "z_95": 1.96,
   "method": "bias-aware: interval centred on (forecast - bias), half-width z*sd",
   "source": "../nowcasting_v2/cache/sweep_v2/B3_nab_wmi_qa_a05_q1_l01.csv",
-  "computed_at": "2026-06-10T23:16:51Z"
+  "computed_at": "2026-06-10T23:16:51Z",
+  "model": "qa_a05 (dfm_q=1)",
+  "dfm_q": 1
 }

@@ -1,11 +1,24 @@
 {
-  "mae_millions": 0,
-  "mae_pct": 0,
-  "bias_millions": 0,
-  "bias_pct": 0,
+  "mae_millions": 3192,
+  "mae_pct": 0.46,
+  "bias_millions": 3192,
+  "bias_pct": 0.46,
   "rba_comparison": {
     "n": 0,
     "avg_edge_pp": null
   },
-  "errors": []
+  "errors": [
+    {
+      "target_quarter": "2026 Q1",
+      "final_nowcast": 699137,
+      "actual": 695945,
+      "error_millions": 3192,
+      "error_pct": 0.46,
+      "yoy_nowcast": 2.99,
+      "yoy_actual": 2.52,
+      "yoy_rba": null,
+      "somp_release": null,
+      "edge_pp": null
+    }
+  ]
 }

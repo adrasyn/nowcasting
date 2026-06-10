@@ -57,9 +57,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up R
+      # setup-r downloads R + Ghostscript from external mirrors; a transient 504
+      # there killed the 2026-06-08 run and staled the site for a week (issue #12).
+      # Attempt once tolerantly, then retry — a uses: step can't be wrapped in a
+      # retry action, so we use continue-on-error + a conditional re-run.
+      - name: Set up R (attempt 1)
+        id: setupr1
+        uses: r-lib/actions/setup-r@v2
+        continue-on-error: true
+        with:
+          r-version: "4.5.1"
+          use-public-rspm: true
+
+      - name: Set up R (retry)
+        if: steps.setupr1.outcome == 'failure'
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.5.1"
@@ -75,7 +88,17 @@ jobs:
         # goes on one line. Prepend the pipeline renv library to .libPaths() so
         # restore writes there — otherwise packages land in system lib and the
         # pipeline step (which activates renv via pipeline/.Rprofile) can't see them.
-        run: Rscript -e 'options(repos = c(CRAN = Sys.getenv("RENV_CONFIG_REPOS_OVERRIDE"))); if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv"); lib <- renv::paths$library(project = "pipeline"); dir.create(lib, recursive = TRUE, showWarnings = FALSE); .libPaths(c(lib, .libPaths())); lock <- renv::lockfile_read("pipeline/renv.lock"); pkgs <- setdiff(names(lock$Packages), "renv"); renv::restore(project = "pipeline", packages = pkgs, prompt = FALSE)'
+        # Retry the restore — CRAN/posit mirrors occasionally 5xx; a single
+        # transient failure here should not stale the site for a week. The
+        # Rscript stays on ONE line (multi-line -e segfaults on Windows Git Bash).
+        run: |
+          for attempt in 1 2 3; do
+            Rscript -e 'options(repos = c(CRAN = Sys.getenv("RENV_CONFIG_REPOS_OVERRIDE"))); if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv"); lib <- renv::paths$library(project = "pipeline"); dir.create(lib, recursive = TRUE, showWarnings = FALSE); .libPaths(c(lib, .libPaths())); lock <- renv::lockfile_read("pipeline/renv.lock"); pkgs <- setdiff(names(lock$Packages), "renv"); renv::restore(project = "pipeline", packages = pkgs, prompt = FALSE)' && exit 0
+            echo "renv restore attempt $attempt failed; retrying in 30s..."
+            sleep 30
+          done
+          echo "renv restore failed after 3 attempts"
+          exit 1
 
       - name: Verify all locked packages installed
         # Check the pipeline renv library on the search path — same lib the pipeline
@@ -111,17 +134,37 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run deploy.yml --ref main
 
-      - name: Open issue on failure
+      - name: Alert on failure
         if: failure()
         uses: actions/github-script@v7
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const today = new Date().toISOString().slice(0, 10);
-            await github.rest.issues.create({
+            // Dedupe: if an open pipeline-failure issue already exists, comment on
+            // it instead of stacking duplicates; otherwise open one and ASSIGN the
+            // owner so GitHub actually notifies (the prior design's bare issue went
+            // unactioned for days).
+            const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Weekly nowcast failed ${today}`,
-              body: `The weekly nowcast pipeline failed. See logs: ${runUrl}`,
-              labels: ["pipeline-failure"]
+              state: "open",
+              labels: "pipeline-failure",
             });
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: `Failed again ${today} (after in-step retries). Logs: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Weekly nowcast failed ${today}`,
+                body: `The weekly nowcast pipeline failed after in-step retries. See logs: ${runUrl}`,
+                labels: ["pipeline-failure"],
+                assignees: [context.repo.owner],
+              });
+            }

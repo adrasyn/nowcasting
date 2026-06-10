@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-06-10T23:26:14Z",
+  "schema": "v2-staged-1",
+  "target_quarter": "2026 Q2",
+  "data_through": "2026-05",
+  "prev_level": {
+    "value": 695945,
+    "date": "2026 Q1",
+    "source": "latest.json latest_actual (realized ABS)"
+  },
+  "models": {
+    "headline": {
+      "model_id": "v2_qa_a05",
+      "model_name": "MAI → QA U-MIDAS (precision)",
+      "target_quarter": "2026 Q2",
+      "gdp_chain_volume_millions": 701379,
+      "qoq_growth_pct": 0.78,
+      "yoy_growth_pct": 2.33,
+      "ci_68_low": 697525,
+      "ci_68_high": 702452,
+      "ci_95_low": 695160,
+      "ci_95_high": 704817,
+      "n_months_in_quarter": 2,
+      "ci_basis": "post-COVID (target quarter >= 2022-01-01)",
+      "ci_n": 17,
+      "ci_sd_pp": 0.354,
+      "ci_bias_pp": 0.1998
+    },
+    "stress": {
+      "model_id": "v2_umidas_a20",
+      "model_name": "MAI → full U-MIDAS (stress / big-events)",
+      "target_quarter": "2026 Q2",
+      "gdp_chain_volume_millions": 699668,
+      "qoq_growth_pct": 0.54,
+      "yoy_growth_pct": 2.08,
+      "ci_68_low": 696711,
+      "ci_68_high": 701093,
+      "ci_95_low": 694608,
+      "ci_95_high": 703196,
+      "n_months_in_quarter": 2,
+      "ci_basis": "post-COVID (target quarter >= 2022-01-01)",
+      "ci_n": 17,
+      "ci_sd_pp": 0.3148,
+      "ci_bias_pp": 0.1101
+    }
+  },
+  "v1_comparison": {
+    "model_name": "v1 (13-series DFM)",
+    "target_quarter": "2026 Q2",
+    "qoq_growth_pct": 0.61,
+    "yoy_growth_pct": 2.16,
+    "gdp_chain_volume_millions": 700222,
+    "source": "data/latest.json"
+  },
+  "note": "STAGED v2 emit (parallel to live latest.json). Headline=precision; stress toggle=big-events. Pending James approval."
+}

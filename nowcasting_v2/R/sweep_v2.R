@@ -44,12 +44,38 @@ dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
   )
 }
 
+# ---- build a summary row from metrics + variant metadata ----
+.summary_row <- function(v, m, n_skipped, runtime_min, fixed_selection) {
+  data.frame(
+    variant = v$id, stage = v$stage, panel = basename(v$panel_rds),
+    exclude = paste(v$exclude_ids, collapse="|"),
+    model = v$model, sel_alpha = v$sel_alpha, dfm_q = v$dfm_q,
+    qa_lag = paste(range(v$qa_lag), collapse=":"),
+    n_full = m$n_full, rmse_full = m$rmse_full, hit_full = m$hit_full,
+    n_pc = m$n_pc, rmse_pc = m$rmse_pc, hit_pc = m$hit_pc,
+    n_oos = m$n_oos, rmse_oos = m$rmse_oos, hit_oos = m$hit_oos, oos_from = m$oos_from,
+    n_skipped = n_skipped, runtime_min = runtime_min,
+    fixed_selection = fixed_selection,
+    stringsAsFactors = FALSE
+  )
+}
+
 # ---- run one variant -> writes its results CSV, returns a summary row ----
+# Resume-safe: if the variant's results CSV already exists, read it back and
+# recompute metrics instead of re-running the (slow) backtest.
 run_variant <- function(v) {
   cat(sprintf("\n========== VARIANT %s ==========\n", v$id))
   cat(sprintf("panel=%s | exclude={%s} | model=%s alpha=%.2f q=%d qa_lag=%s\n",
               basename(v$panel_rds), paste(v$exclude_ids, collapse=","),
               v$model, v$sel_alpha, v$dfm_q, paste(range(v$qa_lag), collapse=":")))
+  out_csv <- file.path(OUT_DIR, paste0(v$id, ".csv"))
+  if (file.exists(out_csv)) {
+    cached <- readr::read_csv(out_csv, show_col_types = FALSE)
+    m <- .metrics(cached)
+    cat(sprintf(">>> %s: CACHED (read back) full RMSE=%.4f (n=%d) | postCOVID RMSE=%.4f (n=%d) | OOS8 RMSE=%.4f\n",
+                v$id, m$rmse_full, m$n_full, m$rmse_pc, m$n_pc, m$rmse_oos))
+    return(.summary_row(v, m, NA_integer_, 0, "(cached)"))
+  }
   t0 <- Sys.time()
   bt <- backtest_v2(panel_rds   = v$panel_rds,
                     panel_info_csv = v$panel_info_csv,
@@ -64,18 +90,8 @@ run_variant <- function(v) {
   m  <- .metrics(bt$results)
   cat(sprintf(">>> %s: full RMSE=%.4f (n=%d) | postCOVID RMSE=%.4f (n=%d) | OOS8 RMSE=%.4f | %.1f min\n",
               v$id, m$rmse_full, m$n_full, m$rmse_pc, m$n_pc, m$rmse_oos, el))
-  data.frame(
-    variant = v$id, stage = v$stage, panel = basename(v$panel_rds),
-    exclude = paste(v$exclude_ids, collapse="|"),
-    model = v$model, sel_alpha = v$sel_alpha, dfm_q = v$dfm_q,
-    qa_lag = paste(range(v$qa_lag), collapse=":"),
-    n_full = m$n_full, rmse_full = m$rmse_full, hit_full = m$hit_full,
-    n_pc = m$n_pc, rmse_pc = m$rmse_pc, hit_pc = m$hit_pc,
-    n_oos = m$n_oos, rmse_oos = m$rmse_oos, hit_oos = m$hit_oos, oos_from = m$oos_from,
-    n_skipped = nrow(bt$skipped), runtime_min = round(el, 2),
-    fixed_selection = paste(bt$fixed_selection, collapse="|"),
-    stringsAsFactors = FALSE
-  )
+  .summary_row(v, m, nrow(bt$skipped), round(el, 2),
+               paste(bt$fixed_selection, collapse="|"))
 }
 
 # ===========================================================================
@@ -159,7 +175,11 @@ if (sys.nframe() == 0L) {
     sumB <- do.call(rbind, rowsB)
     readr::write_csv(sumB, file.path(OUT_DIR, "summary_stageB.csv"))
 
-    # master summary = A + B
+    # master summary = A + B. Coerce oos_from to character on both sides:
+    # read-back sumA parses it as <date>, fresh sumB builds it as <character>,
+    # and bind_rows refuses to combine the two types.
+    sumA$oos_from <- as.character(sumA$oos_from)
+    sumB$oos_from <- as.character(sumB$oos_from)
     sumAll <- dplyr::bind_rows(sumA, sumB)
     readr::write_csv(sumAll, file.path(OUT_DIR, "summary.csv"))
     cat("\n--- FULL summary (sorted by postCOVID RMSE) ---\n")

@@ -309,15 +309,69 @@ def verify(values: dict, data_raw: str, write: bool = False) -> dict:
     return _validate_and_append(data, data_raw, write, report)
 
 
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+
+
+def _is_pdf(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read(5) == b"%PDF-" and os.path.getsize(path) > 1000
+    except Exception:
+        return False
+
+
 def _fetch(pdf):
+    """Download a PDF to a temp path. NAB/ANZ sit behind Akamai WAF, which
+    challenges bare urllib requests from datacenter IPs. We use curl with full
+    browser-like headers + a same-site Referer (this is what successfully pulled
+    the Akamai-protected ANZ file), then fall back to urllib. If we only get an
+    Akamai challenge page (not a PDF), raise a clear WAF error so the routine
+    reports it instead of feeding garbage downstream."""
     if not pdf.startswith("http"):
         return pdf
-    import urllib.request
+    import subprocess, urllib.request, urllib.parse
     dest = os.path.join("/tmp" if os.path.isdir("/tmp") else ".", "nab_live.pdf")
-    req = urllib.request.Request(pdf, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=90) as r, open(dest, "wb") as f:
-        f.write(r.read())
-    return dest
+    pr = urllib.parse.urlparse(pdf)
+    referer = f"{pr.scheme}://{pr.netloc}/"
+    if os.path.exists(dest):
+        os.remove(dest)
+
+    # 1) curl with browser headers (browser-like TLS fingerprint beats Akamai
+    #    where urllib fails; proven on the sibling Akamai-protected ANZ host).
+    hdrs = ["-A", _UA,
+            "-H", "Accept: application/pdf,text/html;q=0.9,*/*;q=0.8",
+            "-H", "Accept-Language: en-AU,en;q=0.9",
+            "-H", f"Referer: {referer}",
+            "-H", "Sec-Fetch-Dest: document", "-H", "Sec-Fetch-Mode: navigate",
+            "-H", "Sec-Fetch-Site: same-origin", "-H", "Upgrade-Insecure-Requests: 1"]
+    try:
+        subprocess.run(["curl", "-sSL", "--compressed", "--max-time", "90",
+                        "--retry", "2", "--retry-delay", "3", *hdrs, pdf, "-o", dest],
+                       capture_output=True, timeout=200)
+        if _is_pdf(dest):
+            return dest
+    except Exception:
+        pass
+
+    # 2) urllib fallback with the same headers
+    try:
+        req = urllib.request.Request(pdf, headers={
+            "User-Agent": _UA, "Referer": referer,
+            "Accept": "application/pdf,*/*;q=0.8", "Accept-Language": "en-AU,en;q=0.9"})
+        with urllib.request.urlopen(req, timeout=90) as r, open(dest, "wb") as f:
+            f.write(r.read())
+        if _is_pdf(dest):
+            return dest
+    except Exception as e:
+        raise RuntimeError(
+            f"download failed for {pdf}: {e}. Likely Akamai WAF blocking this "
+            "(datacenter) IP. Options: retry; obtain the PDF via a residential-IP "
+            "path; or report BLOCKED -- do NOT fabricate values.") from e
+
+    raise RuntimeError(
+        f"downloaded content from {pdf} is not a PDF (got an Akamai/WAF challenge "
+        "page). Report BLOCKED for NAB this run -- do NOT fabricate values.")
 
 
 def _print_report(rep, write):

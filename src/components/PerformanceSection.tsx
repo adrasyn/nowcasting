@@ -3,14 +3,20 @@ import { formatMillions, formatPct } from "@/lib/format";
 
 interface Props {
   performance: Performance;
+  isBacktest?: boolean;
 }
 
-export default function PerformanceSection({ performance }: Props) {
+export default function PerformanceSection({ performance, isBacktest = false }: Props) {
   const edge = performance.rba_comparison.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
-  const edgeSub = performance.rba_comparison.n === 0
-    ? "Year-ended forecast, updates twice yearly (Q2 & Q4)"
-    : `${performance.rba_comparison.n} comparison${performance.rba_comparison.n === 1 ? "" : "s"} · ${edge !== null && edge < 0 ? "we beat RBA" : "RBA beats us"}`;
+  // Only claim an edge when it's material (|gap| >= 0.1pp); a 0.05pp average over
+  // 6 quarters is not significant, so call it level (Fable review B1).
+  const edgeMag = edge === null ? 0 : Math.abs(edge);
+  const edgeSub = performance.rba_comparison.n > 0
+    ? `${performance.rba_comparison.n} year-ended comparison${performance.rba_comparison.n === 1 ? "" : "s"} (Q2/Q4) · ${edgeMag < 0.1 ? "roughly level with the RBA" : edge !== null && edge < 0 ? "we edge the RBA" : "RBA edges us"}`
+    : isBacktest
+    ? "Not compared for tested quarters"
+    : "Year-ended forecast, updates twice yearly (Q2 & Q4)";
 
   return (
     <section className="mb-10">
@@ -30,9 +36,22 @@ export default function PerformanceSection({ performance }: Props) {
           sub={edgeSub}
         />
       </div>
-      <p className="text-xs text-label mb-3">
-        Each quarter, the final nowcast (latest vintage before the release) is compared against the actual GDP value. Bias is the average signed error, so a negative value means we systematically underpredict. Accuracy gap vs RBA compares our year-ended error to the RBA Statement on Monetary Policy forecast closest to quarter-end; a negative gap means our nowcast was closer to the final number.
-      </p>
+      {isBacktest ? (
+        <p className="text-xs text-label mb-3">
+          These are <strong>tested results</strong> — the new model run on past quarters before it
+          went live, not real-time predictions — so it has a track record from day one. Each quarter,
+          the estimate is compared with the actual GDP figure. Bias is the average miss; a positive
+          value means it tends to come in a little high. The RBA gap compares our year-ended estimate
+          with the RBA&rsquo;s forecast published mid-quarter (about two months before our full-quarter
+          estimate) for each June and December quarter; a negative gap means we landed closer to the
+          final figure. We use more within-quarter data than that RBA forecast, and both are measured
+          against later-revised GDP.
+        </p>
+      ) : (
+        <p className="text-xs text-label mb-3">
+          Each quarter, the final nowcast (latest vintage before the release) is compared against the actual GDP value. Bias is the average signed error, so a negative value means we systematically underpredict. Accuracy gap vs RBA compares our year-ended error to the RBA Statement on Monetary Policy forecast closest to quarter-end; a negative gap means our nowcast was closer to the final number.
+        </p>
+      )}
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">
@@ -41,12 +60,15 @@ export default function PerformanceSection({ performance }: Props) {
             <th className="py-2">Actual</th>
             <th className="py-2">Error ($M)</th>
             <th className="py-2">Error (%)</th>
+            <th className="py-2">Our (YE)</th>
             <th className="py-2">RBA (YE)</th>
             <th className="py-2">Gap (pp)</th>
           </tr>
         </thead>
         <tbody>
-          {performance.errors.map((e) => (
+          {[...performance.errors]
+            .sort((a, b) => b.target_quarter.localeCompare(a.target_quarter))
+            .map((e) => (
             <tr key={e.target_quarter} className="border-b border-border">
               <td className="py-2">{e.target_quarter}</td>
               <td className="py-2">{formatMillions(e.final_nowcast)}</td>
@@ -56,6 +78,9 @@ export default function PerformanceSection({ performance }: Props) {
               </td>
               <td className={`py-2 ${e.error_pct > 0 ? "text-teal" : "text-[#c0392b]"}`}>
                 {formatPct(e.error_pct)}
+              </td>
+              <td className="py-2 text-label">
+                {e.yoy_nowcast == null ? "—" : `${e.yoy_nowcast.toFixed(2)}%`}
               </td>
               <td className="py-2 text-label">
                 {e.yoy_rba === null ? "—" : `${e.yoy_rba.toFixed(2)}%`}

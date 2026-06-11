@@ -5,7 +5,7 @@ const SITE_URL = "https://wlsn.me";
 const SITE_NAME = "James Wilson";
 const PAGE_TITLE = "Australia GDP nowcast";
 const PAGE_DESCRIPTION =
-  "Weekly nowcast of Australian GDP using a dynamic factor model over 13 indicators.";
+  "Weekly nowcast of Australian GDP using an RBA-style Monthly Activity Indicator and MIDAS regression.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

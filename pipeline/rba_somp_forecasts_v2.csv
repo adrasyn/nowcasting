@@ -1,0 +1,7 @@
+target_quarter,somp_release,yoy_forecast_pct,source_url
+2023 Q2,2023-05,1.75,https://www.rba.gov.au/publications/smp/2023/may/economic-outlook.html
+2023 Q4,2023-11,1.5,https://www.rba.gov.au/publications/smp/2023/nov/economic-outlook.html
+2024 Q2,2024-05,1.2,https://www.rba.gov.au/publications/smp/2024/may/outlook.html
+2024 Q4,2024-11,1.5,https://www.rba.gov.au/publications/smp/2024/nov/outlook.html
+2025 Q2,2025-05,1.8,https://www.rba.gov.au/publications/smp/2025/may/outlook.html
+2025 Q4,2025-11,2.0,https://www.rba.gov.au/publications/smp/2025/nov/outlook.html

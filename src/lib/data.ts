@@ -7,6 +7,8 @@ import type {
   IndicatorData,
   Performance,
   DashboardData,
+  LatestV2,
+  BackcastData,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -18,6 +20,17 @@ function readJson<T>(filename: string, fallback: T): T {
     return JSON.parse(raw) as T;
   } catch {
     return fallback;
+  }
+}
+
+// Optional artifacts: return undefined (not a fallback) when the file is absent,
+// so consumers can feature-detect the staged v2 cutover.
+function readJsonOptional<T>(filename: string): T | undefined {
+  const filePath = path.join(DATA_DIR, filename);
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
+  } catch {
+    return undefined;
   }
 }
 
@@ -57,5 +70,9 @@ export function loadDashboardData(): DashboardData {
       rba_comparison: { n: 0, avg_edge_pp: null },
       errors: [],
     }),
+    latestV2: readJsonOptional<LatestV2>("latest_v2.json"),
+    backcasts: readJsonOptional<BackcastData>("backcasts.json"),
+    performanceV2: readJsonOptional<Performance>("performance_v2.json"),
+    indicatorsV2: readJsonOptional<IndicatorData>("indicators_v2.json"),
   };
 }

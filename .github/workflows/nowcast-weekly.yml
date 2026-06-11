@@ -110,6 +110,28 @@ jobs:
         working-directory: pipeline
         run: Rscript run_complete_nowcast.R
 
+      # v2 (RBA MAI + MIDAS). RBA/ABS are gov sources (no WAF) and the emit is the
+      # v2 model itself, so both belong here in the R cron, NOT on the laptop. The
+      # WAF-blocked surveys (NAB/ANZ/Westpac) are refreshed separately by the local
+      # Cowork task; this step just reads whatever data_raw CSVs are present.
+      # continue-on-error so a transient v2 issue can't block the v1 commit/deploy;
+      # if v2 emit fails the prior data/latest_v2.json is still served (stale, not
+      # broken). NB: v2 failures are currently silent here -- a follow-up could add
+      # v2-specific alerting.
+      - name: Refresh v2 panel + nowcast (RBA/ABS data + emit)
+        id: v2
+        if: success()
+        continue-on-error: true
+        working-directory: nowcasting_v2
+        env:
+          # v2 scripts source R/_setup.R (prepends the pipeline renv library); set
+          # R_LIBS too so rlang >= 1.1.7 from renv wins over any base copy.
+          R_LIBS: ${{ github.workspace }}/pipeline/renv/library/windows/R-4.5/x86_64-w64-mingw32
+        run: |
+          Rscript R/fetch/fetch_rba_panel.R
+          Rscript R/fetch/fetch_abs_panel.R
+          Rscript R/emit_v2_json.R
+
       - name: Commit updated JSON and vintage index
         id: commit
         if: success()
@@ -117,6 +139,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
+          git add nowcasting_v2/data_raw/
           git add pipeline/.cache/model_output/vintages/vintage_tracking.csv
           if git diff --staged --quiet; then
             echo "No JSON changes to commit"

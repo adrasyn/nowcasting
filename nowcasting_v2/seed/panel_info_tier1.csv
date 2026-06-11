@@ -1,0 +1,22 @@
+id,source,series_id,tcode,tlog,tgroup,longname,status,notes
+emp,ABS_6202.0,A84423043C,t2,TRUE,H,Employment,OK,Employed total; Persons; Seasonally Adjusted (level '000)
+ft_emp,ABS_6202.0,A84423041X,t2,TRUE,H,FT Employment,OK,Employed full-time; Persons; SA (level '000)
+pt_emp,ABS_6202.0,A84423042A,t2,TRUE,H,PT Employment,OK,Employed part-time; Persons; SA (level '000)
+ue,ABS_6202.0,A84423050A,t2,FALSE,H,Unemployment,OK,Unemployment rate; Persons; SA (%) - RBA uses the RATE (tlog FALSE)
+ud,ABS_6202.0,A85255719L,t2,FALSE,H,Underemployment,OK,Underemployed total; Persons; SA (level '000)
+hours,ABS_6202.0,A84426277X,t2,TRUE,H,Hours worked,OK,Monthly hours worked in all jobs; Persons; SA ('000 hours)
+rt,ABS_8501.0,A3348585R,t2,TRUE,H,Retail Sales,OK,"Retail turnover; Total (State)/Total (Industry); SA ($m). NOTE: ABS discontinued monthly Retail Trade at 2025-06; current replacement is the MHSI (5682.0) but that only starts 2012 - splice is Tier-3."
+export,ABS_5368.0,A2718577A,t2,TRUE,H,Exports,OK,International trade: credits; total goods; SA ($m)
+house_prices,ABS_6416.0,A83728455L,t2,TRUE,F,House prices,MISSING,"RPPI weighted-avg 8 capitals (index) is the RBA concept but ABS DISCONTINUED 6416.0 at 2021-Q4; successor 6432.0 (mean price) starts only 2011. No single free ABS series has >=2005 history AND current data. Defer to Tier-3 (CoreLogic / RPPI-6432 splice)."
+credit,RBA_D2,DLCACN+DLCACSFN,t2,TRUE,F,Total Credit,OK,"Credit; Total ($b). Spliced at 2019-07 break: DLCACN (excl fin businesses) 1976-2019-06 + DLCACSFN (incl select fin businesses) 2019-07 onward."
+credit_housing,RBA_D2,DLCACOHN+DLCACIHN,t2,TRUE,F,Housing Credit,OK,"Credit; Housing = owner-occupier (DLCACOHN) + investor (DLCACIHN), Original ($b). 1990 onward (D2 housing split begins 1990)."
+credit_business,RBA_D2,DLCACBN+DLCACSFBN,t2,TRUE,F,Business Credit,OK,"Credit; Business ($b). Spliced at 2019-07 break: DLCACBN 1976-2019-06 + DLCACSFBN 2019-07 onward."
+fcmygbag3,RBA_F2.1,FCMYGBAG3,t2,FALSE,F,AGS 3 year,OK,"Australian Government 3yr bond yield; monthly (% pa). NOTE: free f2.1-data.csv only goes back to 2013-05; pre-2013 history is in the RBA historical XLS (Tier-3 splice) - fails the >=2005 target."
+fcmygbag5,RBA_F2.1,FCMYGBAG5,t2,FALSE,F,AGS 5 year,OK,AGS 5yr bond yield; monthly (% pa). History 2013-09 onward (see fcmygbag3 note).
+fcmygbag10,RBA_F2.1,FCMYGBAG10,t2,FALSE,F,AGS 10 year,OK,AGS 10yr bond yield; monthly (% pa). History 2013-05 onward (see fcmygbag3 note).
+scrigbag3,RBA_derived,FCMYGBAG3-FIRMMBAB90,t1,FALSE,F,"Spread (AGS 3yr - BBSW)",OK,Derived spread = AGS 3yr yield (F2.1) minus 3-mth BBSW (F1.1 FIRMMBAB90). Limited to yield start 2013-09.
+scrigbag5,RBA_derived,FCMYGBAG5-FIRMMBAB90,t1,FALSE,F,"Spread (AGS 5yr - BBSW)",OK,Derived spread = AGS 5yr yield minus 3-mth BBSW. From 2013-09.
+scrigbag10,RBA_derived,FCMYGBAG10-FIRMMBAB90,t1,FALSE,F,"Spread (AGS 10yr - BBSW)",OK,Derived spread = AGS 10yr yield minus 3-mth BBSW. From 2013-05.
+firmmbab90,RBA_F1.1,FIRMMBAB90,t2,FALSE,F,BBSW,OK,3-month BABs/NCDs (BBSW); monthly (% pa); 1969 onward. Used both as a predictor and as the spread base.
+credit_card,RBA_C1,CCCCSTPVSA,t2,TRUE,F,Credit card,OK,Credit & charge cards; Value of purchases; Seasonally Adjusted ($m); 1985 onward.
+asx200,MISSING,NA,t2,TRUE,F,Equity prices,MISSING,"RBA no longer publishes a share-price index CSV (current F7 = business lending rates; old share-market table discontinued). Stooq (^AXJO) now requires an API key; Yahoo unstable for CI. Defer to Tier-2 authenticated/market source."

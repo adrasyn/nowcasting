@@ -1,0 +1,106 @@
+{
+  "model": "v2 headline (MAI -> QA U-MIDAS, qa_a05)",
+  "basis": "pseudo-out-of-sample backtest (hypothetical; not produced in real time)",
+  "note": "These are BACKTESTED estimates, shown to give the new model a track record at launch. They are not live nowcasts.",
+  "n": 12,
+  "mae_pp": 0.258,
+  "hit_rate_pct": 91.7,
+  "backcasts": [
+    {
+      "target_quarter": "2023 Q2",
+      "qoq_forecast_pct": 0.12,
+      "qoq_actual_pct": 0.46,
+      "error_pp": -0.33,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2023 Q3",
+      "qoq_forecast_pct": 0.3,
+      "qoq_actual_pct": 0.4,
+      "error_pp": -0.1,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2023 Q4",
+      "qoq_forecast_pct": 0.14,
+      "qoq_actual_pct": -0.01,
+      "error_pp": 0.15,
+      "direction_correct": false,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2024 Q1",
+      "qoq_forecast_pct": 0.95,
+      "qoq_actual_pct": 0.24,
+      "error_pp": 0.7,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2024 Q2",
+      "qoq_forecast_pct": 0.1,
+      "qoq_actual_pct": 0.25,
+      "error_pp": -0.15,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2024 Q3",
+      "qoq_forecast_pct": 0.33,
+      "qoq_actual_pct": 0.31,
+      "error_pp": 0.03,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2024 Q4",
+      "qoq_forecast_pct": 1.13,
+      "qoq_actual_pct": 0.44,
+      "error_pp": 0.7,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2025 Q1",
+      "qoq_forecast_pct": 0.55,
+      "qoq_actual_pct": 0.26,
+      "error_pp": 0.29,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2025 Q2",
+      "qoq_forecast_pct": 0.75,
+      "qoq_actual_pct": 0.97,
+      "error_pp": -0.22,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2025 Q3",
+      "qoq_forecast_pct": 0.62,
+      "qoq_actual_pct": 0.38,
+      "error_pp": 0.24,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2025 Q4",
+      "qoq_forecast_pct": 0.77,
+      "qoq_actual_pct": 0.87,
+      "error_pp": -0.11,
+      "direction_correct": true,
+      "is_backcast": true
+    },
+    {
+      "target_quarter": "2026 Q1",
+      "qoq_forecast_pct": 0.34,
+      "qoq_actual_pct": 0.27,
+      "error_pp": 0.07,
+      "direction_correct": true,
+      "is_backcast": true
+    }
+  ]
+}

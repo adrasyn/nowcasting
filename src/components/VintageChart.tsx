@@ -4,13 +4,13 @@ import { useState } from "react";
 import {
   ComposedChart,
   Scatter,
+  Area,
   XAxis,
   YAxis,
   ZAxis,
   CartesianGrid,
   ResponsiveContainer,
   ReferenceLine,
-  ErrorBar,
   Label,
 } from "recharts";
 import type { VintageSeries, LatestNowcast } from "@/lib/types";
@@ -27,7 +27,7 @@ type VintagePoint = {
   x: number;
   y: number;
   runDate: string;
-  err68: [number, number]; // [below, above] offsets in growth pp — the 68% likely range
+  range: [number, number]; // [low, high] growth pp — the 68% likely range (shaded)
 };
 type ActualPoint = { kind: "actual"; x: number; y: number; actualQuarter: string };
 type HoverState = { point: VintagePoint | ActualPoint; cx: number; cy: number } | null;
@@ -50,10 +50,7 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
         x: v.days_until_release,
         y: v.qoq_growth_pct,
         runDate: v.run_date,
-        err68: [
-          Math.max(0, v.qoq_growth_pct - lowPp),
-          Math.max(0, highPp - v.qoq_growth_pct),
-        ] as [number, number],
+        range: [lowPp, highPp] as [number, number],
       };
     })
     .sort((a, b) => a.x - b.x);
@@ -65,14 +62,18 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
     actualQuarter: latest.latest_actual.quarter,
   };
 
-  // The whiskers can dip below 0, so the Y-domain must include the band extents.
+  // Y-domain must include the shaded band extents (and 0, for the baseline).
   const yVals = [
     0,
     actualPoint.y,
-    ...vintagePoints.flatMap((p) => [p.y - p.err68[0], p.y + p.err68[1]]),
+    ...vintagePoints.flatMap((p) => p.range),
   ];
-  const yMin = Math.min(...yVals) - 0.05;
-  const yMax = Math.max(...yVals) + 0.05;
+  // Round to nice 0.25%% gridlines so the axis labels are sensible.
+  const STEP = 0.25;
+  const yMin = Math.floor((Math.min(...yVals) - 0.05) / STEP) * STEP;
+  const yMax = Math.ceil((Math.max(...yVals) + 0.05) / STEP) * STEP;
+  const yTicks: number[] = [];
+  for (let t = yMin; t <= yMax + 1e-9; t += STEP) yTicks.push(Number(t.toFixed(2)));
 
   function makeDot(fill: string, radius: number) {
     return function Dot(props: unknown) {
@@ -101,7 +102,7 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
     <section className="mb-10">
       <p className="font-headline text-3xl text-black">Nowcast evolution</p>
       <p className="text-xs text-label mb-2">
-        Each green point is a weekly nowcast for {latest.target_quarter}; the vertical bar shows its likely range (about a 2-in-3 chance). As new indicator data arrives through the quarter, the nowcast evolves. The line traces those revisions up to the ABS GDP release. The dark-teal circle shows the previous quarter&rsquo;s actual GDP growth for context.
+        Each green point is a weekly nowcast for {latest.target_quarter}; the shaded band is its likely range (about a 2-in-3 chance). As new indicator data arrives through the quarter, the nowcast evolves. The line traces those revisions up to the ABS GDP release. The dark-teal circle shows the previous quarter&rsquo;s actual GDP growth for context.
       </p>
       <div className="h-[320px] relative">
         <ResponsiveContainer>
@@ -125,9 +126,8 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
             <YAxis
               type="number"
               dataKey="y"
-              // Anchor at 0% so the chart visually grounds the reader;
-              // extend below 0 only if any nowcast/actual is negative.
               domain={[yMin, yMax]}
+              ticks={yTicks}
               tickFormatter={(v) => `${v.toFixed(2)}%`}
               tick={axisTick}
               label={{
@@ -138,6 +138,19 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
               }}
             />
             <ZAxis range={[80, 80]} />
+            {/* 0% baseline */}
+            <ReferenceLine y={0} stroke={chartColors.label} strokeWidth={1} />
+            {/* Shaded 68% likely-range band (behind the points) */}
+            <Area
+              data={vintagePoints}
+              dataKey="range"
+              type="linear"
+              stroke="none"
+              fill={chartColors.primary}
+              fillOpacity={0.12}
+              isAnimationActive={false}
+              activeDot={false}
+            />
             <Scatter
               data={vintagePoints}
               dataKey="y"
@@ -145,15 +158,7 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
               lineType="joint"
               shape={makeDot(chartColors.accent, 4)}
               isAnimationActive={false}
-            >
-              <ErrorBar
-                dataKey="err68"
-                direction="y"
-                width={4}
-                strokeWidth={1.5}
-                stroke={chartColors.labelLight}
-              />
-            </Scatter>
+            />
             <Scatter
               data={[actualPoint]}
               dataKey="y"

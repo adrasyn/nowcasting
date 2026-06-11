@@ -128,6 +128,7 @@ export interface LatestV2 {
   data_through: string;
   prev_level: { value: number; date: string | null; source: string };
   models: { headline: V2Model; stress: V2Model };
+  vintages: Vintage[]; // qa nowcast at each Monday — drives the evolution chart
   v1_comparison: {
     model_name: string;
     target_quarter: string;

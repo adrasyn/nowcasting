@@ -67,11 +67,9 @@ export default function NowcastHeadline({ headline, stress, prevLevel, gdp }: Pr
         </div>
       </div>
 
-      {/* Likely range */}
-      <div className="mt-3 text-sm">
-        <span className="text-label">Likely range: </span>
-        <span className="text-border-heavy">{formatPct(range.low)} to {formatPct(range.high)}</span>
-        <span className="text-label-light text-xs"> (about a 2-in-3 chance)</span>
+      {/* Likely range — styled to match the 'growth this quarter' label */}
+      <div className="mt-3 text-xs text-label">
+        Likely range: {formatPct(range.low)} to {formatPct(range.high)} (about a 2-in-3 chance)
       </div>
 
       {/* Last 12 quarters + this quarter's estimate */}

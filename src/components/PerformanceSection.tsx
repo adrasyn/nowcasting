@@ -58,7 +58,9 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
           </tr>
         </thead>
         <tbody>
-          {performance.errors.map((e) => (
+          {[...performance.errors]
+            .sort((a, b) => b.target_quarter.localeCompare(a.target_quarter))
+            .map((e) => (
             <tr key={e.target_quarter} className="border-b border-border">
               <td className="py-2">{e.target_quarter}</td>
               <td className="py-2">{formatMillions(e.final_nowcast)}</td>

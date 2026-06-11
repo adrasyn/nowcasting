@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   ReferenceLine,
+  ErrorBar,
   Label,
 } from "recharts";
 import type { VintageSeries, LatestNowcast } from "@/lib/types";
@@ -21,7 +22,13 @@ interface VintageChartProps {
   latest: LatestNowcast;
 }
 
-type VintagePoint = { kind: "vintage"; x: number; y: number; runDate: string };
+type VintagePoint = {
+  kind: "vintage";
+  x: number;
+  y: number;
+  runDate: string;
+  err68: [number, number]; // [below, above] offsets in growth pp — the 68% likely range
+};
 type ActualPoint = { kind: "actual"; x: number; y: number; actualQuarter: string };
 type HoverState = { point: VintagePoint | ActualPoint; cx: number; cy: number } | null;
 
@@ -32,12 +39,23 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
     (v) => v.target_quarter === latest.target_quarter,
   );
   const vintagePoints: VintagePoint[] = relevant
-    .map((v) => ({
-      kind: "vintage" as const,
-      x: v.days_until_release,
-      y: v.qoq_growth_pct,
-      runDate: v.run_date,
-    }))
+    .map((v) => {
+      // The CI in the vintage record is a $M level band; convert it to a
+      // growth-pp band around this point so it plots on the QoQ-growth axis.
+      const prev = v.point / (1 + v.qoq_growth_pct / 100);
+      const lowPp = (v.ci_68_low / prev - 1) * 100;
+      const highPp = (v.ci_68_high / prev - 1) * 100;
+      return {
+        kind: "vintage" as const,
+        x: v.days_until_release,
+        y: v.qoq_growth_pct,
+        runDate: v.run_date,
+        err68: [
+          Math.max(0, v.qoq_growth_pct - lowPp),
+          Math.max(0, highPp - v.qoq_growth_pct),
+        ] as [number, number],
+      };
+    })
     .sort((a, b) => a.x - b.x);
 
   const actualPoint: ActualPoint = {
@@ -46,6 +64,15 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
     y: latest.latest_actual.qoq_growth_pct,
     actualQuarter: latest.latest_actual.quarter,
   };
+
+  // The whiskers can dip below 0, so the Y-domain must include the band extents.
+  const yVals = [
+    0,
+    actualPoint.y,
+    ...vintagePoints.flatMap((p) => [p.y - p.err68[0], p.y + p.err68[1]]),
+  ];
+  const yMin = Math.min(...yVals) - 0.05;
+  const yMax = Math.max(...yVals) + 0.05;
 
   function makeDot(fill: string, radius: number) {
     return function Dot(props: unknown) {
@@ -74,7 +101,7 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
     <section className="mb-10">
       <p className="font-headline text-3xl text-black">Nowcast evolution</p>
       <p className="text-xs text-label mb-2">
-        Each green point is a weekly nowcast for {latest.target_quarter}. As new indicator data arrives through the quarter, the nowcast evolves. The line traces those revisions up to the ABS GDP release. The dark-teal circle shows the previous quarter&rsquo;s actual GDP growth for context.
+        Each green point is a weekly nowcast for {latest.target_quarter}; the vertical bar shows its likely range (about a 2-in-3 chance). As new indicator data arrives through the quarter, the nowcast evolves. The line traces those revisions up to the ABS GDP release. The dark-teal circle shows the previous quarter&rsquo;s actual GDP growth for context.
       </p>
       <div className="h-[320px] relative">
         <ResponsiveContainer>
@@ -100,10 +127,7 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
               dataKey="y"
               // Anchor at 0% so the chart visually grounds the reader;
               // extend below 0 only if any nowcast/actual is negative.
-              domain={[
-                (dataMin: number) => (dataMin >= 0 ? 0 : dataMin - 0.2),
-                "auto",
-              ]}
+              domain={[yMin, yMax]}
               tickFormatter={(v) => `${v.toFixed(2)}%`}
               tick={axisTick}
               label={{
@@ -121,7 +145,15 @@ export default function VintageChart({ nowcasts, latest }: VintageChartProps) {
               lineType="joint"
               shape={makeDot(chartColors.accent, 4)}
               isAnimationActive={false}
-            />
+            >
+              <ErrorBar
+                dataKey="err68"
+                direction="y"
+                width={4}
+                strokeWidth={1.5}
+                stroke={chartColors.labelLight}
+              />
+            </Scatter>
             <Scatter
               data={[actualPoint]}
               dataKey="y"

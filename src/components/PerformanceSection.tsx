@@ -9,11 +9,11 @@ interface Props {
 export default function PerformanceSection({ performance, isBacktest = false }: Props) {
   const edge = performance.rba_comparison.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
-  const edgeSub = isBacktest
+  const edgeSub = performance.rba_comparison.n > 0
+    ? `${performance.rba_comparison.n} year-ended comparison${performance.rba_comparison.n === 1 ? "" : "s"} (Q2/Q4) · ${edge !== null && edge < 0 ? "we edge RBA" : edge !== null && edge > 0 ? "RBA edges us" : "level"}`
+    : isBacktest
     ? "Not compared for tested quarters"
-    : performance.rba_comparison.n === 0
-    ? "Year-ended forecast, updates twice yearly (Q2 & Q4)"
-    : `${performance.rba_comparison.n} comparison${performance.rba_comparison.n === 1 ? "" : "s"} · ${edge !== null && edge < 0 ? "we beat RBA" : "RBA beats us"}`;
+    : "Year-ended forecast, updates twice yearly (Q2 & Q4)";
 
   return (
     <section className="mb-10">
@@ -38,7 +38,9 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
           These are <strong>tested results</strong> — the new model run on past quarters before it
           went live, not real-time predictions — so it has a track record from day one. Each quarter,
           the estimate is compared with the actual GDP figure. Bias is the average miss; a positive
-          value means it tends to come in a little high.
+          value means it tends to come in a little high. The RBA gap compares our year-ended estimate
+          with the RBA forecast for each June and December quarter; a negative gap means we landed
+          closer to the final figure.
         </p>
       ) : (
         <p className="text-xs text-label mb-3">

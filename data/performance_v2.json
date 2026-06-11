@@ -4,8 +4,8 @@
   "bias_millions": 706,
   "bias_pct": 0.1,
   "rba_comparison": {
-    "n": 0,
-    "avg_edge_pp": null
+    "n": 6,
+    "avg_edge_pp": -0.04
   },
   "errors": [
     {
@@ -14,11 +14,11 @@
       "actual": 666120,
       "error_millions": -2222,
       "error_pct": -0.33,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.92,
+      "yoy_actual": 2.26,
+      "yoy_rba": 1.75,
+      "somp_release": "2023-05",
+      "edge_pp": -0.17
     },
     {
       "target_quarter": "2023 Q3",
@@ -38,11 +38,11 @@
       "actual": 668754,
       "error_millions": 988,
       "error_pct": 0.15,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.49,
+      "yoy_actual": 1.33,
+      "yoy_rba": 1.5,
+      "somp_release": "2023-11",
+      "edge_pp": -0.01
     },
     {
       "target_quarter": "2024 Q1",
@@ -62,11 +62,11 @@
       "actual": 672076,
       "error_millions": -1018,
       "error_pct": -0.15,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 0.73,
+      "yoy_actual": 0.89,
+      "yoy_rba": 1.2,
+      "somp_release": "2024-05",
+      "edge_pp": -0.15
     },
     {
       "target_quarter": "2024 Q3",
@@ -86,11 +86,11 @@
       "actual": 677077,
       "error_millions": 4671,
       "error_pct": 0.69,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.94,
+      "yoy_actual": 1.24,
+      "yoy_rba": 1.5,
+      "somp_release": "2024-11",
+      "edge_pp": 0.44
     },
     {
       "target_quarter": "2025 Q1",
@@ -110,11 +110,11 @@
       "actual": 685416,
       "error_millions": -1485,
       "error_pct": -0.22,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.77,
+      "yoy_actual": 1.98,
+      "yoy_rba": 1.8,
+      "somp_release": "2025-05",
+      "edge_pp": 0.03
     },
     {
       "target_quarter": "2025 Q3",
@@ -134,11 +134,11 @@
       "actual": 694041,
       "error_millions": -709,
       "error_pct": -0.1,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 2.4,
+      "yoy_actual": 2.51,
+      "yoy_rba": 2.0,
+      "somp_release": "2025-11",
+      "edge_pp": -0.4
     },
     {
       "target_quarter": "2026 Q1",

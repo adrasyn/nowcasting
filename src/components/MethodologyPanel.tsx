@@ -29,10 +29,11 @@ export default function MethodologyPanel() {
             far (the &ldquo;ragged edge&rdquo;). The nowcast updates each week as new data arrives.
           </p>
           <p>
-            The headline estimate is tuned for precision in normal quarters. A second, more flexible
-            estimate &mdash; the &ldquo;stress&rdquo; view, available from the toggle &mdash; responds
-            faster during volatile periods and large shocks. For continuity, the previous 13-series
-            dynamic factor model (v1) is shown as a comparison line.
+            You can switch between two estimates. The <strong>Main</strong> estimate is tuned for
+            accuracy in normal quarters. The <strong>Volatile-times</strong> estimate is a more
+            flexible version that reacts faster during big swings and large shocks &mdash; worth
+            watching when conditions are choppy. Both are built from the same indicators; they differ
+            only in how heavily they weight the most recent months.
           </p>
           <p>
             Confidence bands are empirical: they are derived from the model&rsquo;s own out-of-sample

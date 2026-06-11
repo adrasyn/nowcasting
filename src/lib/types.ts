@@ -50,7 +50,9 @@ export interface VintageSeries {
   vintages: Vintage[];
 }
 
-export type IndicatorGroup = "Labour" | "Consumer" | "Business" | "External";
+// v1 used a fixed 4-group set; v2 adds its own (Financial & credit, etc.), so
+// this is an open string. IndicatorGrid orders known groups first, then the rest.
+export type IndicatorGroup = string;
 
 export interface IndicatorPoint {
   date: string; // "YYYY-MM"
@@ -165,4 +167,6 @@ export interface DashboardData {
   // Staged v2 cutover artifacts (optional — present once the v2 pipeline emits them).
   latestV2?: LatestV2;
   backcasts?: BackcastData;
+  performanceV2?: Performance; // backcast track record in the live $M schema
+  indicatorsV2?: IndicatorData; // the v2 model's input panel
 }

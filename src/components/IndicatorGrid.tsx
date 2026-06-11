@@ -6,7 +6,12 @@ import IndicatorSparkline, { type SparklineMode } from "./IndicatorSparkline";
 import IndicatorDetailCard from "./IndicatorDetailCard";
 import IndicatorsTable from "./IndicatorsTable";
 
-const GROUP_ORDER: IndicatorGroup[] = ["Labour", "Consumer", "Business", "External"];
+// Preferred ordering; v1's four groups first, then v2's. Any group present in
+// the data but not listed here is appended in encounter order.
+const GROUP_PREF: IndicatorGroup[] = [
+  "Labour", "Consumer", "Business", "External",
+  "Jobs & labour", "Households", "Business surveys", "Financial & credit", "Trade",
+];
 
 // Keys must match indicator IDs in data/indicators.json (source of truth:
 // pipeline/seed/component_metadata.rds). Any unknown key falls through to
@@ -33,7 +38,12 @@ interface Props {
 export default function IndicatorGrid({ indicators }: Props) {
   const [selected, setSelected] = useState<Indicator | null>(null);
 
-  const byGroup = GROUP_ORDER.map((group) => ({
+  const present = Array.from(new Set(indicators.indicators.map((i) => i.group)));
+  const ordered = [
+    ...GROUP_PREF.filter((g) => present.includes(g)),
+    ...present.filter((g) => !GROUP_PREF.includes(g)),
+  ];
+  const byGroup = ordered.map((group) => ({
     group,
     items: indicators.indicators.filter((i) => i.group === group),
   })).filter((g) => g.items.length > 0);

@@ -72,5 +72,7 @@ export function loadDashboardData(): DashboardData {
     }),
     latestV2: readJsonOptional<LatestV2>("latest_v2.json"),
     backcasts: readJsonOptional<BackcastData>("backcasts.json"),
+    performanceV2: readJsonOptional<Performance>("performance_v2.json"),
+    indicatorsV2: readJsonOptional<IndicatorData>("indicators_v2.json"),
   };
 }

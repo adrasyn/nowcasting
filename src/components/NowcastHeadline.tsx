@@ -9,7 +9,6 @@ import { chartColors } from "@/lib/chartTheme";
 interface Props {
   headline: V2Model;
   stress: V2Model;
-  v1QoQ: number | null;
   prevLevel: number;
   gdp: GdpSeries;
 }
@@ -23,15 +22,10 @@ function growthRange(m: V2Model, prev: number) {
   };
 }
 
-export default function NowcastHeadline({ headline, stress, v1QoQ, prevLevel, gdp }: Props) {
+export default function NowcastHeadline({ headline, stress, prevLevel, gdp }: Props) {
   const [mode, setMode] = useState<"main" | "volatile">("main");
   const model = mode === "main" ? headline : stress;
   const range = growthRange(model, prevLevel);
-
-  const blurb =
-    mode === "main"
-      ? "Our standard estimate — most reliable in normal quarters."
-      : "A more flexible estimate that reacts faster during big swings. Worth watching in volatile times.";
 
   const bars = [
     ...gdp.series.slice(-12).map((q) => ({ quarter: q.quarter, growth: q.qoq_pct, isNowcast: false })),
@@ -73,21 +67,11 @@ export default function NowcastHeadline({ headline, stress, v1QoQ, prevLevel, gd
         </div>
       </div>
 
-      <p className="text-xs text-label mt-1">{blurb}</p>
-
-      {/* Likely range + previous-model comparison */}
-      <div className="flex flex-wrap gap-x-8 gap-y-1 mt-3 text-sm">
-        <div>
-          <span className="text-label">Likely range: </span>
-          <span className="text-border-heavy">{formatPct(range.low)} to {formatPct(range.high)}</span>
-          <span className="text-label-light text-xs"> (about a 2-in-3 chance)</span>
-        </div>
-        {v1QoQ !== null && (
-          <div>
-            <span className="text-label">Our previous model: </span>
-            <span className="text-border-heavy">{formatPct(v1QoQ)}</span>
-          </div>
-        )}
+      {/* Likely range */}
+      <div className="mt-3 text-sm">
+        <span className="text-label">Likely range: </span>
+        <span className="text-border-heavy">{formatPct(range.low)} to {formatPct(range.high)}</span>
+        <span className="text-label-light text-xs"> (about a 2-in-3 chance)</span>
       </div>
 
       {/* Last 12 quarters + this quarter's estimate */}
@@ -104,7 +88,6 @@ export default function NowcastHeadline({ headline, stress, v1QoQ, prevLevel, gd
       </div>
       <p className="text-[10px] text-label-light">
         Quarterly growth over the last 12 quarters (dark teal); this quarter&rsquo;s estimate in green.
-        The range reflects how far past estimates have typically landed from the final figure.
       </p>
     </section>
   );

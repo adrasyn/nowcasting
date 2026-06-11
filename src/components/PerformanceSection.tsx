@@ -1,63 +1,17 @@
-import type { Performance, BackcastData } from "@/lib/types";
+import type { Performance } from "@/lib/types";
 import { formatMillions, formatPct } from "@/lib/format";
 
 interface Props {
   performance: Performance;
-  backcasts?: BackcastData;
+  isBacktest?: boolean;
 }
 
-export default function PerformanceSection({ performance, backcasts }: Props) {
-  // v2 cutover: show the new model's pre-launch test record (it has no live
-  // track record yet). Clearly flagged as tested, not live.
-  if (backcasts && backcasts.backcasts.length > 0) {
-    return (
-      <section className="mb-10">
-        <p className="font-headline text-3xl text-black mb-2">Track record</p>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <Tile label="Typical miss" value={`${backcasts.mae_pp.toFixed(2)}pp`} sub="vs the final figure" />
-          <Tile label="Right direction" value={`${backcasts.hit_rate_pct.toFixed(0)}%`} sub="of quarters (up vs down)" />
-          <Tile label="Quarters tested" value={`${backcasts.n}`} sub="before launch" />
-        </div>
-        <p className="text-xs text-label mb-3">
-          How the new model would have performed if it had been running over the last few years.
-          These are <strong>tested estimates</strong> — run on past quarters before the model went
-          live, not real-time predictions — shown so the model has a track record from day one.
-        </p>
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">
-              <th className="py-2">Quarter</th>
-              <th className="py-2">Our estimate</th>
-              <th className="py-2">Actual</th>
-              <th className="py-2">Miss</th>
-              <th className="py-2">Direction</th>
-            </tr>
-          </thead>
-          <tbody>
-            {backcasts.backcasts.slice().reverse().map((b) => (
-              <tr key={b.target_quarter} className="border-b border-border">
-                <td className="py-2">
-                  {b.target_quarter} <span className="text-label-light">(tested)</span>
-                </td>
-                <td className="py-2">{formatPct(b.qoq_forecast_pct)}</td>
-                <td className="py-2">{formatPct(b.qoq_actual_pct)}</td>
-                <td className="py-2 text-label">
-                  {Math.abs(b.error_pp).toFixed(2)}pp
-                </td>
-                <td className={`py-2 ${b.direction_correct ? "text-teal" : "text-[#c0392b]"}`}>
-                  {b.direction_correct ? "✓ right" : "✗ wrong"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    );
-  }
-
+export default function PerformanceSection({ performance, isBacktest = false }: Props) {
   const edge = performance.rba_comparison.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
-  const edgeSub = performance.rba_comparison.n === 0
+  const edgeSub = isBacktest
+    ? "Not compared for tested quarters"
+    : performance.rba_comparison.n === 0
     ? "Year-ended forecast, updates twice yearly (Q2 & Q4)"
     : `${performance.rba_comparison.n} comparison${performance.rba_comparison.n === 1 ? "" : "s"} · ${edge !== null && edge < 0 ? "we beat RBA" : "RBA beats us"}`;
 
@@ -79,9 +33,18 @@ export default function PerformanceSection({ performance, backcasts }: Props) {
           sub={edgeSub}
         />
       </div>
-      <p className="text-xs text-label mb-3">
-        Each quarter, the final nowcast (latest vintage before the release) is compared against the actual GDP value. Bias is the average signed error, so a negative value means we systematically underpredict. Accuracy gap vs RBA compares our year-ended error to the RBA Statement on Monetary Policy forecast closest to quarter-end; a negative gap means our nowcast was closer to the final number.
-      </p>
+      {isBacktest ? (
+        <p className="text-xs text-label mb-3">
+          These are <strong>tested results</strong> — the new model run on past quarters before it
+          went live, not real-time predictions — so it has a track record from day one. Each quarter,
+          the estimate is compared with the actual GDP figure. Bias is the average miss; a positive
+          value means it tends to come in a little high.
+        </p>
+      ) : (
+        <p className="text-xs text-label mb-3">
+          Each quarter, the final nowcast (latest vintage before the release) is compared against the actual GDP value. Bias is the average signed error, so a negative value means we systematically underpredict. Accuracy gap vs RBA compares our year-ended error to the RBA Statement on Monetary Policy forecast closest to quarter-end; a negative gap means our nowcast was closer to the final number.
+        </p>
+      )}
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">

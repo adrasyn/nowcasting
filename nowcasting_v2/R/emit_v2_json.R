@@ -113,7 +113,9 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL) {
 
   # ---- one model at one as_of: truncate -> transform -> build_mai -> nowcast ----
   mk <- function(tfs, gdpt, id, name, sel_alpha, model, ci_path) {
-    mai <- build_mai(tfs = tfs, sel_alpha = sel_alpha, dfm_q = 1L, exclude_ids = AIG,
+    # Exclude AiG (dead) and rt (old Retail Trade, superseded by MHSI =
+    # household_spending, which the model already uses; rt was never selected).
+    mai <- build_mai(tfs = tfs, sel_alpha = sel_alpha, dfm_q = 1L, exclude_ids = c(AIG, "rt"),
                      out_csv = file.path("cache", paste0("mai_", id, ".csv")),
                      out_rds = file.path("cache", paste0("mai_", id, ".rds")))$mai
     nc  <- nowcast_midas(mai, gdpt, prev_level = prev_level, model = model, qa_lag = 0L:1L)

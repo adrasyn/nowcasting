@@ -29,6 +29,11 @@ const SPARKLINE_MODE: Record<string, SparklineMode> = {
   exports_servs: "level",
   imports_goods: "level",
   imports_servs: "level",
+  // v2 credit series: monthly change shown as bars (levels are near-flat lines)
+  credit: "bar",
+  credit_housing: "bar",
+  credit_business: "bar",
+  credit_card: "bar",
 };
 
 interface Props {

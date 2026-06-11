@@ -1082,8 +1082,8 @@
           "value": 37906.6
         }
       ],
-      "last_release_date": "2025-08-14",
-      "next_release_estimate": "2025-09-14"
+      "last_release_date": "2025-08-02",
+      "next_release_estimate": "2025-09-02"
     },
     {
       "id": "household_spending",
@@ -1092,10 +1092,6 @@
       "unit": "$m",
       "source": "ABS",
       "series": [
-        {
-          "date": "2023-04",
-          "value": 77036.092
-        },
         {
           "date": "2023-05",
           "value": 76845.979
@@ -1235,10 +1231,14 @@
         {
           "date": "2026-03",
           "value": 78978.073
+        },
+        {
+          "date": "2026-04",
+          "value": 78089.577
         }
       ],
-      "last_release_date": "2026-05-15",
-      "next_release_estimate": "2026-06-14"
+      "last_release_date": "2026-05-28",
+      "next_release_estimate": "2026-06-28"
     },
     {
       "id": "export",
@@ -1247,10 +1247,6 @@
       "unit": "$m",
       "source": "ABS",
       "series": [
-        {
-          "date": "2023-04",
-          "value": 45879.0
-        },
         {
           "date": "2023-05",
           "value": 47046.0
@@ -1390,10 +1386,14 @@
         {
           "date": "2026-03",
           "value": 44011.0
+        },
+        {
+          "date": "2026-04",
+          "value": 47191.0
         }
       ],
-      "last_release_date": "2026-05-15",
-      "next_release_estimate": "2026-06-14"
+      "last_release_date": "2026-06-04",
+      "next_release_estimate": "2026-07-05"
     },
     {
       "id": "credit",
@@ -2012,8 +2012,8 @@
           "value": 4.647
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-05-02",
+      "next_release_estimate": "2026-06-02"
     },
     {
       "id": "fcmygbag5",
@@ -2167,8 +2167,8 @@
           "value": 4.683
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-05-02",
+      "next_release_estimate": "2026-06-02"
     },
     {
       "id": "fcmygbag10",
@@ -2322,8 +2322,8 @@
           "value": 4.969
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-05-02",
+      "next_release_estimate": "2026-06-02"
     },
     {
       "id": "scrigbag3",
@@ -2477,8 +2477,8 @@
           "value": 0.307
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-05-02",
+      "next_release_estimate": "2026-06-02"
     },
     {
       "id": "scrigbag5",
@@ -2632,8 +2632,8 @@
           "value": 0.343
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-05-02",
+      "next_release_estimate": "2026-06-02"
     },
     {
       "id": "scrigbag10",
@@ -2787,8 +2787,8 @@
           "value": 0.629
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-05-02",
+      "next_release_estimate": "2026-06-02"
     },
     {
       "id": "firmmbab90",
@@ -2797,10 +2797,6 @@
       "unit": "%",
       "source": "RBA",
       "series": [
-        {
-          "date": "2023-05",
-          "value": 3.9
-        },
         {
           "date": "2023-06",
           "value": 4.25
@@ -2940,10 +2936,14 @@
         {
           "date": "2026-04",
           "value": 4.34
+        },
+        {
+          "date": "2026-05",
+          "value": 4.43
         }
       ],
-      "last_release_date": "2026-05-30",
-      "next_release_estimate": "2026-06-30"
+      "last_release_date": "2026-06-02",
+      "next_release_estimate": "2026-07-02"
     },
     {
       "id": "credit_card",

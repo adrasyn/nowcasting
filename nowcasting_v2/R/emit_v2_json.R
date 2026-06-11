@@ -31,9 +31,51 @@ suppressMessages({ library(jsonlite) })
 
 AIG       <- c("aig_pmi", "aig_pci", "aig_psi")   # B3_nab_wmi panel excludes the AiG block
 GDP_LAG   <- 60L                                  # National Accounts ~9wk after quarter-end
-MONDAYS   <- c("2026-06-01", "2026-06-08")        # Q2 Monday cadence so far
 CI_QA     <- "../pipeline/seed/ci_params_v2.json"
 CI_UMIDAS <- "../pipeline/seed/ci_params_v2_umidas.json"
+
+# Accurate publication lags (days from END of reference month). Corrects the
+# coarse backtest map (.lag_for_id) after the 2026-06-11 Fable review, which showed
+# the lag-45 ABS-activity block and lag-30 financial block withheld data that was
+# actually public (MHSI April released 28 May; daily AGS yields/spreads/BBSW are
+# available within days). Used for the LIVE as-of truncation here and mirrored in
+# the indicators release-date generator. NB: the CI params remain calibrated on
+# the backtest's coarser lags — a known follow-up to recalibrate.
+.LAG_ACC <- c(emp = 15, ft_emp = 15, pt_emp = 15, ue = 15, ud = 15, hours = 15,
+              household_spending = 28, rt = 33, export = 35, building_app = 33,
+              credit = 30, credit_housing = 30, credit_business = 30, credit_card = 30,
+              fcmygbag3 = 2, fcmygbag5 = 2, fcmygbag10 = 2,
+              scrigbag3 = 2, scrigbag5 = 2, scrigbag10 = 2, firmmbab90 = 2,
+              nab_conf = 10, nab_cond = 10, nab_trade = 10, nab_profit = 10,
+              nab_emp = 10, nab_forward = 10, nab_stocks = 10, nab_cu = 10,
+              anz_ads = 10, anz_sent = 10, wmi_sent = -15)
+.lag_acc <- function(id) if (id %in% names(.LAG_ACC)) .LAG_ACC[[id]] else 30L
+
+# Truncate the panel to data published by as_of, using the accurate lags above.
+.truncate_acc <- function(wide, as_of_date) {
+  as_of_date <- as.Date(as_of_date)
+  ids <- setdiff(names(wide), "date")
+  ref_end <- lubridate::ceiling_date(wide$date, unit = "month") - lubridate::days(1)
+  out <- wide
+  for (id in ids) {
+    rel <- ref_end + lubridate::days(.lag_acc(id))
+    out[[id]][rel > as_of_date] <- NA_real_
+  }
+  out
+}
+
+# Monday cadence: every Monday from the first Monday after the prior quarter's GDP
+# became available (so the target is the current quarter) up to today. Programmatic
+# so the weekly cron advances on its own (Fable review BLOCKER 2).
+.mondays_to_date <- function(gdp_full) {
+  last_q_end    <- lubridate::ceiling_date(max(as.Date(gdp_full$date)), "quarter") - 1
+  prior_release <- as.Date(last_q_end) + GDP_LAG
+  d <- prior_release
+  while (as.integer(format(d, "%u")) != 1L) d <- d + 1   # next Monday on/after
+  today <- Sys.Date()
+  if (d > today) return(format(d, "%Y-%m-%d"))
+  format(seq(d, today, by = "week"), "%Y-%m-%d")
+}
 
 # yoy from the last 3 actual QoQ growths + the target-quarter nowcast.
 .compute_yoy <- function(gdp, nowcast_qoq) {
@@ -42,7 +84,7 @@ CI_UMIDAS <- "../pipeline/seed/ci_params_v2_umidas.json"
   (prod(1 + c(last3, nowcast_qoq) / 100) - 1) * 100
 }
 
-emit_v2_json <- function(repo_root = "..", mondays = MONDAYS) {
+emit_v2_json <- function(repo_root = "..", mondays = NULL) {
   cat("=== emit_v2_json (Monday cadence, staged) ===\n")
 
   # ---- shared inputs (full panel; truncated per as_of below) ----
@@ -56,6 +98,8 @@ emit_v2_json <- function(repo_root = "..", mondays = MONDAYS) {
   cat(sprintf("[1] panel OK: %d series; wmi_sent present, extended NAB (n=%d)\n", ncol(wide_full) - 1L, nab_n))
   gdp_full <- read.csv("data_raw/rt_dgdp_qtr.csv")
   gdp_full$date <- as.Date(gdp_full$date)   # .truncate_gdp needs Date, not character
+  if (is.null(mondays)) mondays <- .mondays_to_date(gdp_full)
+  cat(sprintf("[0] Monday cadence: %s\n", paste(mondays, collapse = ", ")))
 
   jlatest <- tryCatch(jsonlite::fromJSON(file.path(repo_root, "data", "latest.json")), error = function(e) NULL)
   # prev_level = realized level of the quarter BEFORE target (the $ anchor).
@@ -90,7 +134,7 @@ emit_v2_json <- function(repo_root = "..", mondays = MONDAYS) {
 
   for (m in mondays) {
     as_of  <- as.Date(m)
-    wide_m <- .truncate_panel(wide_full, as_of)
+    wide_m <- .truncate_acc(wide_full, as_of)
     gdp_m  <- .truncate_gdp(gdp_full, as_of, gdp_lag = GDP_LAG)
     tfs_m  <- transform_panel(wide_m, "seed/panel_info.csv")
     ids    <- setdiff(names(wide_m), "date")
@@ -119,7 +163,9 @@ emit_v2_json <- function(repo_root = "..", mondays = MONDAYS) {
     gdp_chain_volume_millions = jlatest$nowcast$gdp_chain_volume_millions, source = "data/latest.json") else NULL
 
   out <- list(
-    generated_at   = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+    # The data vintage = the latest Monday (matches the production cron), not the
+    # wall-clock time this script happened to run.
+    generated_at   = paste0(latest_m, "T02:00:00Z"),
     schema         = "v2-staged-2",
     as_of          = latest_m,
     target_quarter = headline$target_quarter,

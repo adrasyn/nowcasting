@@ -9,8 +9,11 @@ interface Props {
 export default function PerformanceSection({ performance, isBacktest = false }: Props) {
   const edge = performance.rba_comparison.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
+  // Only claim an edge when it's material (|gap| >= 0.1pp); a 0.05pp average over
+  // 6 quarters is not significant, so call it level (Fable review B1).
+  const edgeMag = edge === null ? 0 : Math.abs(edge);
   const edgeSub = performance.rba_comparison.n > 0
-    ? `${performance.rba_comparison.n} year-ended comparison${performance.rba_comparison.n === 1 ? "" : "s"} (Q2/Q4) · ${edge !== null && edge < 0 ? "we edge RBA" : edge !== null && edge > 0 ? "RBA edges us" : "level"}`
+    ? `${performance.rba_comparison.n} year-ended comparison${performance.rba_comparison.n === 1 ? "" : "s"} (Q2/Q4) · ${edgeMag < 0.1 ? "roughly level with the RBA" : edge !== null && edge < 0 ? "we edge the RBA" : "RBA edges us"}`
     : isBacktest
     ? "Not compared for tested quarters"
     : "Year-ended forecast, updates twice yearly (Q2 & Q4)";
@@ -39,8 +42,10 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
           went live, not real-time predictions — so it has a track record from day one. Each quarter,
           the estimate is compared with the actual GDP figure. Bias is the average miss; a positive
           value means it tends to come in a little high. The RBA gap compares our year-ended estimate
-          with the RBA forecast for each June and December quarter; a negative gap means we landed
-          closer to the final figure.
+          with the RBA&rsquo;s forecast published mid-quarter (about two months before our full-quarter
+          estimate) for each June and December quarter; a negative gap means we landed closer to the
+          final figure. We use more within-quarter data than that RBA forecast, and both are measured
+          against later-revised GDP.
         </p>
       ) : (
         <p className="text-xs text-label mb-3">
@@ -55,6 +60,7 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
             <th className="py-2">Actual</th>
             <th className="py-2">Error ($M)</th>
             <th className="py-2">Error (%)</th>
+            <th className="py-2">Our (YE)</th>
             <th className="py-2">RBA (YE)</th>
             <th className="py-2">Gap (pp)</th>
           </tr>
@@ -72,6 +78,9 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
               </td>
               <td className={`py-2 ${e.error_pct > 0 ? "text-teal" : "text-[#c0392b]"}`}>
                 {formatPct(e.error_pct)}
+              </td>
+              <td className="py-2 text-label">
+                {e.yoy_nowcast == null ? "—" : `${e.yoy_nowcast.toFixed(2)}%`}
               </td>
               <td className="py-2 text-label">
                 {e.yoy_rba === null ? "—" : `${e.yoy_rba.toFixed(2)}%`}

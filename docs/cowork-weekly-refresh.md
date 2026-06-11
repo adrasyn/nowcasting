@@ -64,6 +64,11 @@ C. NAB Monthly Business Survey -> nab_conf/cond/trade/profit/emp/forward/stocks/
        appending; if it rejects, re-view and correct; if still won't reconcile,
        leave BLOCKED and report. Never hand-edit the CSVs.
 
+D. ANZ-Roy Morgan Consumer Confidence -> data_raw/anz_sent.csv (index ~100, range 50-150).
+   Source: https://www.roymorgan.com/morgan-poll/consumer-confidence-anz-roy-morgan-australian-cc-monthly-ratings
+   WebFetch the monthly-ratings table; take the LATEST month's value (strip any
+   footnote markers like * or **), range-check 50-150, append if newer.
+
 COMMIT: `git diff --stat`; confirm only genuine new rows. Commit
 ("data: weekly v2 surveys <date>") and `git push origin nowcast-v2`. If nothing
 new, no commit.

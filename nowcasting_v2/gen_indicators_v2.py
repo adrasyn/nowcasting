@@ -19,8 +19,13 @@ Design:
     historical months flow through too.
   * Advances last_release_date / next_release_estimate by however many months the
     data extended (preserves each source's day-of-month release pattern).
+  * Clamps last_release_date to today if the shifted heuristic lands in the
+    future. Some sources (e.g. RM Consumer Confidence) publish mid-month rolling
+    monthly averages, so the data point IS in our file before the heuristic's
+    "Nth of next month" release day — a future last_release_date there is
+    self-contradicting.
 """
-import json, csv, os, calendar
+import json, csv, os, calendar, datetime as dt
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IND = os.path.join(ROOT, "data", "indicators_v2.json")
@@ -82,8 +87,10 @@ def load_v1_abs_dates():
 def main():
     doc = json.load(open(IND))
     v1_dates = load_v1_abs_dates()
+    today_iso = dt.date.today().isoformat()
     advanced = []
     abs_synced = []
+    clamped = []
     for ind in doc["indicators"]:
         sid = ind["id"]
         old = ind["series"]
@@ -115,6 +122,13 @@ def main():
                 if v:
                     ind[k] = v
             abs_synced.append(sid)
+        # last_release_date describes a past event — the data is already in
+        # our file, so it cannot be in the future. Clamp if the heuristic ran
+        # ahead of itself.
+        lrd = ind.get("last_release_date")
+        if lrd and lrd > today_iso:
+            ind["last_release_date"] = today_iso
+            clamped.append(f"{sid} {lrd}->{today_iso}")
         ind["series"] = new
 
     json.dump(doc, open(IND, "w"), indent=2)
@@ -125,6 +139,8 @@ def main():
         print("All indicators already current.")
     if abs_synced:
         print(f"ABS dates synced from v1 ({len(abs_synced)}):", ", ".join(abs_synced))
+    if clamped:
+        print(f"Clamped future last_release_date to today ({len(clamped)}):", ", ".join(clamped))
 
 
 if __name__ == "__main__":

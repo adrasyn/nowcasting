@@ -28,17 +28,46 @@ symptom. The primary source (NAB's PDF) survived; the aggregator scrape did not.
 
 ## What replaced it
 
-`03d_sync_nab_from_v2.R` copies across any month in `nab_conf.csv` strictly newer
-than v1's last row. It is **append-only** and deliberately so:
+`03d_sync_nab_from_v2.R` **mirrors** `nab_conf.csv` into the v1 CSV on every run.
+v2 is authoritative and v1's history is not preserved, because v1's history was wrong.
 
-- The two series disagree on **83 of 347** overlapping months — mostly a clean
-  one-month misalignment across 2013-08..2014-08 (`v2[m] == v1[m+1]` exactly),
-  plus aggregator noise (2015+: 12 of 139 months differ, max 4).
-- Rewriting v1's history from v2 would silently move the v1 model's inputs and the
-  **published track record**. So history is frozen and gaps are never backfilled.
-- This accepts a source seam at the join. That is the intended trade.
+### v1 was one month late
 
-Tests: `pipeline/tests/test_sync_nab_from_v2.R` (run from `pipeline/`).
+v1 recorded each value one month too late across large parts of 2008-2014. NAB
+published business confidence of **12 for September 2013** and **5 for October 2013**
+([Inside Retail, Nov 2013](https://insideretail.com.au/news/business-confidence-falls-high-201311)).
+
+| Series | Sep 2013 | Oct 2013 |
+|---|---|---|
+| v2 (cloud routine, NAB PDF) | 12 | 5 |
+| v1 (old, investing.com) | 6 | 12 |
+
+The shift is not a local anomaly. It covers eight runs:
+
+```
+2008-03..2008-06   2008-10..2008-12   2009-02..2009-11   2010-02..2010-11
+2011-01..2011-10   2011-12..2012-12   2013-02..2013-10   2013-12..2014-08
+```
+
+70 of the 89 disagreeing months are this shift. The v1 model therefore read NAB
+confidence a month late through the GFC and the recovery.
+
+The mirror corrected **86 months**, added 2, dropped 4, and removed the duplicate
+rows for 2008-10, 2009-02 and 2010-12 that the loader never de-duplicated.
+
+### A broken scrape cannot destroy the series
+
+The overwrite only happens if `nab_conf.csv` passes validation: at least 300 rows,
+no duplicate dates, all dates first-of-month, all values within [-80, 80]. Any
+failure leaves the v1 file untouched and raises a warning.
+
+Tests: `pipeline/tests/test_sync_nab_from_v2.R` (19 tests, run from `pipeline/`).
+
+### Months not carried over
+
+v2 has no data for **2000-05, 2008-02, 2009-12 and 2010-12**, which v1 had. Those v1
+values were NOT kept: each sits on the edge of a shift run, so they are very likely a
+month out as well. Recovering them from NAB's own history is an open follow-up.
 
 ## Correction to a claim this file used to make
 

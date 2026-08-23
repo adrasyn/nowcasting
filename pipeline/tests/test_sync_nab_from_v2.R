@@ -1,12 +1,13 @@
 #### test_sync_nab_from_v2.R ####
-# Tests for 03d_sync_nab_from_v2.R — the append-only sync that feeds the legacy
-# v1 NAB CSV from the v2 survey scrape (nowcasting_v2/data_raw/nab_conf.csv).
+# Tests for 03d_sync_nab_from_v2.R — the mirror that feeds the legacy v1 NAB CSV
+# from the v2 survey scrape (nowcasting_v2/data_raw/nab_conf.csv).
 #
-# The property that matters most: v1's HISTORY MUST NOT MOVE. The two series
-# disagree on 83 of 347 overlapping months (a clean one-month misalignment
-# across 2013-08..2014-08, plus ±1 aggregator noise), so rewriting history from
-# v2 would silently shift the v1 nowcast and the published track record.
-# The sync is therefore strictly append-forward.
+# v2 is authoritative: v1 is overwritten in full. v1's old history was misaligned
+# by one month across large parts of 2008-2014, so it is not preserved.
+#
+# The property that matters most here is the opposite of trust: a BROKEN v2 file
+# must never be allowed to truncate or corrupt v1. Every validation failure has to
+# leave v1 exactly as it was.
 #
 # Run from pipeline/ with:   Rscript tests/test_sync_nab_from_v2.R
 
@@ -25,82 +26,90 @@ pass <- 0L
 fail <- 0L
 check <- function(label, ok) {
   if (isTRUE(ok)) {
-    cat(sprintf("  ok   %s\n", label))
-    pass <<- pass + 1L
+    cat(sprintf("  ok   %s\n", label)); pass <<- pass + 1L
   } else {
-    cat(sprintf("  FAIL %s\n", label))
-    fail <<- fail + 1L
+    cat(sprintf("  FAIL %s\n", label)); fail <<- fail + 1L
   }
 }
 
-# Scratch files, cleaned up at exit
 tmp <- tempfile("nabsync"); dir.create(tmp)
 on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
 v1_path <- file.path(tmp, "v1.csv")
 v2_path <- file.path(tmp, "v2.csv")
 
-write_csv_rows <- function(path, dates, values) {
-  write_csv(tibble(date = dates, value = values), path)
+# A valid v2 file: long enough to clear NAB_SYNC_MIN_ROWS, first-of-month, in range.
+months_seq <- seq(ymd("1997-03-01"), by = "month", length.out = 350)
+good_v2 <- tibble(date = months_seq, value = rep(c(-5, 3, 12, -20, 0), length.out = 350))
+write_valid_v2 <- function() write_csv(good_v2, v2_path)
+
+# A small v1 file that disagrees with v2, standing in for the misaligned history.
+write_old_v1 <- function() {
+  write_csv(tibble(
+    date  = c(ymd("2013-09-01"), ymd("2013-10-01"), ymd("2026-06-01")),
+    value = c(6, 12, -5)   # the WRONG, one-month-late values
+  ), v1_path)
 }
 
-read_rows <- function(path) {
-  read_csv(path, show_col_types = FALSE) |> mutate(date = ymd(date))
+read_v1 <- function() read_csv(v1_path, show_col_types = FALSE) |> mutate(date = ymd(date))
+
+cat("\n== 1. v2 is mirrored in full ==\n")
+write_valid_v2(); write_old_v1()
+res <- sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path, quiet = TRUE)
+got <- read_v1()
+check("returns every v2 row", nrow(res) == nrow(good_v2))
+check("v1 now has v2's row count", nrow(got) == nrow(good_v2))
+check("v1 values equal v2 values", identical(got$value, good_v2$value))
+check("v1 dates equal v2 dates", identical(got$date, good_v2$date))
+
+cat("\n== 2. the old misaligned v1 history is gone ==\n")
+check("old wrong Sep-2013 value (6) removed", !any(got$date == ymd("2013-09-01") & got$value == 6))
+check("no duplicate dates", sum(duplicated(got$date)) == 0)
+check("dates ascending", all(diff(got$date) > 0))
+
+cat("\n== 3. idempotent ==\n")
+before <- readLines(v1_path)
+sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path, quiet = TRUE)
+check("second run is byte-identical", identical(before, readLines(v1_path)))
+
+cat("\n== 4. a BROKEN v2 must never destroy v1 ==\n")
+# Each case writes a bad v2, then asserts v1 is untouched.
+expect_v1_untouched <- function(label, bad_v2_tbl) {
+  write_valid_v2(); write_old_v1()
+  sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path, quiet = TRUE)  # establish good state
+  keep <- readLines(v1_path)
+  write_csv(bad_v2_tbl, v2_path)
+  out <- suppressWarnings(sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path, quiet = TRUE))
+  check(label, identical(keep, readLines(v1_path)) && nrow(out) == 0)
 }
+expect_v1_untouched("truncated scrape (5 rows) rejected", good_v2[1:5, ])
+expect_v1_untouched("empty file rejected", good_v2[0, ])
+expect_v1_untouched("duplicate dates rejected",
+                    bind_rows(good_v2, good_v2[10, ]) |> arrange(date))
+expect_v1_untouched("out-of-range values rejected",
+                    good_v2 |> mutate(value = ifelse(row_number() == 5, 950, value)))
+expect_v1_untouched("mid-month dates rejected",
+                    good_v2 |> mutate(date = ifelse(row_number() == 5, date + 14, date) |> as.Date()))
 
-cat("\n== 1. appends only months strictly newer than v1's last row ==\n")
-# v1 ends May; v2 runs to July AND disagrees with v1 on an existing month.
-write_csv_rows(v1_path, c("2026-03-01", "2026-04-01", "2026-05-01"), c(-29, -24, -14))
-write_csv_rows(v2_path,
-  c("2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01", "2026-07-01"),
-  c(-29, -24, -99, -5, -6))  # -99 = deliberate conflict on an existing month
-
-added <- sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path)
-res <- read_rows(v1_path)
-
-check("returns the 2 new months", nrow(added) == 2)
-check("v1 now ends 2026-07-01", max(res$date) == ymd("2026-07-01"))
-check("July value came from v2 (-6)", res$value[res$date == ymd("2026-07-01")] == -6)
-check("June value came from v2 (-5)", res$value[res$date == ymd("2026-06-01")] == -5)
-
-cat("\n== 2. HISTORY IS FROZEN: existing rows are never overwritten ==\n")
-check("May still -14, NOT v2's -99", res$value[res$date == ymd("2026-05-01")] == -14)
-check("row count grew by exactly 2", nrow(res) == 5)
-check("no duplicate dates introduced", sum(duplicated(res$date)) == 0)
-check("dates remain ascending", all(diff(res$date) > 0))
-
-cat("\n== 3. no-op when v1 is already current ==\n")
-added2 <- sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path)
-res2 <- read_rows(v1_path)
-check("nothing appended on second run", nrow(added2) == 0)
-check("file unchanged (idempotent)", identical(res$value, res2$value))
-
-cat("\n== 4. never backfills gaps inside v1's history ==\n")
-# v1 is missing April entirely; v2 has it. A gap is history, not a new month.
-write_csv_rows(v1_path, c("2026-03-01", "2026-05-01"), c(-29, -14))
-sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path)
-res3 <- read_rows(v1_path)
-check("April gap left alone", !any(res3$date == ymd("2026-04-01")))
-check("still appended the new months", max(res3$date) == ymd("2026-07-01"))
-
-cat("\n== 5. degrades safely when v2 is unavailable ==\n")
-# Missing v2 must NOT crash the pipeline — the freshness guard downstream is
-# what decides whether stale data is fatal.
-write_csv_rows(v1_path, c("2026-03-01", "2026-04-01"), c(-29, -24))
-added4 <- tryCatch(
-  sync_nab_from_v2(v1_path = v1_path, v2_path = file.path(tmp, "does_not_exist.csv")),
-  error = function(e) structure(list(), class = "sync_errored")
+cat("\n== 5. missing v2 leaves v1 alone and does not error ==\n")
+write_valid_v2(); write_old_v1()
+sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path, quiet = TRUE)
+keep <- readLines(v1_path)
+out <- tryCatch(
+  suppressWarnings(sync_nab_from_v2(v1_path = v1_path, v2_path = file.path(tmp, "gone.csv"), quiet = TRUE)),
+  error = function(e) structure(list(), class = "errored")
 )
-check("missing v2 does not error", !inherits(added4, "sync_errored"))
-check("missing v2 appends nothing", is.data.frame(added4) && nrow(added4) == 0)
-check("v1 left intact", max(read_rows(v1_path)$date) == ymd("2026-04-01"))
+check("missing v2 does not error", !inherits(out, "errored"))
+check("missing v2 writes nothing", is.data.frame(out) && nrow(out) == 0)
+check("v1 untouched", identical(keep, readLines(v1_path)))
 
-cat("\n== 6. ignores v2 rows with missing values ==\n")
-write_csv_rows(v1_path, c("2026-03-01"), c(-29))
-write_csv_rows(v2_path, c("2026-03-01", "2026-04-01", "2026-05-01"), c(-29, NA, -14))
-sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path)
-res5 <- read_rows(v1_path)
-check("NA month not appended", !any(res5$date == ymd("2026-04-01")))
-check("later real month still appended", any(res5$date == ymd("2026-05-01")))
+cat("\n== 6. NA rows in v2 are dropped, not written ==\n")
+write_csv(good_v2 |> mutate(value = ifelse(row_number() == 7, NA, value)), v2_path)
+write_old_v1()
+out <- sync_nab_from_v2(v1_path = v1_path, v2_path = v2_path, quiet = TRUE)
+got <- read_v1()
+check("NA month absent from v1", !any(got$date == good_v2$date[7]))
+check("all other months present", nrow(got) == nrow(good_v2) - 1)
+check("no NA values written", !any(is.na(got$value)))
 
 cat(sprintf("\n---- %d passed, %d failed ----\n", pass, fail))
 if (fail > 0) quit(status = 1)

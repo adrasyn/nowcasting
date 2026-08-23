@@ -45,12 +45,17 @@ cat("----------------------------------------\n")
 
 # Load data fetching scripts
 source("03c_nab_business_confidence.R")
+source("03d_sync_nab_from_v2.R")
 source("03_data_ingestion.R")
 source("03b_fetch_fred_data.R")
 
-# NAB first — fails fast if stale (manual update required)
-# To update: https://www.investing.com/economic-calendar/nab-business-confidence-217
-# update_nab_data('2026-02-01', 3)
+# NAB first — fails fast if stale.
+# New months are pulled from the v2 survey scrape (nowcasting_v2/data_raw/nab_conf.csv,
+# refreshed weekly from NAB's own PDF) rather than a second scraper of its own; see
+# 03d for why this is append-only. Manual top-up is still available if v2 is down:
+#   update_nab_data('2026-02-01', 3)
+sync_nab_from_v2()
+
 cat("  → Loading NAB Business Confidence (1)...\n")
 manual_data <- fetch_all_manual_indicators()
 

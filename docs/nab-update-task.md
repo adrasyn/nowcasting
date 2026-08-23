@@ -1,66 +1,102 @@
-# NAB Business Confidence — monthly Claude scheduled task
+# NAB Business Confidence — monthly Claude scheduled task (RETIRED 2026-08-23)
 
-This is the prompt James pastes into Claude Desktop's scheduled-task UI. It runs once a month, post the 2nd Tuesday, and updates the NAB Business Confidence CSV in the nowcasting repo via Chrome MCP against the user's preferred aggregator (no server-side scrape needed).
+> **This task is retired. It was already deleted from Claude Desktop some time ago,**
+> **and replaced by the cloud routine — but that routine only writes the v2 files.**
+> **The v1 CSV was left with no feeder at all. That is why May, June and July 2026**
+> **all needed manual unblocks. No action is needed from you.**
+>
+> The v1 CSV (`pipeline/nab_business_confidence_raw.csv`) is now fed automatically
+> from the v2 survey scrape by `pipeline/03d_sync_nab_from_v2.R`, which runs at the
+> top of `run_complete_nowcast.R`. There is nothing left to paste anywhere.
 
-## Schedule
+## Why it was retired
 
-| Field | Value |
-|---|---|
-| Cron | `0 2 15 * *` (02:00 local on the 15th of each month) |
-| Frequency | monthly |
-| Window | The 15th is always past the 2nd Tuesday, so the previous month's data will always be available by then. |
+This task scraped investing.com monthly to maintain v1's CSV. It was deleted and
+replaced by the cloud/weekly routine — but that routine only writes the **v2**
+files (`nowcasting_v2/data_raw/nab_conf.csv`, read from NAB's own survey PDF).
+Nothing was left writing v1.
 
-## Prompt (paste verbatim)
+So v1 was **orphaned, not broken**: there was no failing scraper to find. It
+missed **May, June and July 2026**.
+Because v1's freshness guard hard-stops the run and the v2 workflow step is gated on
+`if: success()`, a stale v1 CSV killed the *entire* weekly job — v2 nowcast, commit
+and deploy included — while the correct value sat in `nab_conf.csv` the whole time.
+That was issue #16.
+
+Retiring the weaker of two fetchers removes the failure class rather than the
+symptom. The primary source (NAB's PDF) survived; the aggregator scrape did not.
+
+## What replaced it
+
+`03d_sync_nab_from_v2.R` **mirrors** `nab_conf.csv` into the v1 CSV on every run.
+v2 is authoritative and v1's history is not preserved, because v1's history was wrong.
+
+### v1 was one month late
+
+v1 recorded each value one month too late across large parts of 2008-2014. NAB
+published business confidence of **12 for September 2013** and **5 for October 2013**
+([Inside Retail, Nov 2013](https://insideretail.com.au/news/business-confidence-falls-high-201311)).
+
+| Series | Sep 2013 | Oct 2013 |
+|---|---|---|
+| v2 (cloud routine, NAB PDF) | 12 | 5 |
+| v1 (old, investing.com) | 6 | 12 |
+
+The shift is not a local anomaly. It covers eight runs:
 
 ```
-You are updating the NAB Business Confidence CSV in the nowcasting repository. Run these steps in order.
-
-1. Open Chrome (via Chrome MCP) and navigate to:
-   https://www.investing.com/economic-calendar/nab-business-confidence-217
-
-2. From the historical table on that page, read the TWO most recent "Actual" values for NAB Business Confidence:
-   a. The most recent row — this is the new observation for the PREVIOUS calendar month. (A release dated 2026-05-13 reports April 2026 data.)
-   b. The row before that — this is the prior month's value. NAB frequently revises the previous month's figure on release day, so it may differ from what is currently in the CSV.
-
-3. Change directory to the nowcasting repo:
-   cd C:/Users/wilso/Documents/Claude/Projects/nowcasting
-
-4. Pull latest:
-   git pull origin main
-
-5. Read the current contents of pipeline/nab_business_confidence_raw.csv and locate the row for the prior month (the one identified in step 2b). Compare its value to what investing.com now shows for that month.
-
-   - If the values match: no revision needed.
-   - If the values differ: UPDATE that row's value in place. Do NOT add a duplicate row and do NOT modify any row older than the prior month.
-
-6. Append the new observation (from step 2a) to pipeline/nab_business_confidence_raw.csv. Format:
-   date,value
-   YYYY-MM-01,<integer or decimal>
-
-   Use the first day of the reported month as the date. Preserve chronological order; append at the bottom.
-
-7. Commit and push. The commit message depends on whether a revision happened in step 5:
-   - New month only:
-     git commit -m "data: NAB Business Confidence for <Month YYYY>"
-   - New month + revision of prior month:
-     git commit -m "data: NAB Business Confidence for <Month YYYY> (+ <Prior Month> revision)"
-
-   git add pipeline/nab_business_confidence_raw.csv
-   git push
-
-8. Report: the new month's value, whether the prior month was revised (and if so, from → to), and the commit URL.
-
-If the investing.com page is blocked, the table is missing the expected row, or the value cannot be read with confidence: STOP. Do NOT write a fabricated value. Report the failure so James can update manually.
+2008-03..2008-06   2008-10..2008-12   2009-02..2009-11   2010-02..2010-11
+2011-01..2011-10   2011-12..2012-12   2013-02..2013-10   2013-12..2014-08
 ```
 
-## Notes
+70 of the 89 disagreeing months are this shift. The v1 model therefore read NAB
+confidence a month late through the GFC and the recovery.
 
-- The repo itself does not scrape NAB — **v1** reads `pipeline/nab_business_confidence_raw.csv`.
-- **There are TWO NAB inputs, not one.** This task maintains v1's CSV. **v2** reads
-  `nowcasting_v2/data_raw/nab_conf.csv` (plus seven sub-indices: `nab_cond`, `nab_trade`,
-  `nab_profit`, `nab_emp`, `nab_forward`, `nab_stocks`, `nab_cu`), which are refreshed by the
-  local Cowork survey routine — see `docs/cowork-weekly-refresh.md`. Updating one does **not**
-  update the other. If the v2 headline stalls on a freshness guard, this task is not the fix.
-- If this task ever fails silently, the weekly nowcast pipeline falls back to the last-known value and the site's headline won't break. James will notice a month-old NAB value on the dashboard.
-- The alternative aggregators (`tradingeconomics.com`, NAB direct) can be swapped into Step 1 without any other changes — the contract is the CSV, not the source.
-- To revise this task, edit this file and re-paste the prompt into Claude Desktop's scheduled-task UI.
+The mirror corrected **86 months**, added 2, dropped 4, and removed the duplicate
+rows for 2008-10, 2009-02 and 2010-12 that the loader never de-duplicated.
+
+### A broken scrape cannot destroy the series
+
+The overwrite only happens if `nab_conf.csv` passes validation: at least 300 rows,
+no duplicate dates, all dates first-of-month, all values within [-80, 80]. Any
+failure leaves the v1 file untouched and raises a warning.
+
+Tests: `pipeline/tests/test_sync_nab_from_v2.R` (19 tests, run from `pipeline/`).
+
+### Months not carried over
+
+v2 has no data for **2000-05, 2008-02, 2009-12 and 2010-12**, which v1 had. Those v1
+values were NOT kept: each sits on the edge of a shift run, so they are very likely a
+month out as well. Recovering them from NAB's own history is an open follow-up.
+
+## Correction to a claim this file used to make
+
+The old version of this doc said:
+
+> "If this task ever fails silently, the weekly nowcast pipeline falls back to the
+> last-known value and the site's headline won't break."
+
+**That was wrong.** There is no fallback. `check_nab_data_freshness()` in
+`03c_nab_business_confidence.R` calls `stop()`, which halts the whole job. That
+mistaken belief is part of why two missed months went unnoticed as a *class* of
+problem rather than a one-off.
+
+## Manual top-up (if v2 is ever down)
+
+The escape hatch still exists — from `pipeline/`:
+
+```r
+source("03c_nab_business_confidence.R")
+update_nab_data("2026-08-01", -4)   # date = first of the REPORTED month
+```
+
+NAB releases on the 2nd Tuesday for the previous month. Never fabricate a value:
+a documented gap is success, a guessed number is failure.
+
+## Related
+
+- `docs/cowork-weekly-refresh.md` — the weekly routine that is now the single NAB fetcher
+- **Known pre-existing bug, not fixed here:** the v1 CSV has duplicate rows for
+  2008-10, 2009-02 and 2010-02 with differing values, and the loader does not
+  dedupe, so those months are double-weighted. Fixing it means re-running the v1
+  backtest.

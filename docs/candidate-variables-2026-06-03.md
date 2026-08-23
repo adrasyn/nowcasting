@@ -110,7 +110,7 @@ Legend — **Value:** ★–★★★ expected contribution to fixing *this* cla
 #### 7. NAB business *conditions* — `nab_conditions`
 - **Value:** ★★  **Feasibility:** 🟡
 - **What:** NAB *conditions* (trading/profitability/employment) tracks actual activity better than *confidence* (which we already have). NY Fed gives surveys their own block as the most timely inputs.
-- **Source / id:** Same NAB monthly survey we already ingest — but the current `nab_business_confidence_raw.csv` is **`date,value` (confidence only)**. Needs: extend CSV schema, update the **user-owned NAB scheduled task** (`docs/nab-update-task.md`) to capture conditions, and **backfill history**.
+- **Source / id:** Same NAB monthly survey we already ingest — but the current `nab_business_confidence_raw.csv` is **`date,value` (confidence only)**. ~~Needs: extend CSV schema, update the **user-owned NAB scheduled task** (`docs/nab-update-task.md`) to capture conditions, and **backfill history**.~~ **Update 2026-08-23:** that scheduled task is retired (see `docs/nab-update-task.md`) and this is now much cheaper — `nowcasting_v2/data_raw/nab_cond.csv` already holds conditions with full history, alongside six more sub-indices (`trade`, `profit`, `emp`, `forward`, `stocks`, `cu`). No new scraping needed; this is a panel-wiring job, not a data-acquisition one.
 - **Frequency / lag:** monthly. **Proposed transform:** net-balance level (code `2`).
 - **Risk:** external manual-data dependency + backfill before it can be backtested. Higher effort than Tier 1–2.
 

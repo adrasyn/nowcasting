@@ -2,12 +2,12 @@
   "basis": "post-COVID (target quarter >= 2022-01-01)",
   "factor_count": 3,
   "n": 16,
-  "qoq_bias_pp": 0.2174,
-  "qoq_sd_pp": 0.2705,
-  "qoq_rmse_pp": 0.3404,
+  "qoq_bias_pp": 0.2063,
+  "qoq_sd_pp": 0.274,
+  "qoq_rmse_pp": 0.3361,
   "z_68": 1,
   "z_95": 1.96,
   "method": "bias-aware: interval centred on (forecast - bias), half-width z*sd",
-  "source": ".cache/backtest_output/r3/backtest_results.csv (panel-expansion baseline r=3 POOS backtest, 2026-06-04)",
-  "computed_at": "2026-06-04T15:43:56Z"
+  "source": ".cache/backtest_output/nab_fix_r3/backtest_results.csv (r=3 POOS backtest re-run after the NAB one-month-shift correction, 2026-08-23)",
+  "computed_at": "2026-08-23T07:21:53Z"
 }

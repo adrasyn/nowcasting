@@ -1,6 +1,9 @@
 # NAB Business Confidence — monthly Claude scheduled task (RETIRED 2026-08-23)
 
-> **This task is retired. Delete it from Claude Desktop's scheduled-task UI.**
+> **This task is retired. It was already deleted from Claude Desktop some time ago,**
+> **and replaced by the cloud routine — but that routine only writes the v2 files.**
+> **The v1 CSV was left with no feeder at all. That is why May, June and July 2026**
+> **all needed manual unblocks. No action is needed from you.**
 >
 > The v1 CSV (`pipeline/nab_business_confidence_raw.csv`) is now fed automatically
 > from the v2 survey scrape by `pipeline/03d_sync_nab_from_v2.R`, which runs at the
@@ -8,12 +11,13 @@
 
 ## Why it was retired
 
-This task scraped investing.com monthly to maintain v1's CSV. The weekly survey
-routine (`docs/cowork-weekly-refresh.md`) *already* fetched the same number from
-NAB's own monthly survey PDF into `nowcasting_v2/data_raw/nab_conf.csv`. Two
-automations, two sources, one number.
+This task scraped investing.com monthly to maintain v1's CSV. It was deleted and
+replaced by the cloud/weekly routine — but that routine only writes the **v2**
+files (`nowcasting_v2/data_raw/nab_conf.csv`, read from NAB's own survey PDF).
+Nothing was left writing v1.
 
-The v1 task then silently stopped landing commits and missed **June and July 2026**.
+So v1 was **orphaned, not broken**: there was no failing scraper to find. It
+missed **May, June and July 2026**.
 Because v1's freshness guard hard-stops the run and the v2 workflow step is gated on
 `if: success()`, a stale v1 CSV killed the *entire* weekly job — v2 nowcast, commit
 and deploy included — while the correct value sat in `nab_conf.csv` the whole time.

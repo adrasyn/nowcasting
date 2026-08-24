@@ -1451,12 +1451,21 @@ def test_reproduces_the_published_nowcast(week, fixture):
 @pytest.mark.slow
 @pytest.mark.fixtures
 def test_reproduces_the_release_impacts(fixture):
-    """Every series' impact must match to 0.01pp, not just the total - a
-    compensating pair of errors can leave the headline right."""
+    """Every series' impact must match, not just the total - a compensating pair
+    of errors can leave the headline right while both components are wrong.
+
+    HORIZON 1 ONLY. example_nowcast.m:174 linear-indexes an (n, T, 2) weights
+    array with an (n, T) mask, so the published Weight/Impact columns cover the
+    first t_now and nothing else. Comparing horizon 2 against them would compare
+    our real numbers to MATLAB's dropped ones and pass or fail for no reason.
+    """
     d = fixture("published_nowcasts")
+    assert int(d["news_0929__horizon"]) == 1
     got = run_reference_week("2023-09-29")
-    for series_id, impact in zip(d["news__series_id"], d["news__impact"]):
-        assert got.impact_for(str(series_id)) == pytest.approx(float(impact), abs=0.01)
+    for series_id, impact in zip(d["news_0929__series_id"], d["news_0929__impact"]):
+        assert got.impact_for(str(series_id), horizon=0) == pytest.approx(
+            float(impact), abs=0.01
+        )
 ```
 
 - [ ] **Step 3: Run the gate**

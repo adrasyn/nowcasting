@@ -1268,7 +1268,11 @@ git commit -m "feat(v3): stochastic volatility, outlier, scale and probability u
 
 ## Task 7: The Gibbs sampler
 
-**Model: Fable 5.** `Gibbs_update.m` is 316 lines of conditional posteriors — `mu`, `gamma_g`, `Phi`, `phi`, `Lambda`, plus the volatility and outlier blocks — with restriction handling threaded through each. No fixture pins a draw. A transposed design matrix or a dropped prior-precision term gives a sampler that converges to the wrong posterior and looks entirely healthy while doing it. This is the single highest-risk file in the project.
+**Model: Opus 5.** *(Revised. This task was the sole remaining Fable assignment, on the reasoning that its output is a draw and no fixture can pin it. Step 0 below removes that reasoning: the conditional posteriors are deterministic given the smoothed state, so injecting the state and stopping before each draw makes the entire conditional structure Tier 1. That is the same seam that converted Task 6, and it targets exactly the failure mode Fable was there to guard against. With a bit-exact oracle in place this is Opus work.)*
+
+**Why the oracle matters more here than anywhere else.** Task 9 does not test this file. `example_nowcast.m` — and therefore our reference runner — loads the **stored** `Estimates_2023_09_20.mat` produced by MATLAB's own estimation run, and nowcasts from it. So the end-to-end gate verifies the nowcast path, not the estimation path. Without Step 0, `Gibbs_update.m` would be the one file in the project whose only evidence is coarse posterior coverage, and nothing downstream would ever contradict a wrong sampler.
+
+`Gibbs_update.m` is 316 lines of conditional posteriors — `mu`, `gamma_g`, `Phi`, `phi`, `Lambda`, plus the volatility and outlier blocks — with restriction handling threaded through each. No fixture pins a draw. A transposed design matrix or a dropped prior-precision term gives a sampler that converges to the wrong posterior and looks entirely healthy while doing it. This is the single highest-risk file in the project.
 
 **Files:**
 - Create: `nowcasting_v3/nyfed/gibbs.py`
@@ -1284,6 +1288,53 @@ git commit -m "feat(v3): stochastic volatility, outlier, scale and probability u
 **The single best test available here is conditional-posterior recovery on synthetic data.** Simulate from the model with known parameters, run the sampler, and check the posterior covers the truth. That catches a mis-specified conditional in a way no fixture can. Budget for it.
 
 **Also note `t_skip` and `t_est`.** `Gibbs_update.m` computes `t_skip = p_e + 5*(n_quart>0)` and estimates only over `t_est`, which extends to the last period with any observation. Getting this window wrong silently changes the sample.
+
+- [ ] **Step 0: Build a conditional-posterior oracle**
+
+All randomness in `Gibbs_update.m` enters at six places, and nowhere else:
+
+| line | site |
+|---|---|
+| 81 | `state = simulation_smoother(Y, SSM)` |
+| 145, 192, 233, 265, 295 | `mvnrnd(m_X, Pinv_X)` for `Phi`, `phi`, `mu`, `Lambda` (joint), `Lambda` (per-factor) |
+| 154-155, 203-204 | `update_vol` / `update_scl` — already Tier 1 from Task 6 |
+| 165, 169, 212, 216, 238 | `update_gam` / `update_ps` |
+
+**Every `(m_X, Pinv_X)` pair is a deterministic function of the data, the current parameters and the drawn state.** Those pairs *are* the conditional posteriors — they are precisely what a transposed design matrix, a dropped prior-precision term or a mis-scaled residual gets wrong. So they can be pinned exactly, even though the draws taken from them cannot.
+
+Write `nowcasting_v3/tools/octave_shims/gibbs_update_cond.m`: a copy of `Gibbs_update.m` that
+
+- takes `state` as an input argument instead of calling `simulation_smoother`, and
+- returns every posterior moment — `m_mu, Pinv_mu, m_Phi, Pinv_Phi, m_phi, Pinv_phi, m_Lambda, Pinv_Lambda` — alongside the usual outputs, with the design matrices `R_Lambda`, `Rr_Lambda`, `RR_Lambda` as well.
+
+Change nothing else. Follow the conventions `update_vol_cond.m` already established: distinct filename so it cannot shadow the vendored original, a header stating exactly which statements were replaced, and `nyfed_matlab/` never touched.
+
+Then extend `tools/gen_fixtures.m` and `tools/matload.py` to emit a `gibbs_update_cond` fixture carrying those moments together with the inputs that produced them — real `Estimates_2023_09_20.mat` parameters, the windowed `Y`, and a `state` drawn once and stored so Python can reuse it. Keep the whole `tests/fixtures/` directory under the 5MB cap; it stood at 2.35 MiB after Task 3.
+
+Exercise the **per-factor `Lambda` loop** as well as the joint path — both exist in the MATLAB and only one runs per call.
+
+- [ ] **Step 0b: Assert the posterior moments in Python**
+
+```python
+@pytest.mark.fixtures
+@pytest.mark.parametrize("block", ["mu", "Phi", "phi", "Lambda"])
+def test_conditional_posterior_moments_match_octave(fixture, block):
+    """Tier 1, and the only exact check this module can have. The draw cannot be
+    reproduced; the distribution it is drawn FROM can. A sampler with a
+    transposed design matrix converges to the wrong posterior while mixing
+    perfectly - this is the test that catches it."""
+    d = fixture("gibbs_update_cond")
+    got = gibbs_update_moments(
+        _params(d), _latent(d), d["Y"], _prior(d), _restrict(d),
+        state=d["state"],
+    )
+    for name in (f"m_{block}", f"Pinv_{block}"):
+        want = d[name]
+        assert np.allclose(np.reshape(getattr(got, name), want.shape), want,
+                           rtol=1e-10), name
+```
+
+This requires `gibbs.py` to expose the moments without drawing — `gibbs_update_moments(...)` returning a dataclass, with `gibbs_update` calling it and then sampling. That split is not decoration: it is what makes the conditionals testable at all, and it keeps the draw in one place.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1482,7 +1533,7 @@ Port `Gibbs_update.m`, `S_update.m` and `Gibbs_sampler.m`. Work block by block �
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd nowcasting_v3 && .venv/bin/pytest tests/test_gibbs.py -v`
-Expected: 8 passed (the three `slow` ones take minutes)
+Expected: 12 passed (8 from Step 1 plus the 4 parametrized moment tests; the three `slow` ones take minutes)
 
 - [ ] **Step 5: Commit**
 

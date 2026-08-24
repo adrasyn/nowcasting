@@ -14,7 +14,7 @@
 - **The vendored MATLAB is read-only.** `nowcasting_v3/nyfed_matlab/` is byte-identical to the NY Fed drop. Never edit it. Same rule as `nowcasting_v2/rba_paper/`.
 - **Bit-exact RNG reproduction against MATLAB is impossible.** MATLAB's `rng(321)` plus `mvnrnd`/`gamrnd`/`betarnd`/`mnrnd` cannot be matched draw-for-draw by numpy. All testing follows the two-tier rule below. Any task that claims "matches MATLAB exactly" for a stochastic function is wrong.
 - **Two-tier test rule.** Tier 1 (deterministic functions): must match Octave fixtures to `rtol=1e-10`. Tier 2 (stochastic functions): test the conditional distribution's moments against analytic values, plus an end-to-end posterior-mean check within Monte Carlo error. Never assert exact equality on a draw.
-- **Never commit** `Estimates_*.mat` (21MB), generated fixtures, or `.venv/`. Add to `.gitignore` in Task 0.
+- **Never commit** `Estimates_*.mat` (21MB) or `.venv/`. Add to `.gitignore` in Task 0. **Test fixtures are the exception and MUST be committed** (Task 3, Step 2b): CI has no Octave and cannot regenerate them, so gitignoring them would silently skip every Tier 1 test in Actions. They are test inputs, not build output. Keep the directory under 5MB.
 - **Model dimensions for the US reference panel:** `n=31`, `n_f=5`, `p_f=4`, `p_e=1`, 3 quarterly series, `n_state=73`, `n_param=390`. These are assertable constants in tests.
 - **The site contract is JSON only.** Pipelines and site communicate through `data/*.json`. No Python imports from the site, no site imports from Python.
 - **Follow v2 conventions:** package at `nowcasting_v3/`, outputs named `data/latest_v3.json` etc., a `/v3` preview page before any main-page design work.

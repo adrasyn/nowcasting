@@ -66,6 +66,7 @@ __pycache__/
 /nowcasting_v3/tests/fixtures/
 /nowcasting_v3/.venv/
 /nowcasting_v3/**/__pycache__/
-# v3: Octave scratch output (regenerate with tools/gen_fixtures.m)
+# v3: build artifacts and Octave scratch output (regenerate with tools/gen_fixtures.m)
+/nowcasting_v3/*.egg-info/
 /nowcasting_v3/tools/fixtures_mat/
 /nowcasting_v3/tools/probe_out.mat

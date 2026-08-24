@@ -1,0 +1,19 @@
+[project]
+name = "nowcasting-v3"
+version = "0.1.0"
+description = "NY Fed Staff Nowcast 2.0, ported to Python and refitted to Australian data"
+requires-python = ">=3.11"
+dependencies = ["numpy>=2.0", "scipy>=1.14", "pandas>=2.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-xdist>=3.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "fixtures: requires Octave-generated fixtures (skipped if absent)",
+  "slow: multi-minute Gibbs runs",
+]
+
+[tool.setuptools.packages.find]
+include = ["nyfed*"]

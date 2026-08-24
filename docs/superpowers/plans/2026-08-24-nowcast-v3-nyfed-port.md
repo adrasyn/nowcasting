@@ -537,12 +537,26 @@ def test_gdp_is_locatable_after_sorting():
     assert spec.trend[i_now] == 1.0
 
 
-def test_blocks_encode_normalising_loadings_as_one_and_free_as_nan():
-    """Blocks.m: entries of 1 become NaN (free), entries >1 become 1 (fixed)."""
+def test_blocks_encode_all_three_loading_states():
+    """load_spec.m recodes in this order: `==1 -> NaN` (free), then `>1 -> 1`
+    (normalising). A 0 is left as 0 (excluded from the block).
+
+    INDPRO's CSV row is Global=100, Soft=0, Nominal=0, Labor=0, COVID=1,
+    so it exhibits all three states at once."""
     spec = load_spec(SPEC_PATH)
     i = spec.series_id.index("INDPRO")
-    assert spec.blocks[i, 0] == 1.0          # was 100 in the CSV: normaliser
-    assert np.isnan(spec.blocks[i, 1])       # was 1 in the CSV: free
+    assert spec.blocks[i, 0] == 1.0          # 100 -> normalising loading
+    assert spec.blocks[i, 1] == 0.0          # 0   -> excluded, stays 0
+    assert np.isnan(spec.blocks[i, 4])       # 1   -> free loading
+
+
+def test_block_recoding_order_does_not_double_convert():
+    """`==1 -> NaN` runs before `>1 -> 1`. Reversing the two would turn every
+    free loading into a normalising one and silently over-identify the model."""
+    spec = load_spec(SPEC_PATH)
+    free = np.isnan(spec.blocks)
+    assert free.any()
+    assert ((spec.blocks == 1.0) | (spec.blocks == 0.0) | free).all()
 
 
 def test_monthly_percent_change_trend_is_scaled_down_by_twelve():
@@ -568,7 +582,7 @@ Port `map_parameter.m`, `vec_parameter.m`, `load_spec.m` and `load_settings.m` i
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd nowcasting_v3 && .venv/bin/pytest tests/test_parameters.py tests/test_spec.py -v`
-Expected: 10 passed
+Expected: 10 passed (4 in `test_parameters.py`, 6 in `test_spec.py`)
 
 - [ ] **Step 5: Commit**
 

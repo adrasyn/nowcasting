@@ -620,6 +620,7 @@ Each fixture stores **inputs and outputs together**, so a Python test loads the 
 - `construct_prior_us`: `dims`, `m_Lambda` in; the full prior struct out.
 - `update_scl`: `x`, `vals`, `probs` in; the **posterior weight matrix** out (add a line to a shimmed copy that returns `posteriors` before the `mnrnd` draw). Never store `s`.
 - `update_vol_cond`: `x`, `sigma`, `gamma` in; the mixture `posteriors` out, same shim approach.
+- `published_nowcasts`: the NY Fed's own published output, read from `nyfed_matlab/output/Update_2023_09_29.mat` and `Update_2023_10_06.mat`. Carries `published__2023_09_29 = 2.0241866715115893` and `published__2023_10_06 = 2.3834662755905036` (2023 Q4, annualised QoQ), plus the per-series news table if it can be decoded. **Task 9's gate has no target without this fixture.** Note `output.news_table` is a MATLAB `table` object and `output.date` a `datetime`; scipy cannot decode either, so the per-series impacts may not be extractable — if so, the gate runs on the headline alone and that limitation is recorded.
 - `nowcast_us`: the full `point_nowcast` call from `example_nowcast.m` — `Y_old`, `Y_new`, `SSM_old`, `SSM_new`, `i_now`, `t_now` in; `nowcast`, `forecasts`, `news`, `weights` out. This is deterministic given the SSMs, so it is a Tier 1 fixture despite sitting at the end of the pipeline.
 
 Save with `save('-v7', ...)` so `scipy.io.loadmat` can read it. Put any shimmed MATLAB under `tools/octave_shims/`; never modify `nyfed_matlab/`.
@@ -1442,7 +1443,7 @@ from nyfed.run_us_reference import run_reference_week
 @pytest.mark.fixtures
 @pytest.mark.parametrize("week", ["2023-09-29", "2023-10-06"])
 def test_reproduces_the_published_nowcast(week, fixture):
-    expected = float(fixture("nowcast_us")[f"published__{week.replace('-', '_')}"])
+    expected = float(fixture("published_nowcasts")[f"published__{week.replace('-', '_')}"])
     got = run_reference_week(week)
     assert got.nowcast == pytest.approx(expected, abs=0.01)
 
@@ -1452,7 +1453,7 @@ def test_reproduces_the_published_nowcast(week, fixture):
 def test_reproduces_the_release_impacts(fixture):
     """Every series' impact must match to 0.01pp, not just the total - a
     compensating pair of errors can leave the headline right."""
-    d = fixture("nowcast_us")
+    d = fixture("published_nowcasts")
     got = run_reference_week("2023-09-29")
     for series_id, impact in zip(d["news__series_id"], d["news__impact"]):
         assert got.impact_for(str(series_id)) == pytest.approx(float(impact), abs=0.01)
@@ -1464,6 +1465,8 @@ Run: `cd nowcasting_v3 && .venv/bin/pytest tests/test_end_to_end.py -v -m slow`
 Expected: 3 passed
 
 **If the nowcast is out by more than 0.01pp:** do not start guessing. The Tier 1 fixtures already pin every deterministic function, so the divergence is in a stochastic path or in how the reference runner assembles inputs. Check, in order: the posterior-median parameter reconstruction, the `s_update` draw count and averaging, the `Y_location`/`Y_scale` standardisation, then `t_now` and `i_now` indexing (MATLAB is 1-based). Escalate to Fable 5 if that pass does not find it.
+
+**The targets.** 2023 Q4, annualised QoQ: **2.0242** for the 2023-09-29 vintage and **2.3835** for 2023-10-06, taken from the drop's own `Update_*.mat`. If the per-series news table proved undecodable in Task 3, `test_reproduces_the_release_impacts` cannot run — skip it explicitly with a reason rather than deleting it, so the gap stays visible.
 
 **Note on tolerance.** ±0.01pp is not arbitrary slack — `example_nowcast.m` averages 1,250 stochastic `s_update` draws, so even MATLAB does not reproduce itself exactly across seeds. Do not tighten this to an exact match; it cannot be met.
 

@@ -121,7 +121,10 @@ rmdir nowcasting-v3
 Append to `.gitignore`:
 
 ```
-# v3 (NY Fed port): the 21MB estimates blob, generated test fixtures, venv
+# v3 (NY Fed port): the 21MB estimates blob, venv, caches.
+# NOTE: tests/fixtures/ is ignored only until Task 3, which commits the
+# fixtures and removes the line below. CI has no Octave and cannot
+# regenerate them, so they are test inputs, not build output.
 /nowcasting_v3/nyfed_matlab/Estimates_*.mat
 /nowcasting_v3/tests/fixtures/
 /nowcasting_v3/.venv/
@@ -610,6 +613,35 @@ Save with `save('-v7', ...)` so `scipy.io.loadmat` can read it. Put any shimmed 
 - [ ] **Step 2: Write the .mat -> .npz converter**
 
 `nowcasting_v3/tools/matload.py` reads each generated `.mat` with `scipy.io.loadmat(..., squeeze_me=False, struct_as_record=False)`, flattens MATLAB structs to `name__field` keys, and writes `tests/fixtures/<name>.npz`. Keep it slim — extract only the arrays the tests name. The 21MB estimates blob must not become a 21MB fixture.
+
+**Two size rules, both load-bearing (see Step 2b).**
+
+1. **Use `np.savez_compressed`, never `np.savez`.** These arrays are highly structured — `H` is mostly zeros, `F` and `G` are block-diagonal — and compress by roughly an order of magnitude.
+2. **Cap the time dimension of the US fixtures at the last 60 periods.** Uncompressed, `H` alone is `31 x 73 x T x 8` bytes, which at the full sample is over 7MB for one array in one fixture. A 60-period window still exercises time-varying `H` and `Sigma_eta`, the quarterly aggregation, the `f_active` COVID mask and the ragged edge — everything the tests actually assert. Slice `Y`, `H`, `Sigma_eta` and the latents to the same window and store the window's start index in the fixture so tests can align.
+
+The `kalman_small` fixture stays at full length: it is small by construction and is the one you debug by hand.
+
+- [ ] **Step 2b: Commit the fixtures — do not gitignore them**
+
+This reverses the `.gitignore` line Task 0 added. That line was wrong, and the reason matters:
+
+**CI has no Octave and never will.** If `tests/fixtures/` is gitignored, every `@pytest.mark.fixtures` test skips in GitHub Actions — which is every Tier 1 exactness check in the project. CI would run only the Tier 2 statistical tests and report green, and the entire safety net for the port would exist on one laptop. That is the opposite of what the fixtures are for.
+
+Unlike `pipeline/tests/fixtures/` (gitignored, and regenerable by any CI run of the R pipeline), these fixtures are **not regenerable in CI** — reproducing them requires MATLAB or Octave plus the vendored code. They are test inputs, not derived build output.
+
+```bash
+cd /Users/James/Documents/Claude/Projects/nowcasting
+# Remove the Task 0 line that ignores fixtures.
+python3 - <<'EOF'
+import pathlib
+p = pathlib.Path(".gitignore")
+s = p.read_text().replace("/nowcasting_v3/tests/fixtures/\n", "")
+p.write_text(s)
+EOF
+du -sh nowcasting_v3/tests/fixtures/
+```
+
+The fixture directory must total **under 5MB** after compression and windowing. If it does not, shrink the window further before committing — do not commit a large binary blob and do not silently gitignore it again. Report the actual size in the commit message.
 
 - [ ] **Step 3: Generate and verify**
 
@@ -1475,7 +1507,15 @@ The one genuinely new component is the **release-impact table** — per-series c
 
 ### Plan E: CI split — **Opus 5**
 
-Quarterly estimation job (heavy; may exceed the 6-hour Actions limit — the Task 9 timing decides) and a weekly nowcast job that loads stored parameters. The parameter artifact is 21MB for the US model: use an Actions artifact or a release asset, or thin the stored latents. Add the v3 step to `nowcast-weekly.yml` as `continue-on-error`, exactly as v2 is, so a v3 failure cannot stale the v1 headline.
+Quarterly estimation job (heavy; may exceed the 6-hour per-job Actions limit — the Task 9 timing decides) and a weekly nowcast job that loads stored parameters.
+
+Four decisions to make here, recorded now so they are not rediscovered late:
+
+- **Run v3 on `ubuntu-latest`, as its own job.** `nowcast-weekly.yml` uses `windows-latest` because of R. GitHub bills Windows minutes at 2x Linux, and v3 needs no Windows-specific anything. A separate job also means a v3 timeout cannot stale the v1 headline.
+- **Ship the parameter file as a release asset, not an Actions artifact.** The weekly job reads it every week; artifacts expire (90 days by default), a release asset does not.
+- **Confirm the weekly job fits `timeout-minutes: 60`.** The weekly path is 1,250 `s_update` draws plus 1,250 `density_nowcast` draws plus one `point_nowcast` — not the sampler. Time it at the end of Task 9 alongside the estimation run, and raise the timeout deliberately if needed rather than discovering it in a failed cron.
+- **Pin Python and lock dependencies.** The R side is pinned via renv and has already lost a week to an unpinned external fetch (issue #12). Do the equivalent here: an exact `requirements.lock`, and `actions/setup-python` with an explicit version.
+ The parameter artifact is 21MB for the US model: use an Actions artifact or a release asset, or thin the stored latents. Add the v3 step to `nowcast-weekly.yml` as `continue-on-error`, exactly as v2 is, so a v3 failure cannot stale the v1 headline.
 
 ---
 

@@ -1389,9 +1389,7 @@ import pytest
 
 from nyfed.run_us_reference import run_reference_week
 
-# Published NY Fed Staff Nowcast, 2023 Q4, from Update_*.mat in the drop.
-# Fill these from the fixture, not from memory.
-EXPECTED = {"2023-09-29": None, "2023-10-06": None}
+# Expected values come from the Update_*.mat fixtures, never from memory.
 
 
 @pytest.mark.slow

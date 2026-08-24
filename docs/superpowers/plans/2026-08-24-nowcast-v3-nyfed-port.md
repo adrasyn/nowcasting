@@ -1290,60 +1290,149 @@ git commit -m "feat(v3): stochastic volatility, outlier, scale and probability u
 `nowcasting_v3/tests/test_gibbs.py`:
 
 ```python
+"""Task 7 is the only module in Plan A with no bit-exact oracle: the sampler's
+output IS a draw. Its safety net is posterior recovery on data simulated from
+the model with known parameters. That catches a mis-specified conditional in a
+way no fixture can - a transposed design matrix converges to the wrong posterior
+while every marginal still looks healthy.
+
+The `synthetic` fixture below is a working scaffold, not a sketch. Verify it
+against the model before trusting it: if the simulated data does not have the
+factor structure it claims, every recovery test below passes vacuously.
+"""
+
 import numpy as np
 import pytest
 
 from nyfed.gibbs import gibbs_sampler, gibbs_update, s_update
-from nyfed.parameters import vec_parameter
+from nyfed.model import InitVal, Latent, Restrict, construct_prior, construct_ssm
+from nyfed.parameters import Params, map_parameter, vec_parameter
+from nyfed.settings import GibbsSettings
+from nyfed.ssm import simulate_ssm
+
+DIMS = (6, 1, 1, 1)   # n=6 series, 1 factor, VAR(1), AR(1)
+T_SIM = 600
 
 
-@pytest.fixture
+def _settings(**kw):
+    """GibbsSettings with test-sized run lengths."""
+    base = dict(n_gs=2000, n_burn=2000, n_thin=1, n_each=8, n_init=50,
+                state_each=1)
+    base.update(kw)
+    return GibbsSettings(**base)
+
+
+def _extract(params, name):
+    """(n_param, n_gs) -> the named field stacked on a trailing draw axis."""
+    draws = [getattr(map_parameter(params[:, i], DIMS), name)
+             for i in range(params.shape[1])]
+    return np.stack(draws, axis=-1)
+
+
+@pytest.fixture(scope="module")
 def synthetic():
-    """A small DFM simulated from known parameters: n=6, n_f=1, p_f=1, p_e=1,
-    T=600, no quarterly series, no SV (gamma fixed near zero)."""
-    ...  # build and return (Y, true_params, restrict, initval, prior)
+    """Simulate from the model itself with known parameters.
+
+    Deliberately a benign corner of the parameter space: the trend is frozen,
+    stochastic volatility is switched off (gamma ~ 0) and no outliers fire
+    (pi = 1). Those blocks have their own Tier 1 coverage in Task 6; what is
+    unpinned - and therefore what this fixture must isolate - is whether the
+    CONDITIONAL POSTERIORS for mu, Lambda, Phi and phi are right.
+    """
+    n, n_f, p_f, p_e = DIMS
+    rng = np.random.default_rng(101)
+
+    truth = Params(
+        mu=np.zeros(n),
+        gamma_g=1e-8,
+        Lambda=np.linspace(0.6, 1.4, n).reshape(n, n_f),
+        Phi=np.full((n_f, n_f, p_f), 0.6),
+        gamma_f=np.full(n_f, 1e-8),
+        pi_f=np.ones(n_f),
+        phi=np.full((n, p_e), 0.3),
+        gamma_e=np.full(n, 1e-8),
+        pi_e=np.ones(n),
+    )
+
+    restrict = Restrict(
+        Lambda=np.full((n, n_f), np.nan),
+        Phi=np.full((n_f, n_f, p_f), np.nan),
+        iota=np.zeros(n),
+        f_active=np.ones((n_f, T_SIM), dtype=bool),
+        isquart=np.zeros(n, dtype=bool),
+    )
+    restrict.Lambda[0, 0] = 1.0        # normalising loading fixes the scale
+
+    latent = Latent(sigma=np.ones((n_f + n, T_SIM)),
+                    s=np.ones((n_f + n, T_SIM)))
+
+    y, _, _ = simulate_ssm(construct_ssm(truth, latent, restrict), T_SIM, rng)
+
+    initval = InitVal(
+        param=Params(
+            mu=np.zeros(n), gamma_g=0.01,
+            Lambda=np.ones((n, n_f)),
+            Phi=np.zeros((n_f, n_f, p_f)),
+            gamma_f=np.full(n_f, 0.1), pi_f=np.full(n_f, 0.95),
+            phi=np.zeros((n, p_e)),
+            gamma_e=np.full(n, 0.1), pi_e=np.full(n, 0.95),
+        ),
+        latent=Latent(sigma=np.ones((n_f + n, T_SIM)),
+                      s=np.ones((n_f + n, T_SIM))),
+    )
+    prior = construct_prior(DIMS, initval.param.Lambda)
+    return y, truth, restrict, initval, prior
+
+
+def test_simulated_data_actually_has_the_factor_structure(synthetic):
+    """Guard on the fixture itself. If this fails, every recovery test below is
+    passing vacuously and proves nothing about the sampler."""
+    y, truth, _, _, _ = synthetic
+    assert y.shape == (DIMS[0], T_SIM)
+    assert np.isfinite(y).all()
+    corr = np.corrcoef(y)
+    off = corr[~np.eye(DIMS[0], dtype=bool)]
+    assert off.min() > 0.1, "series should co-move through the common factor"
 
 
 @pytest.mark.slow
 def test_posterior_covers_the_true_loadings(synthetic):
-    Y, truth, restrict, initval, prior = synthetic
-    rng = np.random.default_rng(31)
-    res = gibbs_sampler(Y, prior, restrict, initval,
-                        _settings(n_gs=2000, n_burn=2000, n_thin=1), rng)
-    lam = _extract(res.params, "Lambda")           # (n, n_f, n_gs)
-    lo, hi = np.percentile(lam, [2.5, 97.5], axis=2)
+    y, truth, restrict, initval, prior = synthetic
+    res = gibbs_sampler(y, prior, restrict, initval, _settings(),
+                        np.random.default_rng(31))
+    lam = _extract(res.params, "Lambda")
+    lo, hi = np.percentile(lam, [2.5, 97.5], axis=-1)
     covered = ((truth.Lambda >= lo) & (truth.Lambda <= hi)).mean()
-    assert covered >= 0.8
+    assert covered >= 0.8, f"only {covered:.0%} of loadings covered"
 
 
 @pytest.mark.slow
 def test_posterior_covers_the_true_factor_var_coefficient(synthetic):
-    Y, truth, restrict, initval, prior = synthetic
-    rng = np.random.default_rng(32)
-    res = gibbs_sampler(Y, prior, restrict, initval,
-                        _settings(n_gs=2000, n_burn=2000, n_thin=1), rng)
-    phi = _extract(res.params, "Phi")[0, 0, :]
+    y, truth, restrict, initval, prior = synthetic
+    res = gibbs_sampler(y, prior, restrict, initval, _settings(),
+                        np.random.default_rng(32))
+    phi = _extract(res.params, "Phi")[0, 0, 0, :]
     lo, hi = np.percentile(phi, [2.5, 97.5])
     assert lo <= truth.Phi[0, 0, 0] <= hi
 
 
 @pytest.mark.slow
 def test_posterior_covers_the_true_idiosyncratic_ar(synthetic):
-    Y, truth, restrict, initval, prior = synthetic
-    rng = np.random.default_rng(33)
-    res = gibbs_sampler(Y, prior, restrict, initval,
-                        _settings(n_gs=2000, n_burn=2000, n_thin=1), rng)
-    ar = _extract(res.params, "phi")               # (n, p_e, n_gs)
-    lo, hi = np.percentile(ar, [2.5, 97.5], axis=2)
+    y, truth, restrict, initval, prior = synthetic
+    res = gibbs_sampler(y, prior, restrict, initval, _settings(),
+                        np.random.default_rng(33))
+    ar = _extract(res.params, "phi")
+    lo, hi = np.percentile(ar, [2.5, 97.5], axis=-1)
     assert ((truth.phi >= lo) & (truth.phi <= hi)).mean() >= 0.8
 
 
 def test_restricted_loadings_never_move(synthetic):
-    """Blocks fixed to 0 or to the normalising 1 must be identical in every draw."""
-    Y, truth, restrict, initval, prior = synthetic
-    rng = np.random.default_rng(34)
-    res = gibbs_sampler(Y, prior, restrict, initval,
-                        _settings(n_gs=50, n_burn=10, n_thin=1), rng)
+    """The normalising loading is fixed, not sampled. If it drifts, the model is
+    unidentified and every other parameter is only pinned up to scale."""
+    y, _, restrict, initval, prior = synthetic
+    res = gibbs_sampler(y, prior, restrict, initval,
+                        _settings(n_gs=50, n_burn=10),
+                        np.random.default_rng(34))
     lam = _extract(res.params, "Lambda")
     fixed = ~np.isnan(restrict.Lambda)
     assert np.allclose(lam[fixed, :].std(axis=-1), 0.0)
@@ -1351,33 +1440,35 @@ def test_restricted_loadings_never_move(synthetic):
 
 
 def test_two_runs_with_the_same_seed_are_identical(synthetic):
-    """Reproducibility within the port. Not a claim about matching MATLAB."""
-    Y, _, restrict, initval, prior = synthetic
-    s = _settings(n_gs=20, n_burn=5, n_thin=1)
-    a = gibbs_sampler(Y, prior, restrict, initval, s, np.random.default_rng(99))
-    b = gibbs_sampler(Y, prior, restrict, initval, s, np.random.default_rng(99))
+    """Reproducibility WITHIN the port. Not a claim about matching MATLAB."""
+    y, _, restrict, initval, prior = synthetic
+    cfg = _settings(n_gs=20, n_burn=5)
+    a = gibbs_sampler(y, prior, restrict, initval, cfg,
+                      np.random.default_rng(99))
+    b = gibbs_sampler(y, prior, restrict, initval, cfg,
+                      np.random.default_rng(99))
     assert np.array_equal(a.params, b.params)
 
 
-def test_gibbs_update_preserves_parameter_vector_length(synthetic):
-    Y, _, restrict, initval, prior = synthetic
-    rng = np.random.default_rng(35)
-    params, latent = gibbs_update(initval.param, initval.latent, Y, prior,
-                                  restrict, rng)
-    assert np.isfinite(vec_parameter(params)).all()
+def test_gibbs_update_preserves_shapes_and_stays_finite(synthetic):
+    y, _, restrict, initval, prior = synthetic
+    params, latent = gibbs_update(initval.param, initval.latent, y, prior,
+                                  restrict, np.random.default_rng(35))
+    vec = vec_parameter(params)
+    assert vec.shape == (DIMS[0] * (1 + DIMS[1] + DIMS[3] + 2)
+                         + DIMS[1] * (DIMS[1] * DIMS[2] + 2) + 1,)
+    assert np.isfinite(vec).all()
     assert latent.sigma.shape == initval.latent.sigma.shape
 
 
 def test_s_update_leaves_sigma_untouched(synthetic):
-    """S_update draws outlier indicators only; sigma is an input, not an output."""
-    Y, _, restrict, initval, prior = synthetic
-    rng = np.random.default_rng(36)
-    out = s_update(initval.param, initval.latent, Y, restrict, rng)
+    """S_update.m draws outlier indicators only; sigma is an input there."""
+    y, _, restrict, initval, prior = synthetic
+    out = s_update(initval.param, initval.latent, y, restrict,
+                   np.random.default_rng(36))
     assert np.array_equal(out.sigma, initval.latent.sigma)
     assert out.s.shape == initval.latent.s.shape
 ```
-
-Fill in `synthetic`, `_settings` and `_extract` concretely â€” the simulation is the test's whole value, so it must be real code, not a sketch.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -1391,7 +1482,7 @@ Port `Gibbs_update.m`, `S_update.m` and `Gibbs_sampler.m`. Work block by block â
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd nowcasting_v3 && .venv/bin/pytest tests/test_gibbs.py -v`
-Expected: 7 passed (the `slow` ones take minutes)
+Expected: 8 passed (the three `slow` ones take minutes)
 
 - [ ] **Step 5: Commit**
 

@@ -28,6 +28,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .linalg import spd_inv, spd_logdet, symmetrize
+from .rng import mvnrnd
 
 __all__ = [
     "StateSpace",
@@ -523,23 +524,9 @@ def fast_smoother(
 # simulate_SSM.m
 # --------------------------------------------------------------------------- #
 
-def _mvnrnd(mean: np.ndarray, cov: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """Draw one N(mean, cov) vector. MATLAB ``mvnrnd``.
-
-    MATLAB factors the covariance with ``cholcov``: a Cholesky factor when the
-    matrix is positive definite, otherwise an eigendecomposition, which also
-    covers the positive-semidefinite defaults such as ``Sigma_eps = zeros(N)``.
-    """
-    n = cov.shape[0]
-    if n == 0:
-        return np.zeros(0)
-    cov = symmetrize(cov)
-    try:
-        chol = np.linalg.cholesky(cov)
-    except np.linalg.LinAlgError:
-        vals, vecs = np.linalg.eigh(cov)
-        chol = vecs * np.sqrt(np.clip(vals, 0.0, None))
-    return mean + chol @ rng.standard_normal(n)
+# MATLAB ``mvnrnd``. Lives in nyfed.rng, which owns the draws; aliased here
+# because simulate_ssm below is a direct port of simulate_SSM.m.
+_mvnrnd = mvnrnd
 
 
 def simulate_ssm(

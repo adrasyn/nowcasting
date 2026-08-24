@@ -8,6 +8,10 @@
 %   cd nowcasting_v3/tools
 %   octave gen_fixtures.m
 %   ../.venv/bin/python matload.py
+%   ../.venv/bin/python extract_published.py
+%
+% extract_published.py is separate because the NY Fed's PUBLISHED figures live in
+% MATLAB table/datetime objects that Octave cannot decode at all; see its header.
 %
 % Two shimmed functions live in octave_shims/ (see the headers there). They
 % exist because update_scl and update_vol end in a random draw; the fixtures
@@ -105,15 +109,17 @@ window_start_py = w0 - 1;             % 0-based (Python)
 window_len      = WINDOW;
 printf('US window: t = %d..%d of %d\n', w0, T_full, T_full);
 
-Data_old = load('../nyfed_matlab/data/Data_2023_09_22.mat');
-Data_new = load('../nyfed_matlab/data/Data_2023_09_29.mat');
-Y_old_full = [(Data_old.data' - est.Y_location)./est.Y_scale, ...
-              NaN(n, T_full - size(Data_old.data, 1))];
-Y_new_full = [(Data_new.data' - est.Y_location)./est.Y_scale, ...
-              NaN(n, T_full - size(Data_new.data, 1))];
+% Standardise and pad a vintage to T_full, then window it. example_nowcast.m
+% works out the pad length from timekey, which is a MATLAB datetime that Octave
+% cannot read; T_full - rows gives the same answer without touching it.
+function Y = load_vintage(name, est, n, T_full, w0)
+    D = load(['../nyfed_matlab/data/Data_' name '.mat']);
+    Y = [(D.data' - est.Y_location)./est.Y_scale, NaN(n, T_full - size(D.data, 1))];
+    Y = Y(:, w0:T_full);
+end
 
-Y_old = Y_old_full(:, w0:T_full);
-Y_new = Y_new_full(:, w0:T_full);
+Y_old = load_vintage('2023_09_22', est, n, T_full, w0);
+Y_new = load_vintage('2023_09_29', est, n, T_full, w0);
 
 % restrict, windowed on its only time-indexed field
 restrict          = est.restrict;
@@ -236,6 +242,32 @@ Y_location = est.Y_location;
 Y_scale    = est.Y_scale;
 
 save('-v7', 'fixtures_mat/nowcast_us.mat', ...
+    'Y_old', 'Y_new', 'SSM_old', 'SSM_new', 'i_now', 't_now', 't_now_py', ...
+    'param_vec_old', 'param_vec_new', 'latent_old', 'latent_new', 'restrict', ...
+    'dimvec', 'Y_location', 'Y_scale', ...
+    'nowcast', 'forecasts', 'news', 'weights', ...
+    'window_start', 'window_start_py', 'window_len', 'T_full');
+
+
+%% ------------------------------------------------------------------
+%% nowcast_us_1006 - the same oracle for the 2023_09_29 -> 2023_10_06 pair.
+%% That is the week Task 9 gates against, and it carries more releases than the
+%% 09_22 -> 09_29 pair, so every release's impact gets its own comparison.
+%% The two SSMs are the same disjoint-Gibbs-half pair used above.
+%% ------------------------------------------------------------------
+Y_old = load_vintage('2023_09_29', est, n, T_full, w0);
+Y_new = load_vintage('2023_10_06', est, n, T_full, w0);
+
+t_now    = (find(~isnan(Y_new(i_now, :)), 1, 'last')+3):3:WINDOW;
+t_now_py = t_now - 1;
+releases = (~isnan(Y_new) & isnan(Y_old));
+printf('nowcast_us_1006: t_now (in window) = %s, %d releases\n', ...
+    mat2str(t_now), nnz(releases));
+
+[nowcast, forecasts, news, weights] = point_nowcast(Y_old, Y_new, SSM_old, SSM_new, i_now, t_now);
+printf('nowcast_us_1006: nowcast rows 1-4 at first horizon = %s\n', mat2str(nowcast(:, 1)', 8));
+
+save('-v7', 'fixtures_mat/nowcast_us_1006.mat', ...
     'Y_old', 'Y_new', 'SSM_old', 'SSM_new', 'i_now', 't_now', 't_now_py', ...
     'param_vec_old', 'param_vec_new', 'latent_old', 'latent_new', 'restrict', ...
     'dimvec', 'Y_location', 'Y_scale', ...

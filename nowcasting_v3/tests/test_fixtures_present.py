@@ -76,7 +76,31 @@ REQUIRED = {
         "weights_miss", "posteriors_miss", "y_t_miss", "x1_KF_miss",
         "p1_KF_miss", "ln_sigmasq_miss", "sigma_out_miss",
     ],
+    "published_nowcasts": [
+        "published__2023_09_29", "published__2023_10_06",
+        "news_2023_09_29__forecast", "news_2023_09_29__actual",
+        "news_2023_09_29__weight", "news_2023_09_29__impact",
+        "news_2023_09_29__series_name", "news_2023_09_29__series_index",
+        "news_2023_10_06__forecast", "news_2023_10_06__actual",
+        "news_2023_10_06__weight", "news_2023_10_06__impact",
+        "news_2023_10_06__series_name", "news_2023_10_06__series_index",
+    ],
     "nowcast_us": [
+        "Y_old", "Y_new", "i_now", "t_now", "t_now_py",
+        "SSM_old__D", "SSM_old__H", "SSM_old__Sigma_eps", "SSM_old__F",
+        "SSM_old__G", "SSM_old__Sigma_eta", "SSM_old__mu_1", "SSM_old__Sigma_1",
+        "SSM_new__D", "SSM_new__H", "SSM_new__Sigma_eps", "SSM_new__F",
+        "SSM_new__G", "SSM_new__Sigma_eta", "SSM_new__mu_1", "SSM_new__Sigma_1",
+        "nowcast", "forecasts", "news", "weights",
+        # enough to rebuild both SSMs from scratch
+        "dimvec", "param_vec_old", "param_vec_new",
+        "latent_old__sigma", "latent_old__s", "latent_new__sigma", "latent_new__s",
+        "restrict__Lambda", "restrict__Phi", "restrict__iota",
+        "restrict__isquart", "restrict__f_active",
+        "Y_location", "Y_scale",
+        "window_start", "window_start_py", "window_len", "T_full",
+    ],
+    "nowcast_us_1006": [
         "Y_old", "Y_new", "i_now", "t_now", "t_now_py",
         "SSM_old__D", "SSM_old__H", "SSM_old__Sigma_eps", "SSM_old__F",
         "SSM_old__G", "SSM_old__Sigma_eta", "SSM_old__mu_1", "SSM_old__Sigma_1",
@@ -126,3 +150,42 @@ def test_fixture_directory_is_small_enough_to_commit():
     total = sum(p.stat().st_size for p in FIXTURE_DIR.glob("*.npz"))
     mib = total / 1024 / 1024
     assert mib < MAX_TOTAL_MIB, f"fixtures are {mib:.2f} MiB, budget is {MAX_TOTAL_MIB} MiB"
+
+
+# The NY Fed's published 2023 Q4 nowcasts, annualised QoQ. These are the Task 9
+# gate targets and are read out of nyfed_matlab/output/Update_*.mat by
+# tools/extract_published.py; see its header for why that takes byte-level work.
+PUBLISHED = {
+    "published__2023_09_29": 2.0241866715115893,
+    "published__2023_10_06": 2.3834662755905036,
+}
+
+
+@pytest.mark.parametrize("key,value", sorted(PUBLISHED.items()))
+def test_published_nowcast_scalars(fixture, key, value):
+    data = fixture("published_nowcasts")
+    assert data[key].item() == value
+
+
+@pytest.mark.parametrize("vintage,n", [("2023_09_29", 9), ("2023_10_06", 7)])
+def test_published_news_table_is_internally_consistent(fixture, vintage, n):
+    """example_nowcast.m computes impacts = (actual - forecasts) .* weights.
+
+    The identity must hold to the bit. It is what proves the news table was read
+    out of the MCOS subsystem correctly rather than plausibly.
+    """
+    import numpy as np
+
+    data = fixture("published_nowcasts")
+    forecast = data[f"news_{vintage}__forecast"]
+    actual = data[f"news_{vintage}__actual"]
+    weight = data[f"news_{vintage}__weight"]
+    impact = data[f"news_{vintage}__impact"]
+    names = data[f"news_{vintage}__series_name"]
+    index = data[f"news_{vintage}__series_index"]
+
+    assert forecast.shape == (n,)
+    assert {actual.shape, weight.shape, impact.shape, names.shape, index.shape} == {(n,)}
+    assert np.array_equal(impact, (actual - forecast) * weight)
+    assert len(set(names.tolist())) == n, "row names must be unique, as MATLAB tables require"
+    assert set(index.tolist()) <= set(range(1, 32))

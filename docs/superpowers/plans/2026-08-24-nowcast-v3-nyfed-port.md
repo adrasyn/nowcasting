@@ -1468,7 +1468,21 @@ Expected: 3 passed
 
 **The targets.** 2023 Q4, annualised QoQ: **2.0242** for the 2023-09-29 vintage and **2.3835** for 2023-10-06, taken from the drop's own `Update_*.mat`. If the per-series news table proved undecodable in Task 3, `test_reproduces_the_release_impacts` cannot run — skip it explicitly with a reason rather than deleting it, so the gap stays visible.
 
-**Note on tolerance.** ±0.01pp is not arbitrary slack — `example_nowcast.m` averages 1,250 stochastic `s_update` draws, so even MATLAB does not reproduce itself exactly across seeds. Do not tighten this to an exact match; it cannot be met.
+**Set the tolerance from measurement, not from my guess — do this before running the gate.**
+
+The published figures came out of MATLAB with `rng(321)` and 1,250 averaged `S_update` draws. Our numpy RNG cannot reproduce that draw sequence, so the port converges to the same limit by a different path, with Monte Carlo error around it. Whether that error fits inside ±0.01pp is an empirical question that nobody has answered, and asserting a tolerance we have not measured would make this gate either falsely reassuring or falsely alarming.
+
+So Task 9 gets a Step 0:
+
+- [ ] **Step 0: Measure the seed-to-seed spread**
+
+Run `run_reference_week("2023-09-29")` five times with five different seeds. Record the five nowcasts, their mean, and their standard deviation. Write all of it into the README.
+
+Then set the gate tolerance to `max(0.01, 3 * measured_sd)` and state the chosen number and its basis in the test file. If `3 * sd` exceeds 0.01pp, the wider tolerance is the honest one — and the spread itself is a finding worth recording, because it bounds how reproducible any weekly published figure can be.
+
+If the spread is so wide that no useful tolerance exists (say, over 0.1pp), stop and report it. That would mean the averaging is not damping the draws the way the design assumes, which is a model-level finding, not a porting bug — and it would matter for the live site, since it bounds what a weekly nowcast can claim.
+
+**Note on tolerance.** The ±0.01pp floor is not arbitrary slack — `example_nowcast.m` averages 1,250 stochastic `s_update` draws, so even MATLAB does not reproduce itself exactly across seeds. Do not tighten this to an exact match; it cannot be met.
 
 - [ ] **Step 4: Record the timing**
 

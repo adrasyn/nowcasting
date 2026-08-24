@@ -1079,7 +1079,9 @@ git commit -m "feat(v3): state-space construction and prior, pinned to Octave fi
 
 ## Task 6: The four conditional updaters
 
-**Model: Fable 5.** This is the first task where a wrong answer looks right. `update_vol` is a 10-component mixture approximation to a log chi-square; `update_scl` is a 100-point discrete posterior; both are drawn from, so no fixture can pin the output. The fixtures pin the *posterior weights*, which is the strongest available check and still leaves the draw mechanics unguarded.
+**Model: Opus 5.** *(Revised after inspecting Task 3's shims. The original assignment was Fable 5, because these functions are sampled from and no fixture can pin a draw. That turned out to be wrong: `tools/octave_shims/update_vol_cond.m` injects **both** random statements as arguments — `weights` replaces `mnrnd(1, posteriors)` and `utmp` replaces `randn(T+1,1)` — and returns every intermediate. Conditional on those two inputs the whole routine is deterministic, so `update_vol` is pinnable bit-exactly end to end, stage by stage. The genuinely unpinnable surface that remains is small: `update_gam` and `update_ps`, which are 26 and 23 lines of conjugate draws. Fable stays on Task 7, where `Gibbs_update.m` really cannot be pinned.)*
+
+The original concern still describes the risk correctly, and is worth keeping in mind even with the oracle available. `update_vol` is a 10-component mixture approximation to a log chi-square; `update_scl` is a 100-point discrete posterior; both are drawn from, so no fixture can pin the output. The fixtures pin the *posterior weights*, which is the strongest available check and still leaves the draw mechanics unguarded.
 
 **Files:**
 - Create: `nowcasting_v3/nyfed/updates.py`, `nowcasting_v3/nyfed/rng.py`
@@ -1090,7 +1092,11 @@ git commit -m "feat(v3): state-space construction and prior, pinned to Octave fi
 - Produces:
   - `rng.py`: `mvnrnd(mean, cov, rng)`, `gamrnd(shape, scale, rng)`, `betarnd(a, b, rng)`, `mnrnd_rows(probs, rng) -> (T,) int` — vectorised inverse-CDF row sampling, replacing MATLAB's `mnrnd(1, posteriors)`
   - `updates.py`:
-    - `update_vol(x, sigma, gamma, mean_prior=0.0, var_prior=1e6, rng=None, *, return_posteriors=False)` -> `(T,)` draw, or the `(T, 10)` mixture posterior when `return_posteriors=True`
+    - `update_vol(x, sigma, gamma, mean_prior=0.0, var_prior=1e6, rng=None, *, weights=None, innovations=None, return_stages=False)` -> `(T,)` updated volatility path.
+
+      **`weights` and `innovations` are the injection seam that makes this function Tier 1.** They correspond exactly to the two statements `tools/octave_shims/update_vol_cond.m` replaced with arguments: `weights` is the `(T, 10)` one-hot mixture draw that MATLAB takes with `mnrnd(1, posteriors)`, and `innovations` is the `(T+1,)` sequence MATLAB draws with `randn(T+1, 1)`. When either is `None` the function draws it from `rng`, which is the production path. When both are supplied the routine is fully deterministic and must reproduce Octave bit-for-bit.
+
+      `return_stages=True` returns a `VolStages` dataclass carrying every intermediate the shim returns, in its order: `posteriors`, `mean_t`, `vars_t`, `y_t`, `x1_KF`, `p1_KF`, `x2_KF`, `p2_KF`, `ln_sigmasq`, `sigma`. Stage-by-stage comparison is what localises a mismatch to one line instead of one function.
     - `update_scl(x, vals, probs, rng=None, *, return_posteriors=False)` -> `(T,)` draw, or the `(T, n_s)` posterior when `return_posteriors=True`
     - `update_gam(x, nu_prior, s2_prior, rng) -> (N,)`
     - `update_ps(x, a_prior, b_prior, rng) -> (N,)`
@@ -1117,35 +1123,56 @@ from nyfed.updates import (
     KSC_MEANS, KSC_PROBS, KSC_STDVS, update_gam, update_ps, update_scl, update_vol,
 )
 
+STAGES = ("posteriors", "mean_t", "vars_t", "y_t",
+          "x1_KF", "p1_KF", "x2_KF", "p2_KF", "ln_sigmasq")
+
 
 def test_ksc_mixture_probabilities_sum_to_one():
+    """Omori, Chib, Shephard & Nakajima (2007), 10-component approximation to
+    log chi-square with 1 df. Transcribe from update_vol.m, not the paper."""
     assert len(KSC_PROBS) == len(KSC_MEANS) == len(KSC_STDVS) == 10
     assert KSC_PROBS.sum() == pytest.approx(1.0, abs=1e-12)
 
 
 @pytest.mark.fixtures
-def test_update_scl_posterior_weights_match_octave(fixture):
-    d = fixture("update_scl")
-    got = update_scl(d["x"], d["vals"], d["probs"], rng=None, return_posteriors=True)
-    assert np.allclose(got, d["posteriors"], rtol=1e-10)
+@pytest.mark.parametrize("suffix", ["", "_miss"])
+def test_update_vol_reproduces_octave_stage_by_stage(fixture, suffix):
+    """Tier 1. With the mixture draw and the innovations injected, update_vol is
+    fully deterministic, so every intermediate must match - not just the final
+    path. A stage-level assert says WHICH line diverged."""
+    d = fixture("update_vol_cond")
+    got = update_vol(
+        d[f"x{suffix}"].ravel(), d["sigma_in"].ravel(),
+        float(d["gamma"].item()),
+        mean_prior=float(d["mean_prior"].item()),
+        var_prior=float(d["var_prior"].item()),
+        weights=d[f"weights{suffix}"], innovations=d["utmp"].ravel(),
+        return_stages=True,
+    )
+    for name in STAGES:
+        want = d[f"{name}{suffix}"] if f"{name}{suffix}" in d else d[name]
+        assert np.allclose(np.reshape(getattr(got, name), want.shape), want,
+                           rtol=1e-10), f"{name}{suffix}"
+    assert np.allclose(got.sigma, d[f"sigma_out{suffix}"].ravel(), rtol=1e-10)
 
 
 @pytest.mark.fixtures
-def test_update_vol_mixture_posteriors_match_octave(fixture):
-    d = fixture("update_vol_cond")
-    got = update_vol(d["x"], d["sigma"], float(d["gamma"].item()),
-                     rng=None, return_posteriors=True)
-    assert np.allclose(got, d["posteriors"], rtol=1e-10)
+@pytest.mark.parametrize("suffix", ["", "_miss"])
+def test_update_scl_posterior_weights_match_octave(fixture, suffix):
+    d = fixture("update_scl")
+    got = update_scl(d[f"x{suffix}"].ravel(), d["vals"].ravel(), d["probs"].ravel(),
+                     return_posteriors=True)
+    assert np.allclose(got, d[f"posteriors{suffix}"], rtol=1e-10)
 
 
 def test_update_scl_falls_back_to_the_prior_where_data_is_missing():
-    """Missing months are normal on the ragged edge. Without the NaN branch
-    they draw from a garbage posterior."""
+    """Missing months are normal on the ragged edge. update_scl.m sets the
+    posterior to the prior there; without that branch every missing month draws
+    from a garbage posterior."""
     rng = np.random.default_rng(21)
     vals = np.concatenate([[1.0], np.linspace(2, 5, 99)])
     probs = np.concatenate([[0.9], np.full(99, 0.1 / 99)])
-    x = np.full(5000, np.nan)
-    drawn = update_scl(x, vals, probs, rng)
+    drawn = update_scl(np.full(5000, np.nan), vals, probs, rng)
     assert np.mean(drawn == 1.0) == pytest.approx(0.9, abs=0.02)
 
 
@@ -1153,35 +1180,38 @@ def test_update_scl_detects_a_large_outlier():
     rng = np.random.default_rng(22)
     vals = np.concatenate([[1.0], np.linspace(2, 5, 99)])
     probs = np.concatenate([[0.95], np.full(99, 0.05 / 99)])
-    x = np.concatenate([np.zeros(99), [8.0]])      # last obs is 8 sd out
+    x = np.concatenate([np.zeros(99), [8.0]])
     drawn = np.array([update_scl(x, vals, probs, rng)[-1] for _ in range(200)])
     assert drawn.mean() > 2.0
     assert update_scl(x, vals, probs, rng)[0] == 1.0
 
 
+def test_update_vol_survives_an_exact_zero_residual():
+    """The 1e-4 floor inside log(x^2 + barr) is load-bearing: without it an exact
+    zero residual sends the log to -inf."""
+    rng = np.random.default_rng(24)
+    out = update_vol(np.zeros(50), np.ones(50), 0.2, rng=rng)
+    assert np.isfinite(out).all()
+
+
 def test_update_vol_tracks_a_known_volatility_break():
-    """sigma is flat then 5x. The smoothed path must rise across the break."""
+    """Tier 2, production path. sigma is flat then 5x; the smoothed path must
+    rise across the break."""
     rng = np.random.default_rng(23)
     t = 400
     truth = np.concatenate([np.full(t // 2, 1.0), np.full(t // 2, 5.0)])
     x = truth * rng.standard_normal(t)
     sigma = np.ones(t)
     for _ in range(40):
-        sigma = update_vol(x, sigma, 0.2, 0.0, 1e6, rng)
+        sigma = update_vol(x, sigma, 0.2, rng=rng)
     assert sigma[:t // 2].mean() < 2.0
     assert sigma[t // 2:].mean() > 3.0
 
 
-def test_update_vol_survives_an_exact_zero_residual():
-    """The 1e-4 floor inside log(x^2 + barr) is load-bearing."""
-    rng = np.random.default_rng(24)
-    x = np.zeros(50)
-    out = update_vol(x, np.ones(50), 0.2, 0.0, 1e6, rng)
-    assert np.isfinite(out).all()
-
-
 def test_update_gam_recovers_a_known_scale():
-    """x_t = gamma * eps_t with gamma = 0.3; a diffuse prior must recover it."""
+    """x_t = gamma * eps_t with gamma = 0.3, diffuse prior. Note update_gam
+    returns 1/sqrt(gamrnd(...)) - an inverse-gamma expressed through a gamma.
+    Do not substitute scipy.stats.invgamma; the parameterisations differ."""
     rng = np.random.default_rng(25)
     x = 0.3 * rng.standard_normal((20000, 1))
     draws = [update_gam(x, np.array([2.0]), np.array([0.001]), rng)[0]
@@ -1191,7 +1221,7 @@ def test_update_gam_recovers_a_known_scale():
 
 def test_update_ps_recovers_a_known_probability():
     rng = np.random.default_rng(26)
-    x = (rng.random((10000, 1)) < 0.8).astype(float)  # 1 with prob 0.8
+    x = (rng.random((10000, 1)) < 0.8).astype(float)
     draws = [update_ps(x, np.array([1.0]), np.array([1.0]), rng)[0]
              for _ in range(50)]
     assert np.mean(draws) == pytest.approx(0.8, abs=0.02)
@@ -1199,8 +1229,7 @@ def test_update_ps_recovers_a_known_probability():
 
 def test_mnrnd_rows_respects_the_row_probabilities():
     rng = np.random.default_rng(27)
-    probs = np.tile([0.1, 0.3, 0.6], (30000, 1))
-    idx = mnrnd_rows(probs, rng)
+    idx = mnrnd_rows(np.tile([0.1, 0.3, 0.6], (30000, 1)), rng)
     counts = np.bincount(idx, minlength=3) / len(idx)
     assert np.allclose(counts, [0.1, 0.3, 0.6], atol=0.01)
 
@@ -1225,7 +1254,7 @@ Port `update_vol.m`, `update_scl.m`, `update_gam.m`, `update_ps.m` and the RNG s
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd nowcasting_v3 && .venv/bin/pytest tests/test_updates.py -v`
-Expected: 11 passed
+Expected: 13 passed (the two fixture tests are parametrized over the clean and missing-data cases)
 
 - [ ] **Step 5: Commit**
 

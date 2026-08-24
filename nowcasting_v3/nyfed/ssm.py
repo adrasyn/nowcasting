@@ -80,15 +80,16 @@ class Disturbances:
 class KalmanResult:
     """MATLAB ``[log_likelihood, prediction, filter]``.
 
-    ``loglik`` is ``None`` unless ``need_loglik=True``.
+    ``loglik`` is ``None`` unless ``need_loglik=True``; ``filter_mu`` and
+    ``filter_sigma`` are ``None`` unless ``need_filter=True``.
     """
 
     loglik: float | None
     error: np.ndarray
     inv_mse: np.ndarray
     gain: np.ndarray
-    filter_mu: np.ndarray
-    filter_sigma: np.ndarray
+    filter_mu: np.ndarray | None
+    filter_sigma: np.ndarray | None
 
 
 @dataclass
@@ -147,13 +148,28 @@ def _col(a: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 
 def kalman_filter(
-    Y: np.ndarray, ssm: StateSpace, *, need_loglik: bool = False
+    Y: np.ndarray,
+    ssm: StateSpace,
+    *,
+    need_loglik: bool = False,
+    need_filter: bool = True,
 ) -> KalmanResult:
     """Kalman filter. Port of ``Kalman_filter.m``.
 
     ``need_loglik`` defaults to ``False``, unlike the MATLAB, which always
     accumulates the log likelihood. The smoothers discard it and it costs a
     log-determinant per period.
+
+    ``need_filter`` is MATLAB's ``nargout > 2``. With it off, ``filter_mu`` and
+    ``filter_Sigma`` are never allocated, which saves an (M,M,T) array per call
+    on the Gibbs path.
+
+    Note on time variation: this model, as built by ``construct_SSM.m``, only
+    ever varies ``H`` and ``Sigma_eta``. ``F`` and ``G`` are ``blkdiag``
+    constants, ``Sigma_eps`` is ``1e-4*eye(n)``, ``D`` is ``mu`` and ``C`` is
+    never set, so no fixture exercises the time-varying branches of ``C``,
+    ``F``, ``G`` or ``Sigma_eps``. Those are pinned by
+    ``test_all_six_time_varying_matrices_use_the_matlab_index_split`` alone.
     """
     Y = np.asarray(Y, dtype=float)
 
@@ -194,8 +210,12 @@ def kalman_filter(
     prediction_error = np.full((N, T), np.nan)
     prediction_invMSE = np.full((N, N, T), np.nan)
     prediction_gain = np.full((M, N, T), np.nan)
-    filter_mu = np.zeros((M, T))
-    filter_Sigma = np.zeros((M, M, T))
+    if need_filter:
+        filter_mu = np.zeros((M, T))
+        filter_Sigma = np.zeros((M, M, T))
+    else:
+        filter_mu = None
+        filter_Sigma = None
 
     # Create auxiliary variables
     Ct = _vec0(C)
@@ -223,8 +243,9 @@ def kalman_filter(
     prediction_error[nonmiss, 0] = e
     prediction_invMSE[:, :, 0][np.ix_(nonmiss, nonmiss)] = S_inv
     prediction_gain[:, :, 0][:, nonmiss] = Kt
-    filter_mu[:, 0] = mu
-    filter_Sigma[:, :, 0] = Sigma
+    if need_filter:
+        filter_mu[:, 0] = mu
+        filter_Sigma[:, :, 0] = Sigma
 
     # Perform Kalman filter recursions
     for t in range(1, T):
@@ -267,8 +288,9 @@ def kalman_filter(
         prediction_error[nonmiss, t] = e
         prediction_invMSE[:, :, t][np.ix_(nonmiss, nonmiss)] = S_inv
         prediction_gain[:, :, t][:, nonmiss] = Kt
-        filter_mu[:, t] = mu
-        filter_Sigma[:, :, t] = Sigma
+        if need_filter:
+            filter_mu[:, t] = mu
+            filter_Sigma[:, :, t] = Sigma
 
     return KalmanResult(
         loglik=float(log_likelihood) if need_loglik else None,
@@ -322,8 +344,9 @@ def fast_smoother(
     isTV_G = _is_tv3(G)
     isTV_Sigma_eta = _is_tv3(Sigma_eta)
 
-    # Run Kalman filter and recover prediction outputs
-    kf = kalman_filter(Y, ssm)
+    # Run Kalman filter and recover prediction outputs. MATLAB asks for the
+    # filter output only when the MSEs are needed (fast_smoother.m:72-76).
+    kf = kalman_filter(Y, ssm, need_filter=need_mses)
     e = kf.error
     S_inv = kf.inv_mse
     Kt = kf.gain

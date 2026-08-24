@@ -53,7 +53,14 @@ import numpy as np
 from .parameters import Params
 from .ssm import StateSpace
 
-__all__ = ["Restrict", "Latent", "Prior", "construct_ssm", "construct_prior"]
+__all__ = [
+    "Restrict",
+    "Latent",
+    "InitVal",
+    "Prior",
+    "construct_ssm",
+    "construct_prior",
+]
 
 
 # --------------------------------------------------------------------------- #
@@ -97,6 +104,19 @@ class Latent:
     sigma: np.ndarray
     s: np.ndarray
     state: np.ndarray | None = None
+
+
+@dataclass
+class InitVal:
+    """Starting point for the Gibbs sampler, as stored in ``initval.mat``.
+
+    MATLAB ``initval`` struct: a full parameter draw and a full latent draw,
+    which ``example_estimate.m`` feeds to the first sweep so the chain does not
+    have to be initialised from the prior.
+    """
+
+    param: Params
+    latent: Latent
 
 
 @dataclass
@@ -177,7 +197,10 @@ def construct_ssm(
     """
     # Extract parameters from structure
     mu = np.asarray(param.mu, dtype=float).ravel()
-    gamma_g = float(param.gamma_g)
+    # np.asarray(...).item() rather than float(...): the latter raises on a
+    # (1, 1) array under NumPy 2.5, and callers may hand us the fixture's
+    # param__gamma_g in that shape.
+    gamma_g = np.asarray(param.gamma_g, dtype=float).item()
     Lambda = np.asarray(param.Lambda, dtype=float)
     Phi = param.Phi
     phi = param.phi
@@ -338,6 +361,18 @@ def construct_ssm(
     if var_init is None:
         state_group = [np.ones((n_g_state, n_g_state))]
         for i_f in range(n_f):
+            # construct_SSM.m:166 lays the factor part of var_init out as n_f
+            # contiguous (n_f_state/n_f)-square blocks, scaling block i_f by
+            # f_active[i_f, 0].  The factor states are LAG-major, so block i_f
+            # spans states n_g_state + i_f*(n_f_state/n_f) ... +(n_f_state/n_f-1),
+            # which is a contiguous run mixing factors and lags -- it is NOT
+            # "the states of factor i_f" unless n_f == 1.  For the US panel
+            # (n_f = 5, n_f_state/n_f = 5) block i_f is exactly all factors at
+            # lag i_f, so an inactive factor tightens the prior on a whole LAG
+            # of every factor.  With n_f = 2 and factor 2 off at t = 1, Octave
+            # gives diag(Sigma_1)(6:15) = [12 12 12 12 12 2 2 2 2 2]: the tight
+            # prior lands on the higher lags of both factors, not on factor 2.
+            # Ported as written; do not "fix" it without changing the fixture.
             state_group.append(
                 f_active[i_f, 0] * np.ones((n_f_state // n_f, n_f_state // n_f))
             )

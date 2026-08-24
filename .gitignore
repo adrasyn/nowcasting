@@ -61,9 +61,11 @@ __pycache__/
 # local RDS snapshots for pipeline/tests/test_emit_json.R (regenerable from a run)
 /pipeline/tests/fixtures/
 
-# v3 (NY Fed port): the 21MB estimates blob, generated test fixtures, venv
+# v3 (NY Fed port): the 21MB estimates blob and the venv.
+# NOTE: tests/fixtures/*.npz is deliberately NOT ignored. CI has no Octave and
+# cannot regenerate it, so ignoring it would make every Tier 1 exactness test
+# skip in GitHub Actions while still reporting green.
 /nowcasting_v3/nyfed_matlab/Estimates_*.mat
-/nowcasting_v3/tests/fixtures/
 /nowcasting_v3/.venv/
 /nowcasting_v3/**/__pycache__/
 # v3: build artifacts and Octave scratch output (regenerate with tools/gen_fixtures.m)

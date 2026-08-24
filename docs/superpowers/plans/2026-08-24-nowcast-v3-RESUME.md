@@ -1,6 +1,6 @@
 # Nowcast v3 — resume note
 
-**Paused:** 2026-08-24. **Branch:** `feat/nowcast-v3-nyfed-port` (off `main`, **not pushed**).
+**Paused:** 2026-08-24. **Branch:** `feat/nowcast-v3-nyfed-port` (off `main`, **pushed to origin**, upstream set).
 **HEAD at pause:** `4aa6e8b`. Working tree clean. Suite **88 passing** under `-W error`.
 
 ## Restart in three commands

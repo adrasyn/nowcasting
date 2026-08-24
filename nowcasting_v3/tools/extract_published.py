@@ -29,9 +29,25 @@ loudly rather than silently produce a plausible fixture:
   3. Every (start, stride) alignment that satisfies 1-2 must agree on the
      numbers, so the read is unambiguous rather than merely self-consistent.
 
+Note what check 2 does and does not buy. It rules out column transposition and
+row misalignment, but it is INVARIANT TO A COMMON ROW PERMUTATION, so it cannot
+on its own validate the name-to-row pairing - which is exactly what a
+byte-order-sorted name scan is most likely to get wrong. What closes that gap is
+external evidence, and both halves of it are committed as tests in
+tests/test_fixtures_present.py rather than left in a report:
+
+  * ``Actual`` reproduces ``Y_location + Y_scale .* Y_new`` at the release cells
+    of the raw data vintages, to ~2e-15.
+  * the release mask computed from the raw vintages, flattened column-major as
+    example_nowcast.m flattens it, reproduces ``series_index`` exactly -
+    including the non-monotone order of the 2023-10-06 week.
+
 Sanity-checked against reality for the 2023-10-06 vintage: the recovered
 Actuals are JOLTS +690k, nonfarm payrolls +336k, unemployment rate change 0.0,
 ADP +89k - the September 2023 prints.
+
+WEIGHT AND IMPACT ARE FIRST-HORIZON ONLY; see HORIZON below and the ``horizon``
+key in the fixture.
 
 Usage:
     ../.venv/bin/python extract_published.py
@@ -52,10 +68,19 @@ NPZ = HERE.parent / "tests" / "fixtures" / "published_nowcasts.npz"
 VINTAGES = ["2023_09_29", "2023_10_06"]
 COLUMNS = ["forecast", "actual", "weight", "impact"]
 
+# Weight and Impact in the published tables are for the FIRST nowcast horizon
+# only. example_nowcast.m line 174 linear-indexes weights, which is n x T x
+# length(t_now), with the n x T logical mask `releases`; linear indexing stops at
+# the end of the first page, so the second horizon never reaches the table.
+# A test that compared horizon 2 against these values would mis-gate silently.
+HORIZON = 1
 
-def spec_names() -> list[str]:
+
+def spec_series() -> tuple[list[str], list[str]]:
+    """Return (SeriesID, SeriesName) columns of the model spec, in file order."""
     with open(MATLAB / "model_spec_FRED.csv", newline="", encoding="utf-8") as fh:
-        return [row["SeriesName"] for row in csv.DictReader(fh)]
+        rows = list(csv.DictReader(fh))
+    return [r["SeriesID"] for r in rows], [r["SeriesName"] for r in rows]
 
 
 def find_row_names(raw: bytes, names: list[str]) -> list[tuple[int, str, int]]:
@@ -110,7 +135,7 @@ def find_table(raw: bytes, nrows: int) -> np.ndarray:
     return first
 
 
-def extract(vintage: str, names: list[str]) -> dict[str, np.ndarray]:
+def extract(vintage: str, ids: list[str], names: list[str]) -> dict[str, np.ndarray]:
     path = MATLAB / "output" / f"Update_{vintage}.mat"
     raw = loadmat(path, struct_as_record=False, squeeze_me=False)
     nowcast = raw["output"][0, 0].nowcast.item()
@@ -126,23 +151,27 @@ def extract(vintage: str, names: list[str]) -> dict[str, np.ndarray]:
         out[f"news_{vintage}__{column}"] = values
     out[f"news_{vintage}__series_name"] = np.array([name for _, name, _ in rows], dtype="U80")
     out[f"news_{vintage}__series_index"] = np.array([idx for _, _, idx in rows], dtype=np.int64)
+    # SeriesID is the join key Task 9 uses; SeriesName is the long description and
+    # four of them carry U+2019, which makes it a poor thing to join on.
+    out[f"news_{vintage}__series_id"] = np.array([ids[idx - 1] for _, _, idx in rows], dtype="U32")
     return out
 
 
 def main() -> int:
-    names = spec_names()
-    out: dict[str, np.ndarray] = {}
+    ids, names = spec_series()
+    out: dict[str, np.ndarray] = {"horizon": np.array(HORIZON, dtype=np.int64)}
     for vintage in VINTAGES:
-        part = extract(vintage, names)
+        part = extract(vintage, ids, names)
         out.update(part)
         impact = part[f"news_{vintage}__impact"]
         print(f"{vintage}: published nowcast = {part[f'published__{vintage}'].item():.16f}, "
               f"{impact.size} releases, sum(impact) = {impact.sum():.8f}")
-        for name, forecast, actual, weight, imp in zip(
-            part[f"news_{vintage}__series_name"], part[f"news_{vintage}__forecast"],
-            part[f"news_{vintage}__actual"], part[f"news_{vintage}__weight"], impact,
+        for sid, name, forecast, actual, weight, imp in zip(
+            part[f"news_{vintage}__series_id"], part[f"news_{vintage}__series_name"],
+            part[f"news_{vintage}__forecast"], part[f"news_{vintage}__actual"],
+            part[f"news_{vintage}__weight"], impact,
         ):
-            print(f"    {name[:44]:44s} F={forecast:12.6f} A={actual:12.6f} "
+            print(f"    {sid:12s} {name[:40]:40s} F={forecast:12.6f} A={actual:12.6f} "
                   f"W={weight:10.6f} I={imp:9.6f}")
     NPZ.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(NPZ, **out)

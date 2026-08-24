@@ -77,13 +77,15 @@ REQUIRED = {
         "p1_KF_miss", "ln_sigmasq_miss", "sigma_out_miss",
     ],
     "published_nowcasts": [
-        "published__2023_09_29", "published__2023_10_06",
+        "published__2023_09_29", "published__2023_10_06", "horizon",
         "news_2023_09_29__forecast", "news_2023_09_29__actual",
         "news_2023_09_29__weight", "news_2023_09_29__impact",
         "news_2023_09_29__series_name", "news_2023_09_29__series_index",
+        "news_2023_09_29__series_id",
         "news_2023_10_06__forecast", "news_2023_10_06__actual",
         "news_2023_10_06__weight", "news_2023_10_06__impact",
         "news_2023_10_06__series_name", "news_2023_10_06__series_index",
+        "news_2023_10_06__series_id",
     ],
     "nowcast_us": [
         "Y_old", "Y_new", "i_now", "t_now", "t_now_py",
@@ -189,3 +191,93 @@ def test_published_news_table_is_internally_consistent(fixture, vintage, n):
     assert np.array_equal(impact, (actual - forecast) * weight)
     assert len(set(names.tolist())) == n, "row names must be unique, as MATLAB tables require"
     assert set(index.tolist()) <= set(range(1, 32))
+
+
+# Each published week paired with the point_nowcast fixture built from the same
+# two data vintages, so the news table can be checked against the raw data.
+VINTAGE_PAIRS = [("2023_09_29", "nowcast_us", 9), ("2023_10_06", "nowcast_us_1006", 7)]
+
+
+def _release_order(nowcast_fixture):
+    """Release cells in the order example_nowcast.m enumerates them.
+
+    example_nowcast.m does `releases = ~isnan(actual(:))` on an n x T array, so
+    rows come out in MATLAB's column-major order: all series of one period, then
+    the next period. That ordering is what makes the 2023-10-06 table
+    non-monotone in series index, and reproducing it is a real check.
+    """
+    import numpy as np
+
+    y_new = nowcast_fixture["Y_new"]
+    releases = (~np.isnan(y_new)) & np.isnan(nowcast_fixture["Y_old"])
+    flat = np.flatnonzero(releases.ravel(order="F"))
+    return flat, (flat % y_new.shape[0]) + 1
+
+
+@pytest.mark.parametrize("vintage,pair,n", VINTAGE_PAIRS)
+def test_published_news_rows_match_the_release_mask(fixture, vintage, pair, n):
+    """External check on the MCOS row order.
+
+    The internal Impact identity is invariant to a common row permutation, so it
+    cannot validate the name-to-row pairing on its own. This can: the release
+    mask is computed from the raw data vintages, with no reference to the
+    published file, and must reproduce series_index element for element.
+    """
+    import numpy as np
+
+    published = fixture("published_nowcasts")
+    _, series_index = _release_order(fixture(pair))
+    assert series_index.size == n
+    assert np.array_equal(series_index, published[f"news_{vintage}__series_index"])
+
+
+@pytest.mark.parametrize("vintage,pair,n", VINTAGE_PAIRS)
+def test_published_actuals_reproduce_the_raw_vintage(fixture, vintage, pair, n):
+    """Second external check: Actual is the raw new-vintage datum at that cell.
+
+    example_nowcast.m builds actual = news + forecasts with
+    news = Y_scale .* (Y_new - forecasts_tmp) and
+    forecasts = Y_location + Y_scale .* forecasts_tmp, which collapses to
+    Y_location + Y_scale .* Y_new up to floating-point rounding.
+    """
+    import numpy as np
+
+    published = fixture("published_nowcasts")
+    nowcast = fixture(pair)
+    flat, _ = _release_order(nowcast)
+    destandardised = nowcast["Y_location"] + nowcast["Y_scale"] * nowcast["Y_new"]
+    actual = destandardised.ravel(order="F")[flat]
+    expected = published[f"news_{vintage}__actual"]
+    assert actual.size == n
+    error = np.abs(actual - expected).max()
+    assert error < 1e-11, f"{vintage}: max |Actual - raw vintage| = {error:g}"
+
+
+def test_published_series_ids_agree_with_the_spec_csv(fixture):
+    """series_id must be the SeriesID column at series_index, 1-based."""
+    import csv
+
+    import numpy as np
+
+    spec = Path(__file__).parent.parent / "nyfed_matlab" / "model_spec_FRED.csv"
+    with open(spec, newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    ids = [row["SeriesID"] for row in rows]
+    names = [row["SeriesName"] for row in rows]
+
+    published = fixture("published_nowcasts")
+    for vintage, _, _ in VINTAGE_PAIRS:
+        index = published[f"news_{vintage}__series_index"]
+        assert np.array_equal(published[f"news_{vintage}__series_id"],
+                              np.array([ids[i - 1] for i in index], dtype="U32"))
+        assert np.array_equal(published[f"news_{vintage}__series_name"],
+                              np.array([names[i - 1] for i in index], dtype="U80"))
+
+
+def test_published_weights_and_impacts_are_first_horizon_only(fixture):
+    """example_nowcast.m linear-indexes an n x T x length(t_now) array with an
+    n x T mask, so only the first nowcast horizon reaches the published table.
+    A Task 9 test comparing horizon 2 against these values would mis-gate.
+    """
+    published = fixture("published_nowcasts")
+    assert published["horizon"].item() == 1

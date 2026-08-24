@@ -1605,6 +1605,10 @@ Written to task level once Plan A's gate passes.
 - **B1** Series selection. ABS/RBA replacements for the 31 FRED series. Several have no monthly Australian equivalent — JOLTS, ADP payrolls, monthly PCE, monthly real GDI, Empire State and Philly Fed. Expect 15–25 series. The Soft block leans on NAB and Westpac-MI, both already fetched by v1/v2.
 - **B2** Block design and normalising loadings. Which series fixes each factor's scale (`100` in the spec CSV) is a modelling decision, not a translation. Also: whether a COVID block is still warranted for Australia, and over what window.
 - **B3** **The quarterly aggregation weights.** `construct_ssm` uses `[1,2,3,2,1]/9`, the Mariano-Murasawa filter for *annualised* quarterly growth. Australian headline GDP is QoQ. Either re-derive the filter for QoQ or keep the model annualised internally and convert on emit. This is a short derivation with total consequence — Fable, and write the derivation into the docs.
+
+  **Landmine, found in Task 5 and confirmed in the source.** `construct_SSM.m:131` pads the *quarterly* branch of `H` using `length(vec_m)*n_f`, where `length(vec_q)*n_f` is meant — the surrounding terms on that same line all use `vec_q`. It is harmless in the US model only because `vec_m = [1,0,0,0,0]` and `vec_q = [1,2,3,2,1]/9` are both length 5.
+
+  **If B3 changes `vec_q` to a different length, this line silently mis-sizes the zero padding and `H` comes out wrong — or the assembly raises a dimension error far from the cause.** The Python port reproduces the bug faithfully, as it must to keep the fixture green. Whoever does B3 must decide deliberately whether to keep or correct it, and if correcting, must regenerate the affected fixtures. Do not discover this by debugging.
 - **B4** `initval` construction. The MATLAB ships a 128KB `initval.mat` whose `param.Lambda` is also the prior mean for the loadings. An Australian panel needs its own, most likely PCA-seeded.
 - **B5** Fetchers and panel assembly to a monthly matrix back to at least 1990, reusing v1/v2 patterns.
 

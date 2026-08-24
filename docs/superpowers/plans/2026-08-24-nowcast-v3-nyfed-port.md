@@ -15,7 +15,7 @@
 - **Bit-exact RNG reproduction against MATLAB is impossible.** MATLAB's `rng(321)` plus `mvnrnd`/`gamrnd`/`betarnd`/`mnrnd` cannot be matched draw-for-draw by numpy. All testing follows the two-tier rule below. Any task that claims "matches MATLAB exactly" for a stochastic function is wrong.
 - **Two-tier test rule.** Tier 1 (deterministic functions): must match Octave fixtures to `rtol=1e-10`. Tier 2 (stochastic functions): test the conditional distribution's moments against analytic values, plus an end-to-end posterior-mean check within Monte Carlo error. Never assert exact equality on a draw.
 - **Never commit** `Estimates_*.mat` (21MB) or `.venv/`. Add to `.gitignore` in Task 0. **Test fixtures are the exception and MUST be committed** (Task 3, Step 2b): CI has no Octave and cannot regenerate them, so gitignoring them would silently skip every Tier 1 test in Actions. They are test inputs, not build output. Keep the directory under 5MB.
-- **Unwrapping fixture scalars: use `.ravel()[0]`, never bare `float()`/`int()`.** The fixtures store most scalars as `(1,1)` arrays, and NumPy 2 raises `TypeError` when converting any array with `ndim > 0` to a Python scalar. `published__*` and `horizon` are 0-d and convert fine, but do not rely on knowing which is which — `.ravel()[0]` is correct for both.
+- **Unwrapping fixture scalars: use `.item()`, never bare `float()`/`int()`.** The fixtures store most scalars as `(1,1)` arrays, and NumPy 2 raises `TypeError` when converting any array with `ndim > 0` to a Python scalar. `published__*` and `horizon` are 0-d and convert fine, but do not rely on knowing which is which — `.item()` handles both, and unlike `.ravel()[0]` it raises on a multi-element array instead of silently taking the first entry.
 - **Model dimensions for the US reference panel:** `n=31`, `n_f=5`, `p_f=4`, `p_e=1`, 3 quarterly series, `n_state=73`, `n_param=390`. These are assertable constants in tests.
 - **The site contract is JSON only.** Pipelines and site communicate through `data/*.json`. No Python imports from the site, no site imports from Python.
 - **Follow v2 conventions:** package at `nowcasting_v3/`, outputs named `data/latest_v3.json` etc., a `/v3` preview page before any main-page design work.
@@ -765,7 +765,7 @@ def test_kalman_matches_octave_on_small_system(fixture):
     hand, and the same system Task 0 used to prove the Octave oracle."""
     d = fixture("kalman_small")
     got = kalman_filter(d["Y"], _ssm(d), need_loglik=True)
-    assert got.loglik == pytest.approx(float(d["loglik"].ravel()[0]), rel=1e-10)
+    assert got.loglik == pytest.approx(float(d["loglik"].item()), rel=1e-10)
     assert np.allclose(got.error, d["prediction__error"], rtol=1e-10, equal_nan=True)
     assert np.allclose(got.gain, d["prediction__gain"], rtol=1e-10, equal_nan=True)
     assert np.allclose(got.filter_mu, d["filter__mu"], rtol=1e-10)
@@ -778,7 +778,7 @@ def test_kalman_matches_octave_with_an_entirely_missing_period(fixture):
     through it without updating, and not produce NaNs downstream."""
     d = fixture("kalman_small")
     got = kalman_filter(d["Y_allmiss"], _ssm(d), need_loglik=True)
-    assert got.loglik == pytest.approx(float(d["loglik_allmiss"].ravel()[0]), rel=1e-10)
+    assert got.loglik == pytest.approx(float(d["loglik_allmiss"].item()), rel=1e-10)
     assert np.allclose(got.error, d["prediction_allmiss__error"],
                        rtol=1e-10, equal_nan=True)
     assert np.allclose(got.filter_mu, d["filter_allmiss__mu"], rtol=1e-10)
@@ -1097,7 +1097,7 @@ def test_update_scl_posterior_weights_match_octave(fixture):
 @pytest.mark.fixtures
 def test_update_vol_mixture_posteriors_match_octave(fixture):
     d = fixture("update_vol_cond")
-    got = update_vol(d["x"], d["sigma"], float(d["gamma"].ravel()[0]),
+    got = update_vol(d["x"], d["sigma"], float(d["gamma"].item()),
                      rng=None, return_posteriors=True)
     assert np.allclose(got, d["posteriors"], rtol=1e-10)
 
@@ -1369,7 +1369,7 @@ from nyfed.nowcast import density_nowcast, news_table, point_nowcast
 def test_point_nowcast_matches_octave(fixture):
     d = fixture("nowcast_us")
     got = point_nowcast(d["Y_old"], d["Y_new"], _ssm(d, "SSM_old"),
-                        _ssm(d, "SSM_new"), int(d["i_now"].ravel()[0]) - 1,
+                        _ssm(d, "SSM_new"), int(d["i_now"].item()) - 1,
                         d["t_now"].ravel().astype(int) - 1)
     assert np.allclose(got.nowcast, d["nowcast"], rtol=1e-10)
     assert np.allclose(got.forecasts, d["forecasts"], rtol=1e-10, equal_nan=True)
@@ -1383,7 +1383,7 @@ def test_impacts_and_revisions_sum_to_the_nowcast_change(fixture):
     + data revision + sum of release impacts = this week's nowcast."""
     d = fixture("nowcast_us")
     got = point_nowcast(d["Y_old"], d["Y_new"], _ssm(d, "SSM_old"),
-                        _ssm(d, "SSM_new"), int(d["i_now"].ravel()[0]) - 1,
+                        _ssm(d, "SSM_new"), int(d["i_now"].item()) - 1,
                         d["t_now"].ravel().astype(int) - 1)
     released = ~np.isnan(got.news)
     impacts = ((got.news + got.forecasts) - got.forecasts) * got.weights[:, :, 0]
@@ -1397,7 +1397,7 @@ def test_impacts_and_revisions_sum_to_the_nowcast_change(fixture):
 def test_series_with_no_release_has_no_impact(fixture):
     d = fixture("nowcast_us")
     got = point_nowcast(d["Y_old"], d["Y_new"], _ssm(d, "SSM_old"),
-                        _ssm(d, "SSM_new"), int(d["i_now"].ravel()[0]) - 1,
+                        _ssm(d, "SSM_new"), int(d["i_now"].item()) - 1,
                         d["t_now"].ravel().astype(int) - 1)
     unchanged = np.isnan(d["Y_new"]) | (d["Y_new"] == d["Y_old"])
     assert np.isnan(got.news[unchanged]).all()
@@ -1407,7 +1407,7 @@ def test_series_with_no_release_has_no_impact(fixture):
 def test_news_table_columns_and_ordering(fixture):
     d = fixture("nowcast_us")
     got = point_nowcast(d["Y_old"], d["Y_new"], _ssm(d, "SSM_old"),
-                        _ssm(d, "SSM_new"), int(d["i_now"].ravel()[0]) - 1,
+                        _ssm(d, "SSM_new"), int(d["i_now"].item()) - 1,
                         d["t_now"].ravel().astype(int) - 1)
     table = news_table(got, _spec(), d["Y_location"], d["Y_scale"])
     assert list(table.columns) == ["series_id", "series_name", "forecast",
@@ -1422,9 +1422,9 @@ def test_density_nowcast_is_centred_on_the_point_nowcast(fixture):
     rng = np.random.default_rng(41)
     t_now = d["t_now"].ravel().astype(int) - 1
     point = point_nowcast(d["Y_old"], d["Y_new"], _ssm(d, "SSM_old"),
-                          _ssm(d, "SSM_new"), int(d["i_now"].ravel()[0]) - 1, t_now)
+                          _ssm(d, "SSM_new"), int(d["i_now"].item()) - 1, t_now)
     draws = np.array([density_nowcast(d["Y_new"], _ssm(d, "SSM_new"),
-                                      int(d["i_now"].ravel()[0]) - 1, t_now, rng)
+                                      int(d["i_now"].item()) - 1, t_now, rng)
                       for _ in range(500)])
     assert draws[:, 0].mean() == pytest.approx(point.nowcast[3, 0], abs=0.05)
 ```

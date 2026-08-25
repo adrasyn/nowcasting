@@ -39,13 +39,14 @@ TOLERANCES ARE MEASURED, NOT CHOSEN
 MATLAB's published figures average 1,250 ``S_update`` draws off ``rng(321)``.
 numpy cannot reproduce that stream, so the port converges to the same limit by a
 different path with Monte Carlo error around it. Whether that error fits inside
-any particular tolerance is an empirical question, so Step 0 of the task
-measured it -- five seeds per week, full 1,250-draw runs -- BEFORE this file was
-run against the published targets. The numbers below are transcribed from that
-measurement; ``README.md`` carries the full table and the command:
+any particular tolerance is an empirical question, so it was measured -- BEFORE
+this file was run against the published targets -- rather than assumed.
 
-    .venv/bin/python -m nyfed.run_us_reference 2023-09-29 --seeds 321 1 2 3 4 \
-        --density-draws 20 --quiet
+Step 0 measured five seeds. Those five turned out to be an unusually tight
+cluster, so **every constant in force below was re-measured over fifteen seeds**;
+the provenance, the command and the reason are in the constants block further
+down, which is the single source of truth for them. ``README.md`` carries the
+full table and the five-seed comparison.
 
 The tolerance is ``3 * sqrt(2) * sd``. The comparison is between TWO
 independent 1,250-draw averages -- ours and MATLAB's -- so the difference has
@@ -65,11 +66,11 @@ either, which is why the plan's own note says an exact match "cannot be met".
    it.
 2. *`sd` is known.* It is not: each figure below is estimated from a handful of
    seeds, and the relative standard error of an sd from `n` samples is about
-   `1/sqrt(2*(n-1))` -- 35% at n=5, 16% at n=20. So a comparison landing near
-   1.0x of tolerance is not meaningfully distinguishable from one landing just
-   over it, and none of the conclusions here rest on such a case. Where one came
-   close, the sd was re-measured over more seeds rather than left at five (see
-   `IMPACT_SD` below).
+   `1/sqrt(2*(n-1))` -- 35% at n=5, 19% at n=15, which is what the constants
+   below are measured over. So a comparison landing near 1.0x of tolerance is
+   not meaningfully distinguishable from one landing just over it, and none of
+   the conclusions here rest on such a case: after the re-measurement the worst
+   is 0.47x.
 
 Neither point moves the substantive results: the 2023-09-29 headline passes
 under `abs=0.01`, under `3*sd` and under `3*sqrt(2)*sd` alike, and the
@@ -130,8 +131,19 @@ def _key(week: str) -> str:
 # comparison, not here, so there is one set of numbers in the code and no doubt
 # about which is in force.
 #
-#     .venv/bin/python -m nyfed.run_us_reference 2023-09-29 --seeds 5 6 7 8 9 \
+# Reproduce, one command per week (each ran as three parallel five-seed chunks
+# for wall clock; a single invocation reports the same sd across all fifteen):
+#
+#     .venv/bin/python -m nyfed.run_us_reference 2023-09-29 \
+#         --seeds 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 \
 #         --density-draws 2 --quiet
+#     .venv/bin/python -m nyfed.run_us_reference 2023-10-06 \
+#         --seeds 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 \
+#         --density-draws 2 --quiet
+#
+# --density-draws is safe to cut here and cannot touch a measured quantity: the
+# density loop runs after the point nowcast and the news table are computed and
+# feeds nothing back into them.
 #
 # An sd from n samples has a relative standard error of about 1/sqrt(2*(n-1)):
 # 35% at n=5, 19% at n=15. That is still not negligible, which is why nothing
@@ -242,10 +254,30 @@ def test_reproduces_the_published_nowcast(fixture, reference):
     currently happens to sit under 4.24 sigma-hat. It is pinned as a two-sided
     observation instead, in
     `test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term`.
+
+    TWO ASSERTIONS, AND THE TIGHTER ONE IS THE GATE. The plan's criterion is a
+    literal +-0.01pp, and the measured deviation of 0.008416 meets it. That is
+    the result. `headline_tolerance` is the wider Monte Carlo statement, and
+    after the sd re-measurement it is 0.073529 -- wide enough that it would no
+    longer catch a gross defect: deleting the entire 1,250-draw `S_update`
+    averaging moves the headline to 0.040760, which sits INSIDE the sigma band
+    and outside the floor. So the floor is asserted too, and it is the assertion
+    that does the work. See README.md, "Is the gate falsifiable?".
+
+    The floor holds at 0.84x with no margin to spare, and it is a statement
+    about SEED 321, not about every seed: the seed-to-seed sd of this headline
+    is 0.017331, so other seeds miss +-0.01pp routinely. That is not fragility
+    here -- the seed is fixed and numpy's PCG64 stream is deterministic -- but
+    it is why the wider Monte Carlo band is kept alongside rather than deleted,
+    and why README.md quotes the spread next to the point estimate.
     """
     week = GATE_WEEK
     expected = fixture("published_nowcasts")[f"published__{_key(week)}"].item()
     got = reference(week)
+    deviation = abs(got.nowcast - expected)
+    # The plan's criterion. Measured 0.008416 against 0.01.
+    assert deviation <= 0.01, deviation
+    # And the wider Monte Carlo statement, which it also clears at 0.11x.
     assert got.nowcast == pytest.approx(expected, abs=headline_tolerance(week))
 
 
@@ -410,7 +442,7 @@ def test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term(
     published, each in units of its own seed-to-seed sd:
 
         component            mean gap        sd        in sigma
-        2023-09-29 level     -0.010291    0.017331        0.61
+        2023-09-29 level     -0.010291    0.017331        0.59
         release total        -0.000522    0.005401        0.10
         REVISIONS TERM       +0.019197    0.002028        9.46
         ---------------------------------------------------------
@@ -453,8 +485,17 @@ def test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term(
     +0.0192 that has to be explained is squarely inside that range, and one of
     the four reproduces it to 1.18x. `rev_data` barely moves across all of them
     (0.138 to 0.193) while `rev_SSM` carries the shift -- the mechanism above.
-    So the missing estimate file is a sufficient explanation of the whole gap;
-    nothing is left over for this port's revisions path to account for. See the
+    So the missing estimate file is a SUFFICIENT explanation of the whole gap.
+    Note what that does and does not establish. It is a scale test: it kills the
+    null that a parameter difference of the measured size is too small to move
+    the revisions term by 0.02, and it kills it cleanly, with a genuine control
+    (`rev_SSM` is exactly 0.000000 when both sides use the same parameters) and a
+    falsifier stated before the run. But 2 of the 4 directions carry the right
+    sign, which is a coin flip, and a range spanning +-0.055 would absorb any
+    additive defect smaller than that. So the correct reading is **no defect
+    detected in the revisions path**, not "a defect there is ruled out" -- and
+    `test_the_0929_revisions_term_has_no_published_counterpart` below records
+    that on the gate week those terms are pinned against nothing at all. See the
     task report, experiment (a).
 
     The bounds below are two-sided so that the day somebody obtains the real
@@ -515,11 +556,14 @@ def test_the_1006_release_impacts_miss_by_more_than_monte_carlo_error(
 ):
     """Pin the 2023-10-06 gap so it stays visible and so its repair is noticed.
 
-    Five of the seven per-series impacts miss the measured Monte Carlo bound,
-    the worst by 5.1x (ADPMNUSNERSA, whose published weight is +3.4e-5 and ours
-    -3.0e-5 -- a near-zero weight whose sign is not stable across parameter
-    draws, so the sign flip is a symptom of the parameter difference and not of
-    a porting error).
+    Four of the seven per-series impacts miss the measured Monte Carlo bound,
+    the worst by 6.72x (TTLCONS), then ADPMNUSNERSA at 6.58x -- whose published
+    weight is +3.4e-5 and ours -3.0e-5, a near-zero weight whose sign is not
+    stable across parameter draws, so the sign flip is a symptom of the
+    parameter difference and not of a porting error.
+
+    (On the superseded five-seed sds this read five of seven, worst 6.45x.
+    BOPTEXP moved under the line when its sd was re-measured 1.8x larger.)
 
     The bounds below are two-sided on purpose. The upper bound keeps this from
     becoming a test that any breakage would satisfy. The lower bound means that
@@ -548,9 +592,10 @@ def test_the_1006_release_impacts_miss_by_more_than_monte_carlo_error(
     # The release TOTAL is checked in
     # test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term, against
     # the measured seed-to-seed sd of the total rather than a round number. It
-    # is not repeated here: the per-seed spread of that total is 0.008262, so a
-    # bound tight enough to look impressive would be encoding seed 321's
-    # particular draw and would fail at seed 1.
+    # is not repeated here: the release total's seed-to-seed sd is 0.005401 over
+    # the fifteen seeds in force (0.008262 over the original five), so a bound
+    # tight enough to look impressive would be encoding seed 321's particular
+    # draw. A 0.005 bound fails at seed 1, whose gap is -0.015973.
 
 
 # --------------------------------------------------------------------------- #

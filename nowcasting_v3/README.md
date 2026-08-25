@@ -234,9 +234,10 @@ would be right only if the published figure were exact, and it is not.
    factor; if smaller, it overstates it.
 2. **`sd` is known.** It is estimated from a handful of seeds, and an sd from `n`
    samples has a relative standard error of about `1/sqrt(2*(n-1))` — 35% at
-   n = 5, 16% at n = 20. A comparison landing near 1.0x of tolerance therefore
-   is not meaningfully distinguishable from one landing just over it. Where one
-   came close, the sd was re-measured over twenty seeds rather than left at five.
+   n = 5, 19% at n = 15, which is what the constants in force are measured over.
+   A comparison landing near 1.0x of tolerance therefore is not meaningfully
+   distinguishable from one landing just over it. Where one came close, the sd
+   was re-measured over fifteen further seeds rather than left at five.
 
 Neither point moves the substantive results. The 2023-09-29 headline passes
 under `abs=0.01`, under `3*sd` and under `3*sqrt(2)*sd` alike; and the
@@ -255,17 +256,37 @@ published impacts for 2023-09-29 are smaller in magnitude than 0.01, so a flat
 ### Gate results
 
 ```
-.venv/bin/pytest tests/test_end_to_end.py -v      # 12 passed in 12:39
+.venv/bin/pytest tests/test_end_to_end.py -v      # 13 passed in 13:10
 ```
 
-**The gate is the 2023-09-29 week.**
+**The gate is the 2023-09-29 week**, and what carries it is the literal floor:
 
-| Week | published | this port (seed 321) | deviation | tolerance | |
-| --- | --- | --- | --- | --- | --- |
-| 2023-09-29 | 2.0241867 | **2.015771** | 0.008416 | 0.073529 | **PASS** (0.11x) |
+| Week | published | this port (seed 321) | deviation | |
+| --- | --- | --- | --- | --- |
+| 2023-09-29 | 2.0241867 | **2.015771** | **0.008416** | **inside the plan's ±0.01pp floor** |
 
-It also passes the plan's original `max(0.01, 3*sd)` rule and its flat
-`abs=0.01` floor, so nothing about the gate rests on the `sqrt(2)`.
+The deviation is 0.008416, and the plan asked for ±0.01pp. That is the result,
+and it depends on no tolerance rule at all: it also clears the plan's original
+`max(0.01, 3*sd)` and the `max(0.01, 3*sqrt(2)*sd)` used here.
+
+`test_reproduces_the_published_nowcast` asserts **both**: the ±0.01pp floor,
+which it meets at 0.84x, and the wider `3*sqrt(2)*sd` band, which it meets at
+0.11x. The floor is the one doing the work — see
+[Is the gate falsifiable?](#is-the-gate-falsifiable) for the mutation that slips
+through the sigma band and is caught by the floor.
+
+Do not read that 0.11x as an improvement on the 0.24x quoted before the sd
+re-measurement: **the deviation never moved.** The tolerance widened, from
+0.034416 to 0.073529, because the sd it is built from was re-measured larger.
+That is a looser gate, not a tighter result.
+
+One caveat on the floor, stated because the file's own rule is not to lean on a
+ratio near 1.0x. Meeting ±0.01pp at 0.84x is a statement about **seed 321**, not
+about every seed: this headline's seed-to-seed sd is 0.017331, so other seeds
+miss ±0.01pp routinely. It does not flake — the seed is fixed and numpy's PCG64
+stream is deterministic — but it is why the Monte Carlo band is kept alongside
+the floor rather than replaced by it, and why the spread above is quoted next to
+the point estimate.
 
 2023-10-06 lands at **2.399940** against a published **2.3834663**, a residual of
 **+0.016474** — which *passes* a Monte Carlo comparison, and is nonetheless not
@@ -297,23 +318,43 @@ understated, not the deviations inflated.)
 
 A gate that cannot fail proves nothing, so the runner was mutated three ways and
 the gate re-run against each. All three are the failure modes the plan names as
-the first things to check after a miss.
+the first things to check after a miss. Re-run against the tolerances now in
+force, after the sd re-measurement:
 
-| Mutation | headline | per-series impacts |
-| --- | --- | --- |
-| *(control — the real runner)* | pass, dev 0.008416 | 9/9 pass |
-| Compare horizon 2 against the published horizon-1 table | pass | **7 of 9 fail** |
-| Skip the 1,250 `S_update` draws; use the posterior-mean latents | **fail**, dev 0.040760 > 0.034416 | **3 of 9 fail** |
-| Use the wrong "old" vintage for the week (09-20, not 09-22) | — | **caught**: 10 release rows, not 9 |
+| Mutation | headline vs the ±0.01pp floor | headline vs `3*sqrt(2)*sd` = 0.073529 | per-series impacts |
+| --- | --- | --- | --- |
+| *(control — the real runner)* | pass, dev 0.008416 | pass | 9/9 pass |
+| Compare horizon 2 against the published horizon-1 table | pass | pass | **6 of 9 fail**, worst 15.8x |
+| Skip the 1,250 `S_update` draws; use the posterior-mean latents | **FAIL**, dev 0.040760 | *pass* | **1 of 9 fails**, 1.8x |
+| Use the wrong "old" vintage for the week (09-20, not 09-22) | — | — | **caught**: 10 release rows, not 9 |
 
-The headline alone would have missed the horizon mutation entirely. That is what
-the per-series test is for.
+Two things fall out of that table, and both matter more than the pass itself.
+
+**The `3*sqrt(2)*sd` tolerance is too loose to catch a real defect.** Deleting
+the entire 1,250-draw `S_update` averaging — a gross error, the second thing the
+plan says to check after a miss — moves the headline to 0.040760, which sits
+comfortably *inside* the 0.073529 sigma band and would have gone green. **The
+±0.01pp floor catches it.** That is the concrete reason the floor is the gate
+criterion above and the sigma ratio is only supporting detail: on the one
+mutation where the two disagree, the floor is right.
+
+**The headline alone would miss the horizon mutation entirely** — it passes both
+headline criteria while six of the nine per-series impacts fail, the worst by
+15.8x. That is what the per-series test is for, and it is the same
+compensating-errors argument that demotes the 2023-10-06 week below.
+
+(Before the sd re-measurement this table read *7 of 9* and *3 of 9* for the first
+two mutations, and the `S_update` mutation failed the sigma band as well as the
+floor. The mutation deviations did not change; the tolerances they are judged
+against did.)
 
 ### 2023-10-06 is not reproducible from this drop, and that is not a port bug
 
-Its per-series table misses — five of seven impacts beyond the measured Monte
-Carlo bound, the worst by 5.1x — and its headline residual of +0.016474 is a
-**fixed offset, not a Monte Carlo excursion.**
+Its per-series table misses — four of seven impacts beyond the measured Monte
+Carlo bound, the worst by 6.72x (TTLCONS), then ADPMNUSNERSA at 6.58x — and its
+headline residual of +0.016474 hides a **fixed offset** in one component. (On
+the superseded five-seed sds this read five of seven, worst 6.45x; BOPTEXP moved
+under the line when its sd was re-measured 1.8x larger.)
 
 **The published 2023-10-06 update was produced from an estimate file the drop
 does not contain.** This is measured, not inferred, and pinned by
@@ -349,7 +390,7 @@ own seed-to-seed sd:
 
 | component | mean gap | sd | **in sigma** |
 | --- | --- | --- | --- |
-| 2023-09-29 level (row 1 of the 10-06 week) | −0.010291 | 0.017331 | 0.61 |
+| 2023-09-29 level (row 1 of the 10-06 week) | −0.010291 | 0.017331 | 0.59 |
 | release total | −0.000522 | 0.005401 | 0.10 |
 | **revisions term** | **+0.019197** | **0.002028** | **9.46** |
 | headline residual (the sum) | +0.008383 | 0.014124 | 0.59 |
@@ -391,9 +432,20 @@ the +0.019197 that has to be explained:
 
 The offset that must be explained is squarely inside the range a
 correctly-sized parameter perturbation produces, and one of four directions
-reproduces it to 1.18x. Nothing is left over for the port's revisions path to
-account for. (`rev_data` barely moves across all of these — 0.138 to 0.193 —
-while `rev_SSM` carries the shift, which is the mechanism above.)
+reproduces it to 1.18x. (`rev_data` barely moves across all of these — 0.138 to
+0.193 — while `rev_SSM` carries the shift, which is the mechanism above.)
+
+**What that establishes, and what it does not.** It is a scale test, and it
+passes as one: it kills the null that a parameter difference of the measured
+size is too small to move the revisions term by 0.02, with a genuine control
+(`rev_SSM` is exactly 0.000000 when both sides use the same parameters) and a
+falsifier stated before the run. But 2 of the 4 directions carry the right sign,
+which is a coin flip, and a range spanning ±0.055 would absorb any additive
+defect smaller than that. So the missing estimate file is a **sufficient**
+explanation, not a demonstrated exclusive one. **"No defect detected in the
+revisions path" is what this earns; "a defect there is ruled out" is not** — and
+the section below records that on the gate week those terms are pinned against
+nothing at all.
 
 The gap is pinned with two-sided bounds rather than skipped, so that the day
 somebody obtains the real 2023-10-06 estimate file the tests fail and say to

@@ -236,8 +236,12 @@ def test_the_fifth_factors_volatility_is_pinned_at_one(fixture):
                                  _restrict(d), None, _draws(d))
     assert np.all(latent.sigma[4] == 1.0)
     # ...and no neighbouring factor is touched: they carry the injected values.
-    assert np.allclose(latent.sigma[3], d["sigma_new"][3])
-    assert np.allclose(latent.sigma[0], d["sigma_new"][0])
+    # nyfed/gibbs.py's per-factor loop assigns sigma[i_f, :] =
+    # draws.sigma[i_f, :] straight through for every non-overridden row - no
+    # arithmetic runs on it - so this is a passthrough, not a floating-point
+    # computation, and the honest check is bit-exact equality, not a tolerance.
+    assert np.array_equal(latent.sigma[3], d["sigma_new"][3])
+    assert np.array_equal(latent.sigma[0], d["sigma_new"][0])
 
 
 @pytest.mark.fixtures

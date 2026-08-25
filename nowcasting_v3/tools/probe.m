@@ -1,4 +1,12 @@
 % Probe: can Octave run the numerical core? No datetime anywhere below.
+%
+% RETAINED AS THE TASK 0 PROVENANCE ARTEFACT. Nothing calls this file and its
+% system, seeding and outputs were absorbed into gen_fixtures.m's kalman_small
+% block. It is kept because gen_fixtures.m:39 cites "the Task 0 probe (anchor
+% loglik = -60.919914554813)" as the number that block reproduces, and this is
+% the only file that shows where that anchor came from: deleting it would leave
+% a cited constant with no producer. It is documentation, not a build step -
+% gen_fixtures.m does not run it, and probe_out.mat is not committed.
 addpath('../nyfed_matlab/functions/general')
 addpath('../nyfed_matlab/functions/model')
 pkg load statistics

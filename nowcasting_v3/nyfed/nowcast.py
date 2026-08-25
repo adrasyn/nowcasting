@@ -28,8 +28,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .spec import ModelSpec
-from .ssm import StateSpace, fast_smoother, simulation_smoother
+from .spec import ModelSpec, check_panel_row_order
+from .ssm import (
+    StateSpace, _is_tv3, _mat0, fast_smoother, simulation_smoother,
+)
 
 __all__ = ["PointNowcast", "point_nowcast", "density_nowcast", "news_table"]
 
@@ -55,11 +57,6 @@ class PointNowcast:
 # Helpers for MATLAB's constant-or-time-varying measurement equation
 # --------------------------------------------------------------------------- #
 
-def _is_tv(H: np.ndarray) -> bool:
-    """MATLAB ``size(SSM.H, 3) > 1``."""
-    return H.ndim == 3 and H.shape[2] > 1
-
-
 def _d_seq(ssm: StateSpace, N: int, T: int) -> np.ndarray:
     """``SSM.D`` as an (N,T) sequence, MATLAB's ``repmat(SSM.D, [1, T])``."""
     if ssm.D is None:
@@ -74,16 +71,16 @@ def _d_seq(ssm: StateSpace, N: int, T: int) -> np.ndarray:
 
 def _fitted(H: np.ndarray, states: np.ndarray, D: np.ndarray) -> np.ndarray:
     """``D_t + H_t x_t`` for every t: point_nowcast.m's inner loop, vectorised."""
-    if _is_tv(H):
+    if _is_tv3(H):
         return D + np.einsum("ijt,jt->it", H, states)
-    return D + (H[:, :, 0] if H.ndim == 3 else H) @ states
+    return D + _mat0(H) @ states
 
 
 def _h_row(H: np.ndarray, i: int, t: int) -> np.ndarray:
     """``SSM.H(i, :, t)``, honouring the constant case."""
-    if _is_tv(H):
+    if _is_tv3(H):
         return H[i, :, t]
-    return (H[:, :, 0] if H.ndim == 3 else H)[i, :]
+    return _mat0(H)[i, :]
 
 
 # --------------------------------------------------------------------------- #
@@ -223,7 +220,13 @@ def news_table(
 
     Rows are sorted by descending absolute impact so the site can take the top
     rows directly; ties keep MATLAB's own enumeration order.
+
+    Raises ``ValueError`` if the spec is not frequency-sorted: this is the one
+    place a raw-order panel row meets a ``load_spec``-permuted label, and the
+    port relies on the permutation being the identity. See
+    :func:`nyfed.spec.check_panel_row_order`.
     """
+    check_panel_row_order(spec)
     loc = np.asarray(y_location, dtype=float).reshape(-1, 1)
     scale = np.asarray(y_scale, dtype=float).reshape(-1, 1)
     i_now = result.i_now

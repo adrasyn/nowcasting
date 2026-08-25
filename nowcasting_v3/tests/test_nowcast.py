@@ -15,22 +15,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from conftest import ssm_from_fixture as _ssm
+
 from nyfed.nowcast import density_nowcast, news_table, point_nowcast
 from nyfed.spec import load_spec
-from nyfed.ssm import StateSpace
 
 SPEC_PATH = Path(__file__).parents[1] / "nyfed_matlab" / "model_spec_FRED.csv"
-
-
-def _ssm(d, prefix="SSM"):
-    """Rebuild a StateSpace from a fixture's flattened `prefix__field` keys."""
-    return StateSpace(
-        D=d.get(f"{prefix}__D"), H=d[f"{prefix}__H"],
-        Sigma_eps=d.get(f"{prefix}__Sigma_eps"), C=d.get(f"{prefix}__C"),
-        F=d[f"{prefix}__F"], G=d[f"{prefix}__G"],
-        Sigma_eta=d.get(f"{prefix}__Sigma_eta"), mu_1=d[f"{prefix}__mu_1"].ravel(),
-        Sigma_1=d[f"{prefix}__Sigma_1"],
-    )
 
 
 def _spec():

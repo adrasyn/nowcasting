@@ -137,3 +137,33 @@ def load_spec(specfile: str | Path) -> ModelSpec:
         block_names=block_names,
         category_names=category_names,
     )
+
+
+def check_panel_row_order(spec: ModelSpec) -> None:
+    """Raise unless the spec CSV was already in ``FREQUENCY_ORDER``.
+
+    ``load_spec`` permutes every field monthly-before-quarterly, so
+    ``spec.series_id[i]`` names the *permuted* row i. The data panel ``Y`` is
+    built in the raw ``.mat`` column order and is never permuted -- see
+    ``example_nowcast.m``, which the port is faithful to. The two orders agree
+    only because ``model_spec_FRED.csv`` happens to list all 28 monthly series
+    before its 3 quarterly ones, which makes the permutation the identity.
+
+    Reorder that CSV, or point a new panel at a spec whose frequencies are
+    interleaved, and every series label in the news table silently attaches to
+    the wrong row. Nothing else in the port checks it, so this does.
+    """
+    ranks = [FREQUENCY_ORDER.index(f) if f in FREQUENCY_ORDER else len(FREQUENCY_ORDER)
+             for f in spec.frequency]
+    bad = [i for i in range(1, len(ranks)) if ranks[i] < ranks[i - 1]]
+    if bad:
+        i = bad[0]
+        raise ValueError(
+            "spec rows are not in frequency order, so load_spec's permutation is "
+            f"not the identity: row {i} is {spec.frequency[i]!r} "
+            f"({spec.series_id[i]}) after row {i - 1} is "
+            f"{spec.frequency[i - 1]!r} ({spec.series_id[i - 1]}). "
+            "The data panel is built in raw CSV order and is not permuted with "
+            "the spec, so series labels would attach to the wrong panel rows. "
+            f"Sort the spec CSV by frequency in the order {FREQUENCY_ORDER}."
+        )

@@ -41,12 +41,14 @@ array are enumerated down columns, then across, then by lag.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
 from .linalg import spd_inv
-from .model import InitVal, Latent, Prior, Restrict, construct_ssm
+from .model import (
+    InitVal, Latent, Prior, Restrict, _blkdiag, construct_ssm, state_layout,
+)
 from .parameters import Params, vec_parameter
 from .rng import mvnrnd
 from .settings import GibbsSettings
@@ -223,19 +225,14 @@ def _window(param: Params, Y: np.ndarray, restrict: Restrict) -> _Window:
         raise ValueError("Y has no observed period")
     T_est = int(np.flatnonzero(observed)[-1]) + 1 - t_skip
 
-    if n_quart == 0:
-        n_g_state = 1
-        n_f_state = max(1, p_f) * n_f
-        n_e_state = max(1, p_e) * n
-    else:
-        n_g_state = 5
-        n_f_state = max(5, p_f) * n_f
-        n_e_state = max(1, p_e) * (n - n_quart)
+    # Same block sizes construct_ssm builds the state vector with; see
+    # model.state_layout for why this is not recomputed here.
+    layout = state_layout(n, n_f, p_f, p_e, n_quart)
 
     return _Window(n=n, n_f=n_f, p_f=p_f, p_e=p_e, T=T, isquart=isquart,
                    n_quart=n_quart, t_skip=t_skip, T_est=T_est,
-                   n_g_state=n_g_state, n_f_state=n_f_state,
-                   n_e_state=n_e_state)
+                   n_g_state=layout.n_g_state, n_f_state=layout.n_f_state,
+                   n_e_state=layout.n_e_state)
 
 
 def _s_support(pi_f: np.ndarray, pi_e: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -618,10 +615,10 @@ def _gibbs_update(
             RR_parts.append(RR_i)
 
         m_Lambda = np.concatenate(m_parts)
-        Pinv_Lambda = _blkdiag(Pinv_parts)
+        Pinv_Lambda = _blkdiag(*Pinv_parts)
         R_Lambda = np.hstack(R_parts)
         Rr_Lambda = np.concatenate(Rr_parts)
-        RR_Lambda = _blkdiag(RR_parts)
+        RR_Lambda = _blkdiag(*RR_parts)
 
     # STORE LATENT VARIABLES -------------------------------------------------
     state_clean = np.full((1 + n_f + n, T), np.nan)
@@ -664,17 +661,6 @@ def _require_rng(rng: np.random.Generator | None, site: str) -> np.random.Genera
     return rng
 
 
-def _blkdiag(blocks: list[np.ndarray]) -> np.ndarray:
-    """Block-diagonal concatenation of square blocks. MATLAB ``blkdiag``."""
-    k = sum(b.shape[0] for b in blocks)
-    out = np.zeros((k, k))
-    i = 0
-    for b in blocks:
-        out[i:i + b.shape[0], i:i + b.shape[1]] = b
-        i += b.shape[0]
-    return out
-
-
 def gibbs_update(
     param: Params,
     latent: Latent,
@@ -713,9 +699,9 @@ def gibbs_update_moments(
     """
     draws = GibbsDraws() if draws is None else draws
     if state is not None:
-        draws = GibbsDraws(state=state, Phi=draws.Phi, phi=draws.phi,
-                           mu=draws.mu, Lambda=draws.Lambda,
-                           sigma=draws.sigma, s=draws.s)
+        # `replace`, not a field-by-field rebuild: a seventh injectable site
+        # added to GibbsDraws later must not be silently dropped here.
+        draws = replace(draws, state=state)
     return _gibbs_update(param, latent, Y, prior, restrict, rng, draws)[2]
 
 
@@ -751,7 +737,11 @@ def s_update(
     state, _ = simulation_smoother(Y, ssm, rng)
     _, f_t, e_t = _reconstruct(state, w)
 
-    sigma = np.asarray(latent.sigma, dtype=float)
+    # `.copy()` on both, as _gibbs_update does: the returned Latent must not
+    # alias the caller's buffer. run_us_reference._average_latents accumulates
+    # `sigma_sum += latent.sigma` over 1,250 S_update calls on this array, so an
+    # alias would let any later in-place write reach back into that running sum.
+    sigma = np.asarray(latent.sigma, dtype=float).copy()
     s = np.asarray(latent.s, dtype=float).copy()
 
     # Update s_f

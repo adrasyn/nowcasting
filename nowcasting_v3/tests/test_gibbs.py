@@ -459,9 +459,20 @@ def test_gibbs_update_leaves_its_inputs_alone(synthetic):
 
 
 def test_s_update_leaves_sigma_untouched(synthetic):
-    """S_update.m draws outlier indicators only; sigma is an input there."""
+    """S_update.m draws outlier indicators only; sigma is an input there.
+
+    Compare against a COPY taken before the call. The previous form compared
+    `out.sigma` to `initval.latent.sigma`, which s_update returned BY
+    REFERENCE - an array compared to itself, which passes however badly sigma
+    has been mutated in place. This guards a live invariant:
+    run_us_reference._average_latents accumulates `sigma_sum += latent.sigma`
+    over 1,250 S_update calls on that same buffer.
+    """
     y, _, restrict, initval, prior = synthetic
+    sigma_before = initval.latent.sigma.copy()
     out = s_update(initval.param, initval.latent, y, restrict,
                    np.random.default_rng(36))
-    assert np.array_equal(out.sigma, initval.latent.sigma)
+    assert np.array_equal(out.sigma, sigma_before)
+    assert np.array_equal(initval.latent.sigma, sigma_before)
+    assert out.sigma is not initval.latent.sigma, "returned sigma must not alias"
     assert out.s.shape == initval.latent.s.shape

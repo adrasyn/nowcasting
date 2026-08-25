@@ -362,8 +362,12 @@ def fast_smoother(
     Ft = _mat0(F)
     Gt = _mat0(G)
     Sigma_eta_t = _mat0(Sigma_eta)
-    Ht = H[:, :, T - 1] if isTV_H else H
-    Sigma_eps_t = Sigma_eps[:, :, T - 1] if isTV_Sigma_eps else Sigma_eps
+    # `_mat0`, not a bare `H`: MATLAB drops a trailing singleton dimension, so
+    # an (N, M, 1) H is 2-D there. kalman_filter already routes this case
+    # through _mat0; without it the constant branch here would leave a 3-D
+    # array and diverge from the source. Same for Sigma_eps.
+    Ht = H[:, :, T - 1] if isTV_H else _mat0(H)
+    Sigma_eps_t = Sigma_eps[:, :, T - 1] if isTV_Sigma_eps else _mat0(Sigma_eps)
 
     # Do first iteration of disturbance smoother
     nonmiss = ~np.isnan(e[:, T - 1])
@@ -455,8 +459,9 @@ def fast_smoother(
         Ft = _mat0(F)
         Gt = _mat0(G)
         Sigma_eta_t = _mat0(Sigma_eta)
-        Ht = H[:, :, T - 1] if isTV_H else H
-        Sigma_eps_t = Sigma_eps[:, :, T - 1] if isTV_Sigma_eps else Sigma_eps
+        # See the note on the same two lines above.
+        Ht = H[:, :, T - 1] if isTV_H else _mat0(H)
+        Sigma_eps_t = Sigma_eps[:, :, T - 1] if isTV_Sigma_eps else _mat0(Sigma_eps)
 
         # Do first iteration of disturbance smoother
         nonmiss = ~np.isnan(e[:, T - 1])

@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-from nyfed.spec import load_spec
+from nyfed.spec import check_panel_row_order, load_spec
 
 SPEC_PATH = Path(__file__).parents[1] / "nyfed_matlab" / "model_spec_FRED.csv"
 
@@ -65,3 +66,24 @@ def test_monthly_percent_change_trend_is_scaled_down_by_twelve():
         if f == "m" and t == "pch"
     ]
     assert all(spec.trend[j] == 0.0 for j in monthly_pch)
+
+
+def test_panel_row_order_guard_accepts_the_reference_spec():
+    """The US spec is already frequency-sorted, so load_spec's permutation is
+    the identity and the raw-order panel lines up with the permuted labels."""
+    check_panel_row_order(load_spec(SPEC_PATH))
+
+
+def test_panel_row_order_guard_rejects_an_interleaved_spec():
+    """The Plan B landmine, made executable.
+
+    `load_spec` permutes the spec but `run_us_reference.load_vintage` builds Y
+    in raw .mat column order, so `news_table` labelling panel row i with
+    `spec.series_id[i]` is correct only while the permutation is the identity.
+    Interleave one quarterly series and every label after it slides.
+    """
+    spec = load_spec(SPEC_PATH)
+    spec.frequency = list(spec.frequency)
+    spec.frequency[0] = "q"                    # a quarterly row before monthlies
+    with pytest.raises(ValueError, match="not in frequency order"):
+        check_panel_row_order(spec)

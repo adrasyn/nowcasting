@@ -13,7 +13,13 @@ def test_spd_inv_matches_dense_inverse():
     rng = np.random.default_rng(0)
     x = rng.standard_normal((6, 6))
     a = x @ x.T + 6 * np.eye(6)
-    assert np.allclose(spd_inv(a), np.linalg.inv(a), rtol=1e-12)
+    want = np.linalg.inv(a)
+    # Explicit atol=0.0, the two-tier rule's default: entries run 7.3e-4 to
+    # 0.147, so there is no near-zero row needing a derived floor. Without the
+    # explicit atol, np.allclose's default 1e-8 would dominate rtol=1e-12 by
+    # five orders and the stated tolerance would be fiction. Measured max
+    # deviation 5.55e-17 against a bound of 1e-12*7.3e-4 = 7.3e-16, margin 13x.
+    assert np.allclose(spd_inv(a), want, rtol=1e-12, atol=0.0)
 
 
 def test_spd_inv_returns_exactly_symmetric():
@@ -29,7 +35,11 @@ def test_spd_solve_matches_dense_solve():
     x = rng.standard_normal((4, 4))
     a = x @ x.T + 4 * np.eye(4)
     b = rng.standard_normal((4, 3))
-    assert np.allclose(spd_solve(a, b), np.linalg.solve(a, b), rtol=1e-12)
+    want = np.linalg.solve(a, b)
+    # Explicit atol=0.0, as above; entries run 0.026 to 0.473, no near-zero
+    # row. Measured max deviation 1.11e-16 against a bound of 1e-12*0.026 =
+    # 2.6e-14, margin 232x.
+    assert np.allclose(spd_solve(a, b), want, rtol=1e-12, atol=0.0)
 
 
 def test_spd_logdet_matches_slogdet():

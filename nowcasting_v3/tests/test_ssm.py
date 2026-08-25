@@ -1,25 +1,11 @@
 import numpy as np
 import pytest
 
+from conftest import ssm_from_fixture as _ssm
+
 from nyfed.ssm import (
     StateSpace, compute_lrv, fast_smoother, kalman_filter, simulation_smoother,
 )
-
-
-def _ssm(d, prefix="SSM"):
-    """Rebuild a StateSpace from a Task 3 fixture.
-
-    Fixtures flatten MATLAB structs to `prefix__field`. `C` and `D` are absent
-    from some fixtures because the MATLAB defaults them; pass None so the port
-    applies the same default.
-    """
-    return StateSpace(
-        D=d.get(f"{prefix}__D"), H=d[f"{prefix}__H"],
-        Sigma_eps=d.get(f"{prefix}__Sigma_eps"), C=d.get(f"{prefix}__C"),
-        F=d[f"{prefix}__F"], G=d[f"{prefix}__G"],
-        Sigma_eta=d.get(f"{prefix}__Sigma_eta"), mu_1=d[f"{prefix}__mu_1"].ravel(),
-        Sigma_1=d[f"{prefix}__Sigma_1"],
-    )
 
 
 def _idx(d, key):
@@ -202,4 +188,9 @@ def test_all_six_time_varying_matrices_use_the_matlab_index_split():
             mu = C_i + F_i @ mu_upd
             Sigma = F_i @ Sigma_upd @ F_i.T + G_i @ Q_i @ G_i.T
 
-    assert np.allclose(got.filter_mu, want, rtol=1e-10)
+    # Explicit atol=0.0, the two-tier rule's default: filter_mu runs 0.135 to
+    # 2.16, with no near-zero entry needing a derived floor. Without it
+    # np.allclose's default atol=1e-8 would dominate rtol=1e-10 on order-1
+    # values by eight orders. Measured max deviation 6.66e-16 against a bound
+    # of 1e-10*0.135 = 1.35e-11, margin 2.0e4x.
+    assert np.allclose(got.filter_mu, want, rtol=1e-10, atol=0.0)

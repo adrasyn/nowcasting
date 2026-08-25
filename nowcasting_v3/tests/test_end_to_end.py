@@ -255,14 +255,20 @@ def test_reproduces_the_published_nowcast(fixture, reference):
     observation instead, in
     `test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term`.
 
-    TWO ASSERTIONS, AND THE TIGHTER ONE IS THE GATE. The plan's criterion is a
-    literal +-0.01pp, and the measured deviation of 0.008416 meets it. That is
-    the result. `headline_tolerance` is the wider Monte Carlo statement, and
-    after the sd re-measurement it is 0.073529 -- wide enough that it would no
-    longer catch a gross defect: deleting the entire 1,250-draw `S_update`
-    averaging moves the headline to 0.040760, which sits INSIDE the sigma band
-    and outside the floor. So the floor is asserted too, and it is the assertion
-    that does the work. See README.md, "Is the gate falsifiable?".
+    ONE LIVE CONSTRAINT, PLUS A RECORDED MONTE CARLO STATEMENT. The plan's
+    criterion is a literal +-0.01pp, and the measured deviation of 0.008416
+    meets it. That is the result, and it is the only assertion below that can
+    ever fail: `headline_tolerance` is `max(0.01, 4.243*sd)`, so it is never
+    below 0.01 and the band assertion is subsumed by the floor in every
+    reachable state. The band line is kept as a recorded observation, not as a
+    second constraint.
+
+    That the band is the weaker of the two is not an accident of arithmetic
+    alone. After the sd re-measurement it stands at 0.073529 -- wide enough that
+    on its own it would no longer catch a gross defect: deleting the entire
+    1,250-draw `S_update` averaging moves the headline to 0.040760, which sits
+    INSIDE the sigma band and outside the floor. The floor is the assertion that
+    does the work. See README.md, "Is the gate falsifiable?".
 
     The floor holds at 0.84x with no margin to spare, and it is a statement
     about SEED 321, not about every seed: the seed-to-seed sd of this headline
@@ -275,9 +281,14 @@ def test_reproduces_the_published_nowcast(fixture, reference):
     expected = fixture("published_nowcasts")[f"published__{_key(week)}"].item()
     got = reference(week)
     deviation = abs(got.nowcast - expected)
-    # The plan's criterion. Measured 0.008416 against 0.01.
+    # The plan's criterion, and the only line here that can fail. Measured
+    # 0.008416 against 0.01.
     assert deviation <= 0.01, deviation
-    # And the wider Monte Carlo statement, which it also clears at 0.11x.
+    # The wider Monte Carlo statement, recorded rather than enforced: the floor
+    # above already implies it. Kept because README.md's falsifiability table
+    # quotes the 0.11x margin, and because dropping the max(0.01, ...) floor
+    # from headline_tolerance would leave this band at 0.0735. It executes,
+    # but with the floor above it can never be the line that fails.
     assert got.nowcast == pytest.approx(expected, abs=headline_tolerance(week))
 
 

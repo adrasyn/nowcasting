@@ -58,6 +58,8 @@ __all__ = [
     "Latent",
     "InitVal",
     "Prior",
+    "StateLayout",
+    "state_layout",
     "construct_ssm",
     "construct_prior",
 ]
@@ -172,6 +174,53 @@ def _eye_pad(k: int, m: int) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
+# The state layout, shared with the Gibbs sampler
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class StateLayout:
+    """Sizes of the four blocks of ``construct_SSM.m``'s companion state vector.
+
+    See the module docstring's table for what each block holds. ``n_q_state``
+    is 0 in the all-monthly branch, where no quarterly aggregator is built.
+    """
+
+    n_g_state: int
+    n_f_state: int
+    n_e_state: int
+    n_q_state: int
+
+    @property
+    def n_state(self) -> int:
+        """Total state dimension."""
+        return self.n_g_state + self.n_f_state + self.n_e_state + self.n_q_state
+
+
+def state_layout(n: int, n_f: int, p_f: int, p_e: int, n_quart: int) -> StateLayout:
+    """``construct_SSM.m``'s "Compute number of states" block, as one function.
+
+    :mod:`nyfed.gibbs` needs the same three monthly-side sizes to slice a state
+    draw back into ``g_t``, ``f_t`` and ``e_t``. Computing them here rather than
+    twice means the two agree by construction: only ``construct_ssm`` is pinned
+    by a fixture, so a divergence in the second copy would not be caught.
+    """
+    if n_quart == 0:
+        return StateLayout(
+            n_g_state=1,
+            n_f_state=max(1, p_f) * n_f,
+            n_e_state=max(1, p_e) * n,
+            n_q_state=0,
+        )
+    return StateLayout(
+        n_g_state=5,
+        n_f_state=max(5, p_f) * n_f,
+        n_e_state=max(1, p_e) * (n - n_quart),
+        n_q_state=max(5, p_e) * n_quart,
+    )
+
+
+# --------------------------------------------------------------------------- #
 # construct_SSM.m
 # --------------------------------------------------------------------------- #
 
@@ -225,21 +274,18 @@ def construct_ssm(
     n_month = n - n_quart
 
     # Compute number of states
+    layout = state_layout(n, n_f, p_f, p_e, n_quart)
+    n_g_state = layout.n_g_state
+    n_f_state = layout.n_f_state
+    n_e_state = layout.n_e_state
+    n_q_state = layout.n_q_state
+    n_state = layout.n_state
     if n_quart == 0:
-        n_g_state = 1
-        n_f_state = max(1, p_f) * n_f
-        n_e_state = max(1, p_e) * n
-        n_q_state = 0
         vec_m = np.ones((1, 1))
         vec_q = np.ones((1, 1))
     else:
-        n_g_state = 5
-        n_f_state = max(5, p_f) * n_f
-        n_e_state = max(1, p_e) * n_month
-        n_q_state = max(5, p_e) * n_quart
         vec_m = np.array([[1.0, 0, 0, 0, 0]])
         vec_q = np.array([[1.0, 2, 3, 2, 1]]) / 9
-    n_state = n_g_state + n_f_state + n_e_state + n_q_state
 
     # Extract latent variables
     sigma = np.asarray(latent.sigma, dtype=float)

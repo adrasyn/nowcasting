@@ -81,6 +81,12 @@ REQUIRED = {
         "latent_gibbs__sigma", "latent_gibbs__s",
         "prior__m_mu", "prior__P_mu", "prior__m_Lambda", "prior__P_Lambda",
         "prior__m_Phi", "prior__P_Phi", "prior__m_phi", "prior__P_phi",
+        # The scalar hyperparameters. _prior() in test_gibbs.py reads all ten
+        # with .item(); listing only the eight vector/matrix ones above left
+        # this guard blind to the half of the prior struct it exists to guard.
+        "prior__nu_g", "prior__s2_g", "prior__nu_f", "prior__s2_f",
+        "prior__a_f", "prior__b_f", "prior__nu_e", "prior__s2_e",
+        "prior__a_e", "prior__b_e",
         "draw_Phi", "draw_phi", "draw_mu", "draw_Lambda", "sigma_new", "s_new",
         "m_mu", "Pinv_mu", "m_Phi", "Pinv_Phi", "m_phi", "Pinv_phi",
         "m_Lambda", "Pinv_Lambda", "Rr_Lambda", "RR_Lambda",
@@ -96,6 +102,12 @@ REQUIRED = {
         "latent_gibbs__sigma", "latent_gibbs__s",
         "prior__m_mu", "prior__P_mu", "prior__m_Lambda", "prior__P_Lambda",
         "prior__m_Phi", "prior__P_Phi", "prior__m_phi", "prior__P_phi",
+        # The scalar hyperparameters. _prior() in test_gibbs.py reads all ten
+        # with .item(); listing only the eight vector/matrix ones above left
+        # this guard blind to the half of the prior struct it exists to guard.
+        "prior__nu_g", "prior__s2_g", "prior__nu_f", "prior__s2_f",
+        "prior__a_f", "prior__b_f", "prior__nu_e", "prior__s2_e",
+        "prior__a_e", "prior__b_e",
         "draw_Phi", "draw_phi", "draw_mu", "draw_Lambda", "sigma_new", "s_new",
         "m_mu", "Pinv_mu", "m_Phi", "Pinv_Phi", "m_phi", "Pinv_phi",
         # R_Lambda is stored for the joint path only; concatenated over the five
@@ -154,6 +166,28 @@ REQUIRED = {
 }
 
 EXPECTED = list(REQUIRED)
+
+
+def test_every_expected_fixture_file_exists():
+    """The one fixture guard that must NOT go through ``conftest.load_fixture``.
+
+    ``load_fixture`` calls ``pytest.skip`` when a fixture is absent, so every
+    other test in this module - ``test_fixture_loads_and_is_non_empty``
+    included - turns GREEN on a checkout with ``tests/fixtures/`` deleted, and
+    so does every Tier 1 exactness test in the suite. That is precisely the
+    failure ``.gitignore`` and ``tools/matload.py`` say they exist to prevent:
+    the defence was built at the gitignore layer and never at the assertion
+    layer. This stats the paths directly, so a missing fixture is a FAILURE.
+    """
+    missing = sorted(name for name in EXPECTED
+                     if not (FIXTURE_DIR / f"{name}.npz").is_file())
+    assert not missing, (
+        f"{len(missing)} committed fixture(s) absent from {FIXTURE_DIR}: "
+        f"{missing}. They are test inputs, not build output - restore them with "
+        "`git checkout -- nowcasting_v3/tests/fixtures`, or regenerate with "
+        "`cd nowcasting_v3/tools && octave gen_fixtures.m && "
+        "../.venv/bin/python matload.py`."
+    )
 
 
 @pytest.mark.parametrize("name", EXPECTED)

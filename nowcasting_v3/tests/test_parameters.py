@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from nyfed.parameters import Params, map_parameter, vec_parameter
 

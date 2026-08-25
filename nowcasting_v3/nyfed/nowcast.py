@@ -28,7 +28,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .spec import ModelSpec, check_panel_row_order
+from .spec import ModelSpec
 from .ssm import (
     StateSpace, _is_tv3, _mat0, fast_smoother, simulation_smoother,
 )
@@ -221,12 +221,12 @@ def news_table(
     Rows are sorted by descending absolute impact so the site can take the top
     rows directly; ties keep MATLAB's own enumeration order.
 
-    Raises ``ValueError`` if the spec is not frequency-sorted: this is the one
-    place a raw-order panel row meets a ``load_spec``-permuted label, and the
-    port relies on the permutation being the identity. See
+    ``spec.series_id[i]`` labels raw panel row ``i``, which is correct only
+    while ``load_spec``'s frequency permutation is the identity. That cannot be
+    checked from here -- a loaded ``ModelSpec`` carries neither the raw order
+    nor the permutation -- so it is enforced inside ``load_spec`` instead; see
     :func:`nyfed.spec.check_panel_row_order`.
     """
-    check_panel_row_order(spec)
     loc = np.asarray(y_location, dtype=float).reshape(-1, 1)
     scale = np.asarray(y_scale, dtype=float).reshape(-1, 1)
     i_now = result.i_now

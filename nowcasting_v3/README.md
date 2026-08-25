@@ -108,8 +108,8 @@ at the command line, so the next new warning cannot pass CI in silence).
 
 ```bash
 cd nowcasting_v3
-.venv/bin/pytest -m "not slow"      # ~25 s, 141 tests: the iteration loop
-.venv/bin/pytest                    # ~30 min, 155 tests, incl. the end-to-end gate
+.venv/bin/pytest -m "not slow"      # ~25 s, 143 tests: the iteration loop
+.venv/bin/pytest                    # ~30 min, 157 tests, incl. the end-to-end gate
 ```
 
 A stale `nyfed/__pycache__` has faked a red suite twice in this project. Clear it

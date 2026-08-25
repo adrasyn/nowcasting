@@ -1783,7 +1783,11 @@ Written to task level once Plan A's gate passes.
 
 ### Plan B: Australian panel — **Fable 5 designs, Sonnet 5 builds**
 
-- **B1** Series selection. ABS/RBA replacements for the 31 FRED series. Several have no monthly Australian equivalent — JOLTS, ADP payrolls, monthly PCE, monthly real GDI, Empire State and Philly Fed. Expect 15–25 series. The Soft block leans on NAB and Westpac-MI, both already fetched by v1/v2.
+- **B1** Series selection.
+
+  **Landmine, found in the Plan A final review and the one most likely to fire, because B1 is what produces the new spec CSV.** `load_spec` permutes every field monthly-before-quarterly (`spec.py:102-118`), so `spec.series_id` is in *permuted* order — but `load_vintage` builds `Y` in the **raw** `.mat` column order (`run_us_reference.py:191`), and `news_table` then labels panel row `i` with `spec.series_id[i]`. This is correct today **only because `model_spec_FRED.csv` happens to list all 28 monthly series before its 3 quarterly ones**, making the permutation the identity. An Australian spec CSV with a quarterly series anywhere but at the end mislabels every news-table row and every `impact_for` lookup, and **no test fails**: `test_spec.py:17` pins the permuted order, `test_fixtures_present.py:298` pins the raw CSV order, and the two agree only by that accident of layout. The port inherits this from `example_nowcast.m`, so it is faithful, not defective. Either keep the AU CSV frequency-sorted and assert it, or make `load_vintage` permute with the spec.
+
+  **Second landmine, carried from Task 6.** `np.minimum` propagates NaN where MATLAB's `min` omits it, at the `bd = 15` volatility cap in `update_vol`. Unreachable with the US panel's missingness pattern. Australian series have different missingness — in particular quarterly-only series with ragged starts — so re-check this before trusting a first AU estimation run. ABS/RBA replacements for the 31 FRED series. Several have no monthly Australian equivalent — JOLTS, ADP payrolls, monthly PCE, monthly real GDI, Empire State and Philly Fed. Expect 15–25 series. The Soft block leans on NAB and Westpac-MI, both already fetched by v1/v2.
 - **B2** Block design and normalising loadings.
 
   **Read this before designing the blocks.** `construct_SSM.m:166` builds the `var_init` factor

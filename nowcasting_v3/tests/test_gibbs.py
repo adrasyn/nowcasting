@@ -23,6 +23,8 @@ same way or the whole factor is recovered on a different scale and every
 recovery test below fails for a reason that has nothing to do with the sampler.
 """
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -364,6 +366,40 @@ def test_two_runs_with_the_same_seed_are_identical(synthetic):
     b = gibbs_sampler(y, prior, restrict, initval, cfg,
                       np.random.default_rng(99))
     assert np.array_equal(a.params, b.params)
+
+
+def test_latent_storage_and_the_inactive_factor_mask(synthetic):
+    """``need_latents`` fills .states/.sigmas/.ss every n_each stored draw, and
+    Gibbs_sampler.m:140 zeroes a factor's STORED state wherever that factor is
+    switched off. Nothing else in this file exercises either."""
+    y, _, restrict, initval, prior = synthetic
+    n, n_f = DIMS[0], DIMS[1]
+    off = np.ones((n_f, T_SIM), dtype=bool)
+    off[0, 100:150] = False
+    masked = dataclasses.replace(restrict, f_active=off)
+
+    cfg = _settings(n_gs=8, n_burn=2, n_each=4)
+    res = gibbs_sampler(y, prior, masked, initval, cfg,
+                        np.random.default_rng(41), need_latents=True)
+
+    n_store = cfg.n_gs // cfg.n_each
+    assert res.states.shape == (1 + n_f + n, T_SIM, n_store)
+    assert res.sigmas.shape == (n_f + n, T_SIM, n_store)
+    assert res.ss.shape == (n_f + n, T_SIM, n_store)
+    assert np.isfinite(res.states).all()
+    assert (res.sigmas > 0).all()
+    assert np.all(res.states[1, 100:150, :] == 0.0), "inactive factor not masked"
+    assert np.any(res.states[1, :100, :] != 0.0), "the mask cannot be everywhere"
+
+
+def test_latents_are_not_stored_unless_asked_for(synthetic):
+    """Gibbs_sampler.m guards the whole latent block on nargout > 1."""
+    y, _, restrict, initval, prior = synthetic
+    res = gibbs_sampler(y, prior, restrict, initval, _settings(n_gs=4, n_burn=1),
+                        np.random.default_rng(42))
+    assert res.states is None
+    assert res.sigmas is None
+    assert res.ss is None
 
 
 def test_gibbs_update_preserves_shapes_and_stays_finite(synthetic):

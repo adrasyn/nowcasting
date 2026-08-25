@@ -69,6 +69,40 @@ REQUIRED = {
         "prior__a_e", "prior__b_e",
     ],
     "update_scl": ["x", "x_miss", "vals", "probs", "posteriors", "posteriors_miss"],
+    # The two Gibbs conditional-posterior oracles. The first takes the
+    # per-factor Lambda loop, the second the joint one; only one path runs per
+    # call, so a fixture set carrying just one of them tests only half the file.
+    "gibbs_update_cond": [
+        "dimvec", "Y", "state", "restrict__Lambda", "restrict__Phi",
+        "restrict__iota", "restrict__isquart", "restrict__f_active",
+        "param_gibbs__mu", "param_gibbs__gamma_g", "param_gibbs__Lambda",
+        "param_gibbs__Phi", "param_gibbs__gamma_f", "param_gibbs__pi_f",
+        "param_gibbs__phi", "param_gibbs__gamma_e", "param_gibbs__pi_e",
+        "latent_gibbs__sigma", "latent_gibbs__s",
+        "prior__m_mu", "prior__P_mu", "prior__m_Lambda", "prior__P_Lambda",
+        "prior__m_Phi", "prior__P_Phi", "prior__m_phi", "prior__P_phi",
+        "draw_Phi", "draw_phi", "draw_mu", "draw_Lambda", "sigma_new", "s_new",
+        "m_mu", "Pinv_mu", "m_Phi", "Pinv_Phi", "m_phi", "Pinv_phi",
+        "m_Lambda", "Pinv_Lambda", "Rr_Lambda", "RR_Lambda",
+        "r_f_pad", "r_e_pad", "y_t", "F_t",
+        "window_start", "window_start_py", "window_len", "T_full",
+    ],
+    "gibbs_update_cond_small": [
+        "dimvec", "Y", "state", "restrict__Lambda", "restrict__Phi",
+        "restrict__iota", "restrict__isquart", "restrict__f_active",
+        "param_gibbs__mu", "param_gibbs__gamma_g", "param_gibbs__Lambda",
+        "param_gibbs__Phi", "param_gibbs__gamma_f", "param_gibbs__pi_f",
+        "param_gibbs__phi", "param_gibbs__gamma_e", "param_gibbs__pi_e",
+        "latent_gibbs__sigma", "latent_gibbs__s",
+        "prior__m_mu", "prior__P_mu", "prior__m_Lambda", "prior__P_Lambda",
+        "prior__m_Phi", "prior__P_Phi", "prior__m_phi", "prior__P_phi",
+        "draw_Phi", "draw_phi", "draw_mu", "draw_Lambda", "sigma_new", "s_new",
+        "m_mu", "Pinv_mu", "m_Phi", "Pinv_Phi", "m_phi", "Pinv_phi",
+        # R_Lambda is stored for the joint path only; concatenated over the five
+        # US factors it is 1550x72 and would dominate the fixture budget.
+        "m_Lambda", "Pinv_Lambda", "R_Lambda", "Rr_Lambda", "RR_Lambda",
+        "r_f_pad", "r_e_pad", "y_t", "F_t",
+    ],
     "update_vol_cond": [
         "x", "x_miss", "sigma_in", "gamma", "utmp", "mean_prior", "var_prior",
         "weights", "posteriors", "mean_t", "vars_t", "y_t",
@@ -135,6 +169,12 @@ def test_fixture_has_required_keys(fixture, name):
     assert not missing, f"fixture {name} is missing {missing}"
 
 
+# In restrict.Lambda and restrict.Phi, NaN IS the value: it marks an entry as
+# unrestricted. An all-NaN one means "nothing is restricted", which is a
+# perfectly good model, so these two are exempt from the all-NaN check below.
+NAN_IS_MEANINGFUL = ("restrict__Lambda", "restrict__Phi")
+
+
 @pytest.mark.parametrize("name", EXPECTED)
 def test_fixture_arrays_are_finite_where_expected(fixture, name):
     """No fixture array may be all-NaN; that is the signature of a bad capture."""
@@ -142,6 +182,8 @@ def test_fixture_arrays_are_finite_where_expected(fixture, name):
 
     data = fixture(name)
     for key, array in data.items():
+        if key in NAN_IS_MEANINGFUL:
+            continue
         if array.size and np.issubdtype(array.dtype, np.floating):
             assert not np.isnan(array).all(), f"{name}.{key} is entirely NaN"
 

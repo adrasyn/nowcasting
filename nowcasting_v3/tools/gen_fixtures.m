@@ -354,4 +354,155 @@ save('-v7', 'fixtures_mat/update_vol_cond.mat', ...
     'weights_miss', 'posteriors_miss', 'mean_t_miss', 'vars_t_miss', 'y_t_miss', ...
     'x1_KF_miss', 'p1_KF_miss', 'x2_KF_miss', 'p2_KF_miss', 'ln_sigmasq_miss', 'sigma_out_miss');
 
+
+
+%% ------------------------------------------------------------------
+%% gibbs_update_cond - the conditional posteriors of Gibbs_update.m on the real
+%% US panel, with every random draw injected (see octave_shims/gibbs_update_cond.m).
+%%
+%% This is the ONLY exact oracle Task 7 can have: the sampler's output is a
+%% draw, but the distribution the draw is taken FROM is deterministic given the
+%% state and the earlier draws of the same sweep. n*n_f = 155 and n_f = 5, so
+%% this case takes the PER-FACTOR Lambda loop; gibbs_update_cond_small below
+%% takes the joint path. The US case also carries n_quart = 3 (t_skip = 6, the
+%% quarterly state block), the COVID f_active mask, and restrictions on both
+%% Lambda and Phi.
+%%
+%% state comes from fast_smoother, not simulation_smoother: the smoothed mean
+%% is a state of exactly the right shape and conditioning, and it is
+%% deterministic, so this fixture needs no RNG at all.
+%%
+%% R_Lambda is NOT stored for this case - concatenated over the five factors it
+%% is 31*(T_est-1) x 72 and would blow the fixture budget on its own. Rr_Lambda
+%% and RR_Lambda, which are what the posterior actually depends on, are stored,
+%% and gibbs_update_cond_small stores R_Lambda in full.
+%% ------------------------------------------------------------------
+
+% update_gam and update_ps survive unshimmed inside gibbs_update_cond (their
+% outputs are terminal there), so the statistics package is needed from here on.
+% Loaded HERE rather than at the top so that every fixture above stays
+% bit-identical to the one Tasks 0-6 were checked against.
+pkg load statistics
+
+Y_gibbs = load_vintage('2023_09_29', est, n, T_full, w0);
+SSM     = construct_SSM(param, latent, restrict);
+[~, state] = fast_smoother(Y_gibbs, SSM);
+
+T_gibbs   = size(Y_gibbs, 2);
+tt_gibbs  = 1:T_gibbs;
+t_last    = find(~all(isnan(Y_gibbs), 1), 1, 'last');
+printf('gibbs_update_cond: T = %d, t_last = %d, t_skip = 6, T_est = %d\n', ...
+    T_gibbs, t_last, t_last - 6);
+
+% Deterministic stand-ins for the five mvnrnd draws and for the volatility and
+% outlier updates. Each perturbs the current value so that a port which assigns
+% a draw into the wrong (row/column-major) slots, or which reads the restricted
+% entries from the wrong array, gives a different answer downstream.
+draw_Phi    = param.Phi + 0.01*reshape(cos(1:numel(param.Phi)), size(param.Phi));
+draw_phi    = param.phi + 0.02*cos((1:n)'/3);
+draw_mu     = param.mu + 0.05*sin((1:n)'/4);
+draw_Lambda = param.Lambda + 0.03*reshape(sin(1:numel(param.Lambda)), size(param.Lambda));
+sigma_new   = latent.sigma .* (1 + 0.10*cos(tt_gibbs/7));
+s_new       = latent.s     .* (1 + 0.05*sin(tt_gibbs/5));
+
+[m_mu, Pinv_mu, m_Phi, Pinv_Phi, m_phi, Pinv_phi, ...
+ m_Lambda, Pinv_Lambda, R_Lambda, Rr_Lambda, RR_Lambda, ...
+ r_f_pad, r_e_pad, y_t, F_t] = gibbs_update_cond( ...
+    param, latent, Y_gibbs, prior, restrict, state, ...
+    draw_Phi, draw_phi, draw_mu, draw_Lambda, sigma_new, s_new);
+
+printf('gibbs_update_cond: m_mu %s, m_Phi %s, m_phi %s, m_Lambda %s (per-factor stack)\n', ...
+    mat2str(size(m_mu)), mat2str(size(m_Phi)), mat2str(size(m_phi)), mat2str(size(m_Lambda)));
+printf('gibbs_update_cond: R_Lambda would be %s - dropped, see header\n', mat2str(size(R_Lambda)));
+
+param_gibbs  = param;
+latent_gibbs = latent;
+Y            = Y_gibbs;
+save('-v7', 'fixtures_mat/gibbs_update_cond.mat', ...
+    'dimvec', 'Y', 'state', 'param_gibbs', 'latent_gibbs', 'restrict', 'prior', ...
+    'draw_Phi', 'draw_phi', 'draw_mu', 'draw_Lambda', 'sigma_new', 's_new', ...
+    'm_mu', 'Pinv_mu', 'm_Phi', 'Pinv_Phi', 'm_phi', 'Pinv_phi', ...
+    'm_Lambda', 'Pinv_Lambda', 'Rr_Lambda', 'RR_Lambda', ...
+    'r_f_pad', 'r_e_pad', 'y_t', 'F_t', ...
+    'window_start', 'window_start_py', 'window_len', 'T_full');
+
+
+%% ------------------------------------------------------------------
+%% gibbs_update_cond_small - the same oracle on a 6-series, 1-factor, all
+%% monthly panel. n*n_f = 6 < 100, so this takes the JOINT Lambda path, the
+%% n_quart == 0 state layout and t_skip = p_e = 1. The last 11 columns of Y are
+%% entirely missing and column 185-189 is ragged, so t_est truncates: T_est is
+%% 188, not 199, and the r_f_tmp / r_e_tmp padding is asymmetric at both ends.
+%% Phi is unrestricted here, which is the branch the US case does not take.
+%% ------------------------------------------------------------------
+clear -x WINDOW
+
+n = 6; n_f = 1; p_f = 1; p_e = 1; T = 200;
+dimvec = [n, n_f, p_f, p_e];
+
+param         = struct();
+param.mu      = 0.1*(1:n)'/n;
+param.gamma_g = 0.01;
+param.Lambda  = linspace(0.6, 1.4, n)';
+param.Lambda(1) = 1;                       % the normalising loading
+param.Phi     = 0.6;
+param.gamma_f = 0.1;
+param.pi_f    = 0.95;
+param.phi     = 0.3*ones(n, 1);
+param.gamma_e = 0.1*ones(n, 1);
+param.pi_e    = 0.95*ones(n, 1);
+
+restrict          = struct();
+restrict.Lambda   = NaN(n, n_f);
+restrict.Lambda(1, 1) = 1;                 % fixes the scale of the factor
+restrict.Phi      = NaN(n_f, n_f, p_f);
+restrict.iota     = zeros(n, 1);
+restrict.isquart  = false(n, 1);
+restrict.f_active = true(n_f, T);
+restrict.f_active(1, 50:60) = false;       % exercises the F_t mask
+
+tt            = 1:T;
+latent        = struct();
+latent.sigma  = repmat(0.8 + 0.3*sin(tt/9), n_f+n, 1);
+latent.s      = ones(n_f+n, T);
+latent.s(3, 40)  = 3.0;
+latent.s(5, 120) = 2.5;
+
+randn('state', 777);
+Y = randn(n, T);
+Y(1, 185:189) = NaN;                       % ragged edge
+Y(:, 190:T)   = NaN;                       % all-missing tail -> t_est truncates
+
+prior = construct_prior(dimvec, param.Lambda);
+
+SSM        = construct_SSM(param, latent, restrict);
+[~, state] = fast_smoother(Y, SSM);
+printf('gibbs_update_cond_small: n_state = %d, t_last = %d, T_est = %d\n', ...
+    size(state, 1), find(~all(isnan(Y), 1), 1, 'last'), find(~all(isnan(Y), 1), 1, 'last') - p_e);
+
+draw_Phi    = param.Phi + 0.01;
+draw_phi    = param.phi + 0.02*cos((1:n)'/3);
+draw_mu     = param.mu + 0.05*sin((1:n)'/4);
+draw_Lambda = param.Lambda + 0.03*sin((1:n)');
+sigma_new   = latent.sigma .* (1 + 0.10*cos(tt/7));
+s_new       = latent.s     .* (1 + 0.05*sin(tt/5));
+
+[m_mu, Pinv_mu, m_Phi, Pinv_Phi, m_phi, Pinv_phi, ...
+ m_Lambda, Pinv_Lambda, R_Lambda, Rr_Lambda, RR_Lambda, ...
+ r_f_pad, r_e_pad, y_t, F_t] = gibbs_update_cond( ...
+    param, latent, Y, prior, restrict, state, ...
+    draw_Phi, draw_phi, draw_mu, draw_Lambda, sigma_new, s_new);
+
+printf('gibbs_update_cond_small: m_Lambda %s (joint), R_Lambda %s\n', ...
+    mat2str(size(m_Lambda)), mat2str(size(R_Lambda)));
+
+param_gibbs  = param;
+latent_gibbs = latent;
+save('-v7', 'fixtures_mat/gibbs_update_cond_small.mat', ...
+    'dimvec', 'Y', 'state', 'param_gibbs', 'latent_gibbs', 'restrict', 'prior', ...
+    'draw_Phi', 'draw_phi', 'draw_mu', 'draw_Lambda', 'sigma_new', 's_new', ...
+    'm_mu', 'Pinv_mu', 'm_Phi', 'Pinv_Phi', 'm_phi', 'Pinv_phi', ...
+    'm_Lambda', 'Pinv_Lambda', 'R_Lambda', 'Rr_Lambda', 'RR_Lambda', ...
+    'r_f_pad', 'r_e_pad', 'y_t', 'F_t');
+
 printf('\nAll fixtures written to fixtures_mat/. Now run: ../.venv/bin/python matload.py\n');

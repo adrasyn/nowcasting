@@ -19,10 +19,16 @@ The drop ships **one** estimate file, ``Estimates_2023_09_20.mat``, and
 ``example_nowcast.m`` ships configured for the **2023-09-29** week. That week
 reproduces completely: the headline and all nine per-series release impacts.
 
-The **2023-10-06** week reproduces its headline but not its per-series table,
-because the published table for that week was produced from an estimate file the
-drop does not contain. That is not a hypothesis; it is measured, and pinned by
+The **2023-10-06** week does not, because the published figures for that week
+were produced from an estimate file the drop does not contain. That is not a
+hypothesis; it is measured, and pinned by
 ``test_the_1006_published_forecasts_need_parameters_this_drop_lacks`` below.
+
+Its headline *passes* a Monte Carlo comparison, and that is exactly why it does
+not gate: the headline is a sum in which a 9.5-sigma error in the revisions term
+is masked by an ordinary noise excursion in another component. See
+``test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term``.
+
 ``example_nowcast.m``'s own comment calls ``date_estimate_new`` the "estimate
 file for current week", so the estimate file rolls forward weekly and only one
 week's was published.
@@ -41,13 +47,34 @@ measurement; ``README.md`` carries the full table and the command:
     .venv/bin/python -m nyfed.run_us_reference 2023-09-29 --seeds 321 1 2 3 4 \
         --density-draws 20 --quiet
 
-The tolerance is ``3 * sqrt(2) * sd``, and the ``sqrt(2)`` is not padding. The
-comparison is between TWO independent 1,250-draw averages -- ours and MATLAB's
--- so the difference has variance ``2 * sd**2`` and a three-sigma bound on it is
-``3 * sqrt(2) * sd = 4.243 * sd``. A bound of ``3 * sd`` would be the right
-number only if the published figure were exact, which it is not: MATLAB does not
-reproduce itself across seeds either, which is why the plan's own note says an
-exact match "cannot be met".
+The tolerance is ``3 * sqrt(2) * sd``. The comparison is between TWO
+independent 1,250-draw averages -- ours and MATLAB's -- so the difference has
+variance ``2 * sd**2`` and a three-sigma bound on it is ``3 * sqrt(2) * sd =
+4.243 * sd``. A bound of ``3 * sd`` would be right only if the published figure
+were exact, which it is not: MATLAB does not reproduce itself across seeds
+either, which is why the plan's own note says an exact match "cannot be met".
+
+**Two things the `sqrt(2)` rests on, stated as the assumptions they are.**
+
+1. *MATLAB's per-run standard deviation equals this port's.* Both average 1,250
+   draws of the same `S_update` from the same posterior, so it is a reasonable
+   assumption -- but it is an ASSUMPTION, not a measurement. Only one MATLAB run
+   was ever published, so its sd cannot be estimated from here at all, and no
+   amount of work on this side would change that. If MATLAB's sd were larger
+   than ours, `sqrt(2)` would understate the right factor; if smaller, overstate
+   it.
+2. *`sd` is known.* It is not: each figure below is estimated from a handful of
+   seeds, and the relative standard error of an sd from `n` samples is about
+   `1/sqrt(2*(n-1))` -- 35% at n=5, 16% at n=20. So a comparison landing near
+   1.0x of tolerance is not meaningfully distinguishable from one landing just
+   over it, and none of the conclusions here rest on such a case. Where one came
+   close, the sd was re-measured over more seeds rather than left at five (see
+   `IMPACT_SD` below).
+
+Neither point moves the substantive results: the 2023-09-29 headline passes
+under `abs=0.01`, under `3*sd` and under `3*sqrt(2)*sd` alike, and the
+2023-10-06 residual is a bias rather than a Monte Carlo excursion, which no
+choice of sigma multiple can turn into a pass.
 
 The headline additionally keeps the plan's ``0.01``pp floor, the precision the
 figure is published to. The per-series impacts get NO such floor: four of the
@@ -87,8 +114,29 @@ def _key(week: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Step 0's measurements. Five seeds (321, 1, 2, 3, 4), 1,250 S_update draws per
-# vintage per seed, transcribed from the run recorded in README.md.
+# The measured spreads.
+#
+# Step 0 measured five seeds (321, 1, 2, 3, 4). The review asked for the two
+# tightest per-series comparisons to be re-measured over more seeds, and doing
+# so showed that a five-sample sd is not good enough here: AMDMTI's came out
+# 2.0x larger and AMDMUO's 2.3x larger on fifteen seeds, and the 2023-09-29
+# HEADLINE sd came out 2.1x larger (0.008112 -> 0.017331). The first five seeds
+# were simply a tight cluster.
+#
+# So every figure below is measured over FIFTEEN seeds, 5..19, at full
+# 1,250-draw production settings. Those seeds are DISJOINT from seed 321, which
+# every assertion in this file runs at, so no tolerance is estimated from the
+# run it then judges. The five-seed values are kept in the task report for
+# comparison, not here, so there is one set of numbers in the code and no doubt
+# about which is in force.
+#
+#     .venv/bin/python -m nyfed.run_us_reference 2023-09-29 --seeds 5 6 7 8 9 \
+#         --density-draws 2 --quiet
+#
+# An sd from n samples has a relative standard error of about 1/sqrt(2*(n-1)):
+# 35% at n=5, 19% at n=15. That is still not negligible, which is why nothing
+# here rests on a comparison landing near 1.0x of tolerance -- after the
+# re-measurement the worst is 0.47x.
 # --------------------------------------------------------------------------- #
 
 #: Three-sigma bound on the difference of two independent 1,250-draw averages.
@@ -96,23 +144,38 @@ SIGMA_MULTIPLE = 3.0 * np.sqrt(2.0)
 
 #: Seed-to-seed sd of the headline nowcast, in pp of annualised GDP growth.
 HEADLINE_SD: dict[str, float] = {
-    "2023-09-29": 0.008112,
-    "2023-10-06": 0.005128,
+    "2023-09-29": 0.017331,
+    "2023-10-06": 0.014124,
 }
+
+#: Seed-to-seed sd of the 2023-10-06 revisions and release totals. The two are
+#: very different animals and that difference is the finding: the revisions term
+#: is stable across seeds and carries a large offset from the published value,
+#: while the release total is noisy and carries none.
+REVISIONS_SD_1006 = 0.002028
+RELEASES_SD_1006 = 0.005401
 
 #: Seed-to-seed sd of each series' first-horizon impact, in pp.
 IMPACT_SD: dict[str, dict[str, float]] = {
     "2023-09-29": {
-        "AMDMTI": 0.000019, "AMDMUO": 0.000006, "AMDMVS": 0.000423,
-        "DGORDER": 0.001198, "DSPIC96": 0.001024, "HSN1F": 0.000457,
-        "PCEC96": 0.000432, "PCEPI": 0.000236, "PCEPILFE": 0.000227,
+        "AMDMTI": 0.000038, "AMDMUO": 0.000014, "AMDMVS": 0.000502,
+        "DGORDER": 0.000919, "DSPIC96": 0.001282, "HSN1F": 0.000392,
+        "PCEC96": 0.000475, "PCEPI": 0.000318, "PCEPILFE": 0.000263,
     },
     "2023-10-06": {
-        "ADPMNUSNERSA": 0.000288, "BOPTEXP": 0.000346, "BOPTIMP": 0.001327,
-        "JTSJOL": 0.000416, "PAYEMS": 0.006218, "TTLCONS": 0.000013,
-        "UNRATE": 0.000781,
+        "ADPMNUSNERSA": 0.000225, "BOPTEXP": 0.000632, "BOPTIMP": 0.001185,
+        "JTSJOL": 0.000376, "PAYEMS": 0.004628, "TTLCONS": 0.000012,
+        "UNRATE": 0.000354,
     },
 }
+
+
+#: The published 2023-10-06 revisions term. Derived from the two committed
+#: fixtures with no new computation:
+#:     published_1006 - published_0929 - sum(published 10-06 impacts)
+#: which is exactly what `example_nowcast.m` prints as "Impact from parameter
+#: and data revisions" -- a published quantity, not a reconstruction of one.
+PUBLISHED_1006_REVISIONS = 0.1618111034766129
 
 
 def headline_tolerance(week: str) -> float:
@@ -170,15 +233,17 @@ def reference(estimates, spec):
 
 @pytest.mark.slow
 @pytest.mark.fixtures
-@pytest.mark.parametrize("week", WEEKS)
-def test_reproduces_the_published_nowcast(week, fixture, reference):
+def test_reproduces_the_published_nowcast(fixture, reference):
     """The whole port, against the number the New York Fed published.
 
-    Both weeks. 2023-10-06's per-series table is not reproducible from this drop
-    (see the module docstring), but its headline is: the estimate-file
-    difference moves the individual release weights around and largely cancels
-    in the total.
+    2023-09-29 only. The 2023-10-06 headline lands close, but its residual is a
+    BIAS, not a Monte Carlo excursion, so a Monte Carlo tolerance is the wrong
+    instrument for it: passing under `3*sqrt(2)*sd` would say only that the bias
+    currently happens to sit under 4.24 sigma-hat. It is pinned as a two-sided
+    observation instead, in
+    `test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term`.
     """
+    week = GATE_WEEK
     expected = fixture("published_nowcasts")[f"published__{_key(week)}"].item()
     got = reference(week)
     assert got.nowcast == pytest.approx(expected, abs=headline_tolerance(week))
@@ -332,6 +397,119 @@ def test_the_1006_published_forecasts_need_parameters_this_drop_lacks(
 
 @pytest.mark.slow
 @pytest.mark.fixtures
+def test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term(
+    fixture, reference
+):
+    """The 2023-10-06 headline residual is a fixed offset, and it is localised.
+
+    Demoted from the gate deliberately. A Monte Carlo tolerance is the wrong
+    instrument for a bias: a pass under `3*sqrt(2)*sd` would say only that the
+    offset currently sits under 4.24 sigma-hat, not that the port is right.
+
+    WHERE THE BIAS IS, measured directly over fifteen seeds (5-19), port minus
+    published, each in units of its own seed-to-seed sd:
+
+        component            mean gap        sd        in sigma
+        2023-09-29 level     -0.010291    0.017331        0.61
+        release total        -0.000522    0.005401        0.10
+        REVISIONS TERM       +0.019197    0.002028        9.46
+        ---------------------------------------------------------
+        headline residual    +0.008383    0.014124        0.59
+
+    Read that column. Two of the three components are indistinguishable from the
+    published values, and the third is off by **nine and a half sigma**. And the
+    headline -- the sum -- is back at 0.59 sigma, because the level term happens
+    to be negative and cancels most of the revisions bias.
+
+    THAT IS THE ARGUMENT FOR DEMOTING THIS WEEK FROM THE GATE. It is not that
+    the headline fails; it passes. It is that the headline CANNOT SEE a
+    9.5-sigma error in one of its own components, because another component's
+    ordinary noise excursion happens to offset it. A gate assertion on the
+    headline would report success while the decomposition underneath it is
+    wrong -- which is the compensating-errors failure the plan's per-series test
+    was written to catch, arriving through the revision terms instead of the
+    releases.
+
+    (An earlier version of this argument compared the two weeks' HEADLINE sds --
+    2023-10-06's 0.005128 being smaller than 2023-09-29's 0.008112, so a
+    revisions term carrying +-0.02 of noise was impossible. The conclusion was
+    right, but both were five-sample sds and re-measurement moved them to
+    0.014124 and 0.017331. The direct measurement above needs no such comparison
+    and is far stronger.)
+
+    WHY THE REVISIONS TERM. `rev_SSM` is by construction the effect of swapping
+    `ssm_old` for `ssm_new`. In this drop `param_old == param_new`, so this
+    port's `rev_SSM` measures the LATENT revision and nothing else. If MATLAB's
+    2023-10-06 run used a later `param_new` -- which
+    `test_the_1006_published_forecasts_need_parameters_this_drop_lacks`
+    establishes on three independent legs -- then its `rev_SSM` also contained a
+    genuine parameter revision, which this port cannot compute at all, because
+    the parameters that would produce it are not in the drop.
+
+    MEASURED, and sufficient: perturbing `param_new` away from
+    `median(param_Gibbs)` by exactly the size the forecast comparison measures
+    (median 6.4% of the parameter-draw spread) shifts the revisions term by
+    -0.055, -0.023, +0.010 and +0.011 for four different draw directions. The
+    +0.0192 that has to be explained is squarely inside that range, and one of
+    the four reproduces it to 1.18x. `rev_data` barely moves across all of them
+    (0.138 to 0.193) while `rev_SSM` carries the shift -- the mechanism above.
+    So the missing estimate file is a sufficient explanation of the whole gap;
+    nothing is left over for this port's revisions path to account for. See the
+    task report, experiment (a).
+
+    The bounds below are two-sided so that the day somebody obtains the real
+    2023-10-06 estimate file, this fails and says to promote the week into
+    `test_reproduces_the_published_nowcast`.
+    """
+    d = fixture("published_nowcasts")
+    got = reference("2023-10-06")
+
+    d_headline = got.nowcast - d["published__2023_10_06"].item()
+    d_releases = got.releases_impact - d["news_2023_10_06__impact"].sum().item()
+    d_revisions = got.revisions_impact - PUBLISHED_1006_REVISIONS
+
+    # The decisive quantity, and the only one that fails. Per-seed values over
+    # seeds 5-19 span +0.016456 to +0.024281; seed 321 sits at +0.021522.
+    assert 0.012 < d_revisions < 0.029, d_revisions
+    # An offset, not an excursion: nine and a half sigma outside its own band.
+    assert abs(d_revisions) > SIGMA_MULTIPLE * REVISIONS_SD_1006, d_revisions
+
+    # The other two components, judged on exactly the same instrument, pass.
+    # The contrast is the finding: one component is inconsistent with the
+    # published figure and the rest of the decomposition is not.
+    assert abs(d_releases) < SIGMA_MULTIPLE * RELEASES_SD_1006, d_releases
+    assert abs(d_headline) < SIGMA_MULTIPLE * HEADLINE_SD["2023-10-06"], d_headline
+
+
+@pytest.mark.fixtures
+def test_the_0929_revisions_term_has_no_published_counterpart(fixture):
+    """Record the check that CANNOT be made, so nobody assumes it was made.
+
+    `test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term` compares
+    this port's revisions term against the published one, which is derivable for
+    2023-10-06 as `published_1006 - published_0929 - sum(published 10-06
+    impacts)`. The same derivation for 2023-09-29 needs the 2023-09-22 headline,
+    and the drop ships no `Update_2023_09_22.mat`. So the gate week's revisions
+    term -- the one week whose parameters this drop can reproduce -- has no
+    published counterpart at all, and is checked only by the internal identity
+    in `test_the_decomposition_adds_up_to_the_headline`.
+
+    That matters for Plan D, whose headline deliverable is a decomposition panel
+    built on exactly these terms: the release impacts are pinned against the
+    published table, and the revision terms are not pinned against anything.
+
+    Asserted rather than written in a comment so that if the missing file ever
+    turns up, this fails and says to add the check.
+    """
+    assert not (MATLAB_DIR / "output" / "Update_2023_09_22.mat").exists(), (
+        "Update_2023_09_22.mat now exists: derive the published 2023-09-29 "
+        "revisions term from it and assert it, then delete this test."
+    )
+    assert "published__2023_09_22" not in fixture("published_nowcasts")
+
+
+@pytest.mark.slow
+@pytest.mark.fixtures
 def test_the_1006_release_impacts_miss_by_more_than_monte_carlo_error(
     fixture, reference
 ):
@@ -358,14 +536,21 @@ def test_the_1006_release_impacts_miss_by_more_than_monte_carlo_error(
     ratios = {s: abs(got.impact_for(s) - published[s].item())
                  / impact_tolerance(week, s) for s in published}
     over = sorted(s for s, r in ratios.items() if r > 1.0)
-    # Measured: 5 of 7 over, worst ratio 5.14 (ADPMNUSNERSA).
-    assert len(over) >= 4, ratios
-    assert max(ratios.values()) > 3.0, ratios
+    # Measured on the re-measured 15-seed sds: 4 of 7 over, worst 6.72x
+    # (TTLCONS), then ADPMNUSNERSA 6.58x, JTSJOL 2.23x, BOPTIMP 1.70x. On the
+    # original 5-seed sds it read 5 of 7, worst 6.45x - BOPTEXP moved under the
+    # line because its sd had been underestimated by 1.8x.
+    assert len(over) >= 3, ratios
+    assert max(ratios.values()) > 4.0, ratios
     # ... but the whole path still works: nothing is off by an order of
-    # magnitude, and the total still lands (see the headline test above).
+    # magnitude.
     assert max(ratios.values()) < 25.0, ratios
-    assert got.releases_impact == pytest.approx(
-        sum(v.item() for v in published.values()), abs=0.02)
+    # The release TOTAL is checked in
+    # test_the_1006_residual_is_a_bias_that_sits_in_the_revisions_term, against
+    # the measured seed-to-seed sd of the total rather than a round number. It
+    # is not repeated here: the per-seed spread of that total is 0.008262, so a
+    # bound tight enough to look impressive would be encoding seed 321's
+    # particular draw and would fail at seed 1.
 
 
 # --------------------------------------------------------------------------- #

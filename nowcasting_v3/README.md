@@ -171,24 +171,49 @@ production-settings runs.
 | 2023-09-29 | 2.015771 | 2.030426 | 2.011280 | 2.010517 | 2.019899 | 2.017578 | **0.008112** | 0.019909 |
 | 2023-10-06 | 2.399940 | 2.396070 | 2.388481 | 2.392394 | 2.400623 | 2.395502 | **0.005128** | 0.012142 |
 
-**A weekly nowcast from this model is reproducible to about ±0.02pp, and no
-further.** That is a property of the model, not of the port — MATLAB does not
-reproduce itself across seeds either. It bounds what any weekly published figure
-can claim, and Plan D should not print more precision than it.
+#### Five seeds were not enough
 
-Seed-to-seed sd of each series' first-horizon release impact, in pp:
+Review asked for the two tightest per-series comparisons to be re-measured over
+more seeds. Doing so showed the five-seed estimates were unreliable — the first
+five seeds happened to be a tight cluster:
+
+| quantity | sd (5 seeds) | **sd (15 seeds, 5-19)** | ratio |
+| --- | --- | --- | --- |
+| 2023-09-29 headline | 0.008112 | **0.017331** | 2.14 |
+| 2023-10-06 headline | 0.005128 | **0.014124** | 2.75 |
+| 2023-09-29 AMDMTI impact | 0.000019 | **0.000038** | 2.01 |
+| 2023-09-29 AMDMUO impact | 0.000006 | **0.000014** | 2.30 |
+
+An sd from `n` samples has a relative standard error of about `1/sqrt(2*(n-1))`
+— 35% at n = 5, 19% at n = 15. **So every tolerance constant in
+`tests/test_end_to_end.py` is measured over the fifteen seeds 5-19**, which are
+disjoint from seed 321, the seed every assertion runs at. No tolerance is
+estimated from the run it then judges.
+
+All twenty 2023-09-29 headlines, sorted, run from 1.984494 to 2.035595, and the
+published 2.024187 sits at the **74th percentile of this port's own
+distribution** — an ordinary draw from it, mean gap −0.009370 = 0.61 sd.
+
+**A weekly nowcast from this model is reproducible to about ±0.05pp, and no
+further** (three sd, on the 15-seed estimate). That is a property of the model,
+not of the port — MATLAB does not reproduce itself across seeds either. It bounds
+what any weekly published figure can claim, and Plan D should not print more
+precision than it.
+
+Seed-to-seed sd of each series' first-horizon release impact, in pp, over the
+fifteen seeds 5-19:
 
 | 2023-09-29 | sd | | 2023-10-06 | sd |
 | --- | --- | --- | --- | --- |
-| DGORDER | 0.001198 | | PAYEMS | 0.006218 |
-| DSPIC96 | 0.001024 | | BOPTIMP | 0.001327 |
-| HSN1F | 0.000457 | | UNRATE | 0.000781 |
-| PCEC96 | 0.000432 | | JTSJOL | 0.000416 |
-| AMDMVS | 0.000423 | | BOPTEXP | 0.000346 |
-| PCEPI | 0.000236 | | ADPMNUSNERSA | 0.000288 |
-| PCEPILFE | 0.000227 | | TTLCONS | 0.000013 |
-| AMDMTI | 0.000019 | | | |
-| AMDMUO | 0.000006 | | | |
+| DSPIC96 | 0.001282 | | PAYEMS | 0.004628 |
+| DGORDER | 0.000919 | | BOPTIMP | 0.001185 |
+| AMDMVS | 0.000502 | | BOPTEXP | 0.000632 |
+| PCEC96 | 0.000475 | | JTSJOL | 0.000376 |
+| HSN1F | 0.000392 | | UNRATE | 0.000354 |
+| PCEPI | 0.000318 | | ADPMNUSNERSA | 0.000225 |
+| PCEPILFE | 0.000263 | | TTLCONS | 0.000012 |
+| AMDMTI | 0.000038 | | | |
+| AMDMUO | 0.000014 | | | |
 
 Every one of these is usable as a tolerance: none of the sixteen is so noisy
 that no useful bound exists for it.
@@ -199,6 +224,28 @@ The comparison is between **two** independent 1,250-draw averages — ours and
 MATLAB's. The difference of two such averages has variance `2 * sd^2`, so a
 three-sigma bound on it is `3 * sqrt(2) * sd = 4.243 * sd`. A bound of `3 * sd`
 would be right only if the published figure were exact, and it is not.
+
+**Two assumptions sit under that, and they are assumptions, not measurements.**
+
+1. **MATLAB's per-run sd equals this port's.** Both average 1,250 draws of the
+   same `S_update` from the same posterior, so it is reasonable — but only one
+   MATLAB run was ever published, so its sd cannot be estimated from here, now
+   or ever. If MATLAB's sd is larger than ours, `sqrt(2)` understates the right
+   factor; if smaller, it overstates it.
+2. **`sd` is known.** It is estimated from a handful of seeds, and an sd from `n`
+   samples has a relative standard error of about `1/sqrt(2*(n-1))` — 35% at
+   n = 5, 16% at n = 20. A comparison landing near 1.0x of tolerance therefore
+   is not meaningfully distinguishable from one landing just over it. Where one
+   came close, the sd was re-measured over twenty seeds rather than left at five.
+
+Neither point moves the substantive results. The 2023-09-29 headline passes
+under `abs=0.01`, under `3*sd` and under `3*sqrt(2)*sd` alike; and the
+2023-10-06 residual is a bias, which no choice of sigma multiple turns into a
+meaningful pass.
+
+**A Monte Carlo tolerance is only the right instrument for Monte Carlo error.**
+Where a residual turns out to be a fixed offset, it is pinned as a two-sided
+observation instead — see the 2023-10-06 section below.
 
 The headline additionally keeps a `0.01`pp floor, the precision the figure is
 published to. The per-series impacts get **no** floor: four of the nine
@@ -211,27 +258,40 @@ published impacts for 2023-09-29 are smaller in magnitude than 0.01, so a flat
 .venv/bin/pytest tests/test_end_to_end.py -v      # 12 passed in 12:39
 ```
 
+**The gate is the 2023-09-29 week.**
+
 | Week | published | this port (seed 321) | deviation | tolerance | |
 | --- | --- | --- | --- | --- | --- |
-| 2023-09-29 | 2.0241867 | **2.015771** | 0.008416 | 0.034416 | PASS (0.24x) |
-| 2023-10-06 | 2.3834663 | **2.399940** | 0.016474 | 0.021756 | PASS (0.76x) |
+| 2023-09-29 | 2.0241867 | **2.015771** | 0.008416 | 0.073529 | **PASS** (0.11x) |
 
-2023-09-29 also passes the plan's original `max(0.01, 3*sd)` rule and its flat
-`abs=0.01` floor, so nothing about the headline rests on the `sqrt(2)`.
+It also passes the plan's original `max(0.01, 3*sd)` rule and its flat
+`abs=0.01` floor, so nothing about the gate rests on the `sqrt(2)`.
+
+2023-10-06 lands at **2.399940** against a published **2.3834663**, a residual of
+**+0.016474** — which *passes* a Monte Carlo comparison, and is nonetheless not
+asserted as a gate. The headline is a sum in which a **9.5-sigma** error in the
+revisions term is masked by an ordinary noise excursion in another component, so
+a headline assertion would report success over a decomposition that is wrong.
+The components are pinned individually instead — see below.
 
 All nine per-series release impacts for 2023-09-29, in pp of the nowcast:
 
 | series | published | this port | deviation | tolerance | ratio |
 | --- | --- | --- | --- | --- | --- |
-| DGORDER | -0.052702 | -0.052058 | 0.000644 | 0.005083 | 0.13 |
-| DSPIC96 | -0.040846 | -0.042265 | 0.001419 | 0.004344 | 0.33 |
-| HSN1F | -0.030640 | -0.031053 | 0.000413 | 0.001939 | 0.21 |
-| PCEPI | 0.021788 | 0.021942 | 0.000154 | 0.001001 | 0.15 |
-| PCEC96 | -0.014736 | -0.014670 | 0.000066 | 0.001833 | 0.04 |
-| AMDMVS | -0.008788 | -0.008640 | 0.000148 | 0.001795 | 0.08 |
-| PCEPILFE | -0.005922 | -0.006285 | 0.000363 | 0.000963 | 0.38 |
-| AMDMTI | -0.000928 | -0.000852 | 0.000076 | 0.000081 | 0.94 |
-| AMDMUO | -0.000358 | -0.000339 | 0.000019 | 0.000025 | 0.76 |
+| DGORDER | -0.052702 | -0.052058 | 0.000644 | 0.003899 | 0.17 |
+| DSPIC96 | -0.040846 | -0.042265 | 0.001419 | 0.005440 | 0.26 |
+| HSN1F | -0.030640 | -0.031053 | 0.000413 | 0.001663 | 0.25 |
+| PCEPI | 0.021788 | 0.021942 | 0.000154 | 0.001350 | 0.11 |
+| PCEC96 | -0.014736 | -0.014670 | 0.000066 | 0.002017 | 0.03 |
+| AMDMVS | -0.008788 | -0.008640 | 0.000148 | 0.002129 | 0.07 |
+| PCEPILFE | -0.005922 | -0.006285 | 0.000363 | 0.001118 | 0.33 |
+| AMDMTI | -0.000928 | -0.000852 | 0.000076 | 0.000162 | 0.47 |
+| AMDMUO | -0.000358 | -0.000339 | 0.000019 | 0.000059 | 0.33 |
+
+All nine pass, the worst at 0.47x of tolerance. (On the original five-seed sds
+the two smallest impacts read 0.94x and 0.76x; re-measuring their sds over
+fifteen seeds moved them to 0.47x and 0.33x. The five-sample sds were
+understated, not the deviations inflated.)
 
 ### Is the gate falsifiable?
 
@@ -249,10 +309,11 @@ the first things to check after a miss.
 The headline alone would have missed the horizon mutation entirely. That is what
 the per-series test is for.
 
-### 2023-10-06 is not fully reproducible from this drop, and that is not a port bug
+### 2023-10-06 is not reproducible from this drop, and that is not a port bug
 
-The 2023-10-06 headline reproduces. Its per-series table does not: five of the
-seven impacts miss the measured Monte Carlo bound, the worst by 5.1x.
+Its per-series table misses — five of seven impacts beyond the measured Monte
+Carlo bound, the worst by 5.1x — and its headline residual of +0.016474 is a
+**fixed offset, not a Monte Carlo excursion.**
 
 **The published 2023-10-06 update was produced from an estimate file the drop
 does not contain.** This is measured, not inferred, and pinned by
@@ -280,9 +341,75 @@ are pre-2020 statistics — identical whatever the estimate vintage. That is
 exactly the signature of a re-estimated parameter file over unchanged
 standardisation.
 
+#### The bias is in the revisions term, and nowhere else
+
+Split the headline residual across the decomposition `example_nowcast.m` itself
+prints. Fifteen seeds (5-19), port minus published, each component scaled by its
+own seed-to-seed sd:
+
+| component | mean gap | sd | **in sigma** |
+| --- | --- | --- | --- |
+| 2023-09-29 level (row 1 of the 10-06 week) | −0.010291 | 0.017331 | 0.61 |
+| release total | −0.000522 | 0.005401 | 0.10 |
+| **revisions term** | **+0.019197** | **0.002028** | **9.46** |
+| headline residual (the sum) | +0.008383 | 0.014124 | 0.59 |
+
+Two of the three components are indistinguishable from the published values; the
+third is off by nine and a half sigma. And the headline is back at 0.59 sigma,
+because the level term is negative and cancels most of the revisions bias.
+
+**That is the argument for not gating this week on its headline.** Not that the
+headline fails — it passes. That it *cannot see* a 9.5-sigma error in one of its
+own components, because another component's ordinary noise happens to offset it.
+It is the compensating-errors failure the per-series test exists to catch,
+arriving through the revision terms instead of the releases.
+
+The published revisions term is derivable from the two committed fixtures with
+no new computation, as `published_1006 − published_0929 − sum(published 10-06
+impacts)` = **+0.161811**, which is exactly what `example_nowcast.m` prints as
+"Impact from parameter and data revisions". This port gives **+0.181008** on the
+same fifteen seeds, +0.183333 at seed 321.
+
+Why that term. `rev_SSM` is by construction the effect of swapping `ssm_old` for
+`ssm_new`, and in this drop `param_old == param_new`, so this port's `rev_SSM`
+measures the **latent** revision and nothing else. MATLAB's 2023-10-06 run used
+a later `param_new`, so its `rev_SSM` also contained a genuine **parameter**
+revision — a quantity this port cannot compute at all, because the parameters
+that would produce it are not in the drop.
+
+**Measured, and sufficient.** Perturbing `param_new` away from
+`median(param_Gibbs)` by exactly the size the forecast comparison measures
+(median 6.4% of the parameter-draw spread) shifts the revisions term by, against
+the +0.019197 that has to be explained:
+
+| perturbation direction | induced shift in the revisions term | vs +0.019197 |
+| --- | --- | --- |
+| draw 0 | +0.010379 | 0.54x |
+| draw 150 | −0.055074 | 2.87x |
+| draw 300 | −0.022565 | **1.18x** |
+| draw 450 | +0.011214 | 0.58x |
+
+The offset that must be explained is squarely inside the range a
+correctly-sized parameter perturbation produces, and one of four directions
+reproduces it to 1.18x. Nothing is left over for the port's revisions path to
+account for. (`rev_data` barely moves across all of these — 0.138 to 0.193 —
+while `rev_SSM` carries the shift, which is the mechanism above.)
+
 The gap is pinned with two-sided bounds rather than skipped, so that the day
-somebody obtains the real 2023-10-06 estimate file the test fails and says to
+somebody obtains the real 2023-10-06 estimate file the tests fail and say to
 promote the week into the gate.
+
+#### What cannot be checked at all
+
+The gate week's own revisions term has **no published counterpart**. Deriving it
+needs the 2023-09-22 headline, and the drop ships no `Update_2023_09_22.mat`. So
+for 2023-09-29 the release impacts are pinned against the published table and
+the revision terms are pinned against nothing but the internal identity.
+
+That is a live gap for Plan D, whose headline deliverable is a decomposition
+panel built on exactly these terms. It is asserted rather than commented, in
+`test_the_0929_revisions_term_has_no_published_counterpart`, so that if the
+missing file ever turns up the test fails and says to add the check.
 
 ## Measured timings
 

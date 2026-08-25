@@ -43,7 +43,7 @@ This document fully specifies **Plan A** only. Plans B–E are scoped here but n
 
 | Plan | Deliverable | Gate to pass | Lead model |
 |---|---|---|---|
-| **A. Engine port** | `nowcasting_v3/nyfed/` reproduces the NY Fed model on US data | Tier 1 fixtures pass; published 2023-09-29 and 2023-10-06 nowcasts reproduced to ±0.01pp | Opus 5, Fable 5 on Tasks 6–7 |
+| **A. Engine port** | `nowcasting_v3/nyfed/` reproduces the NY Fed model on US data | Tier 1 fixtures pass; the published 2023-09-29 nowcast reproduced to ±0.01pp. **2023-10-06 is not reproducible from this drop** — see the amended gate below | Opus 5 |
 | **B. Australian panel** | `model_spec_AU.csv` + ABS/RBA fetchers + `initval` seed | Panel builds to a complete monthly matrix back to at least 1990 | Fable 5 designs, Sonnet 5 builds |
 | **C. Backtest** | Real-time vintage backtest, coverage check on the posterior bands | Bands achieve stated coverage, or the failure is documented as v2's was | Opus 5 |
 | **D. Emit + site** | `data/*_v3.json`, types, `/v3` page, release-impact table | Page renders live numbers; `npm run build` and e2e pass | Sonnet 5 |

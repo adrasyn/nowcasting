@@ -215,6 +215,32 @@ def test_cleaned_state_is_a_permutation_of_the_drawn_state(fixture):
 
 
 @pytest.mark.fixtures
+def test_the_fifth_factors_volatility_is_pinned_at_one(fixture):
+    """Gibbs_update.m:156-158 holds the FIFTH factor's volatility at one - the
+    pandemic factor of the US specification - and the Octave oracle cannot see
+    it. ``r_f_pad`` is written before the override, ``sigmaXs_f`` is never
+    recomputed after the loop, and the override's only consumer inside the shim
+    is the ``gamma_f`` draw, which the shim leaves random and does not return.
+    The Tier 2 synthetic panel has n_f = 1 and never reaches the branch.
+
+    It does reach output, though: latent.sigma -> GibbsResult.sigmas ->
+    example_nowcast.m's mean over sigmas. So an off-by-one here would freeze the
+    wrong factor's volatility all the way into the nowcast in silence. This is
+    the only check on it."""
+    from nyfed.gibbs import _gibbs_update
+
+    d = fixture("gibbs_update_cond")
+    _, n_f, _, _ = _dims(d)
+    assert n_f == 5, "this fixture must reach the branch at all"
+    _, latent, _ = _gibbs_update(_params(d), _latent(d), d["Y"], _prior(d),
+                                 _restrict(d), None, _draws(d))
+    assert np.all(latent.sigma[4] == 1.0)
+    # ...and no neighbouring factor is touched: they carry the injected values.
+    assert np.allclose(latent.sigma[3], d["sigma_new"][3])
+    assert np.allclose(latent.sigma[0], d["sigma_new"][0])
+
+
+@pytest.mark.fixtures
 def test_us_panel_dimensions_are_what_the_reference_says(fixture):
     """Guard on the US oracle itself: if the fixture ever stops being the real
     31-series panel, every Tier 1 assertion above quietly gets easier."""

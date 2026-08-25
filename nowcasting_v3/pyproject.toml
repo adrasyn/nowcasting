@@ -14,6 +14,9 @@ markers = [
   "fixtures: requires Octave-generated fixtures (skipped if absent)",
   "slow: multi-minute Gibbs runs",
 ]
+# Plan A runs the suite under -W error. Enforced here rather than assumed at the
+# command line: without it the next warning to appear passes CI in silence.
+filterwarnings = ["error"]
 
 [tool.setuptools.packages.find]
 include = ["nyfed*"]

@@ -42,11 +42,10 @@ If Octave ever needs a modified version of one of those functions, put the
 modified copy in `tools/octave_shims/` and `addpath` that directory ahead of the
 originals in `tools/gen_fixtures.m`.
 
-Two files inside it are not in git and never should be:
-`Estimates_2023_09_20.mat` (21 MB of stored Gibbs output) and anything else over
-the repository's size budget. They come with the NY Fed drop. Code that needs
-them raises a clear error when they are absent, and the tests that need them
-skip.
+One file inside it is not in git and never should be:
+`Estimates_2023_09_20.mat`, 21 MB of stored Gibbs output that ships with the NY
+Fed drop. `nyfed/run_us_reference.py` raises a clear error when it is absent,
+and the tests that need it skip rather than fail.
 
 ## Testing strategy: Octave as a numerical oracle
 
@@ -109,7 +108,7 @@ at the command line, so the next new warning cannot pass CI in silence).
 
 ```bash
 cd nowcasting_v3
-.venv/bin/pytest -m "not slow"      # ~40 s, 139 tests: the iteration loop
+.venv/bin/pytest -m "not slow"      # ~25 s, 137 tests: the iteration loop
 .venv/bin/pytest                    # ~30 min, 151 tests, incl. the end-to-end gate
 ```
 
@@ -261,7 +260,7 @@ does not contain.** This is measured, not inferred, and pinned by
 
 Each published `Forecast` is a sharp function of the parameter vector — across
 four single draws from `param_Gibbs` every one of the sixteen forecasts moves by
-at least 1.4% of its published value, and the median by 47%. So reproducing one
+at least 1.4% of its published value, and the median by 36.6%. So reproducing one
 to a fraction of a percent pins the parameters. With
 `median(param_Gibbs)` from `Estimates_2023_09_20.mat`, the worst relative error
 over each week's published `Forecast` column is:
@@ -287,7 +286,43 @@ promote the week into the gate.
 
 ## Measured timings
 
-<!-- TIMINGS -->
+Measured on this project's development machine: Apple Silicon macOS (arm64),
+Homebrew CPython 3.13.13, numpy 2.x, single process. Reproduce with:
+
+```bash
+cd nowcasting_v3/tools
+../.venv/bin/python -u time_estimation.py weekly      # 6.4 min
+../.venv/bin/python -u time_estimation.py estimate    # 1.50 h
+```
+
+| Path | What it runs | Wall clock |
+| --- | --- | --- |
+| **Weekly nowcast** | 2 x 1,250 `s_update`, 1 `point_nowcast`, 1,250 `density_nowcast` | **381.8 s = 6.4 min** |
+| **Quarterly estimation** | `gibbs_sampler` at `n_gs=10000, n_burn=8000, n_thin=2` = **36,002** `gibbs_update` sweeps on the (31, 468) panel | **5388.4 s = 89.8 min = 1.50 h** (0.1497 s/sweep) |
+
+Note the sweep count: `Gibbs_sampler.m` loops `-n_burn : n_gs` inclusive and does
+`n_thin` updates per iteration, so production settings are 36,002 sweeps, not
+the 28,000 a quick reading suggests.
+
+**No drift over 36,002 sweeps.** Mean `|param|` over the first 100 stored draws
+is 0.237802 and over the last 100 is 0.251759 — a 5.9% difference on a chain
+that has already burned in 8,000 draws, which is MCMC noise, not degradation.
+Every stored parameter is finite. Memory stayed flat; the only large allocation
+is the 390 x 10,000 output array (31 MB), and `need_latents=False` keeps the
+468-period latent arrays out of it.
+
+### What this means for Plan E
+
+* **The quarterly estimation job fits an Actions runner.** 1.5 h here. GitHub's
+  hosted `ubuntu-latest` is materially slower than this machine for
+  single-threaded numpy — budget 2-3x, so 3-4.5 h against the 6-hour per-job
+  limit. That fits, but not by much: pin the Python version and the numpy
+  version, and do not add series to the panel without re-timing. A self-hosted
+  runner is not required.
+* **The weekly job fits `timeout-minutes: 60` with room to spare.** 6.4 min here,
+  so roughly 13-20 min on a hosted Linux runner. Keep the 60-minute timeout;
+  there is no reason to raise it.
+* Neither number includes fetching data or writing JSON.
 
 ## Attribution
 

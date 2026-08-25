@@ -231,9 +231,10 @@ def _median_param_forecasts(estimates, spec, week, param_vec):
     """Published-unit forecasts from a parameter vector and the mean latents.
 
     No ``S_update``: this asks how sensitive the forecasts are to the PARAMETERS,
-    and the latents' contribution is two orders of magnitude smaller - Step 0
-    measured the seed-to-seed spread of JTSJOL's forecast at 0.6 on a value of
-    119, i.e. 0.5%, against the 17-unit gap this function is about.
+    and the latents' contribution is two orders of magnitude smaller. Step 0's
+    seed-321 and seed-4 runs put JTSJOL's forecast at 119.03 and 119.62 - a
+    0.6-unit spread on a value of 119, against the 17-unit gap this function is
+    about.
     """
     vintage_old, vintage_new = VINTAGE_PAIRS[week]
     Y_old = load_vintage(vintage_old, estimates)
@@ -313,7 +314,7 @@ def test_the_1006_published_forecasts_need_parameters_this_drop_lacks(
         median_ratio[week] = float(np.median(ratios))
 
     # Sensitivity. Measured minimum over all 16 series: 1.39% (PCEPI); the
-    # median is 47%.
+    # median is 36.6% and the maximum 77.8% (PCEC96).
     assert min(spreads) > 0.01, min(spreads)
     # The gate week's parameters are this drop's parameters.
     assert worst["2023-09-29"] < 0.005, worst

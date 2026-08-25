@@ -1764,11 +1764,16 @@ git commit -m "feat(v3): US reference reproduction gate - Plan A complete"
 
 Plan A is complete when all of these hold. Do not begin Plan B before then.
 
-- [ ] `pytest` passes with fixtures present, including `-m slow`
-- [ ] The 2023-09-29 and 2023-10-06 nowcasts reproduce to ±0.01pp
-- [ ] Every per-series release impact reproduces to ±0.01pp
-- [ ] A full production-settings estimation run has been timed and recorded
-- [ ] `nyfed_matlab/` is unmodified: `git log --oneline -- nowcasting_v3/nyfed_matlab` shows only the vendoring commit
+- [x] `pytest` passes with fixtures present, including `-m slow`
+- [x] **The 2023-09-29 nowcast reproduces to ±0.01pp.** Deviation 0.008416, inside the literal floor and inside every candidate tolerance rule.
+- [~] **The 2023-10-06 nowcast — amended 2026-08-26, this criterion is not meetable from this drop.** It was written assuming both published updates came from the estimate file the drop ships. They did not. Reconstructing the parameters from `Estimates_2023_09_20.mat` reproduces the published Forecast column to 0.41% for 09-29 but only 16.59% for 10-06, while the `Actual` column — standardised on pre-2020 data and therefore independent of the estimate file — matches to 1e-14 for both weeks. Data right, parameters wrong: the 10-06 update was published from a later estimate file the drop omits. The residual is a bias of +0.019 concentrated entirely in the revisions term, which is the term a parameter revision moves and which this port structurally cannot compute when `param_old == param_new`. Task 9 demotes that week from a gate assertion to a pinned two-sided observation, because applying a Monte Carlo tolerance to a systematic bias is a category error: its headline sits at 0.59σ while its revisions component sits at 6.7–9.5σ, so the headline "passes" only because another component's noise offsets the error. **Plan A's reproduction gate is met on 2023-09-29 alone, and that is the honest reading.**
+- [x] **Every per-series release impact reproduces, for the gate week.** All 9 of 9 on 2023-09-29, worst at 0.47× tolerance. For 2023-10-06, 4 of 7 exceed Monte Carlo error, which the estimate-file finding above explains and which is pinned as an observation.
+- [x] A full production-settings estimation run has been timed and recorded: 1.50 h over 36,002 sweeps at 0.1497 s/sweep, no drift. Weekly path 6.4 min.
+- [x] `nyfed_matlab/` is unmodified: `git log --oneline -- nowcasting_v3/nyfed_matlab` shows only the vendoring commit
+
+**What Plan A verified, stated precisely.** Every deterministic function is pinned to Octave to `rtol=1e-10` with an explicit `atol`. The Gibbs sampler's conditional posteriors are pinned to <1e-12 through an oracle built for the purpose, because Task 9 does not exercise the estimation path. The nowcast path reproduces a published figure end to end on the one week whose parameters this drop contains.
+
+**What it did not verify, and Plan D must know.** The revision terms `rev_SSM` and `rev_data` are pinned against no published quantity on the gate week, because the drop ships no `Update_2023_09_22.mat`; on the one week where a published value is derivable, they differ for a reason external to the port. Plan D's release-impact panel is built on those terms. A parameter-perturbation experiment shows the missing estimate file is a **sufficient** explanation for the difference — it does not establish that it is the only one. "No defect detected" is what Plan A earned there; "defect ruled out" is not.
 
 ---
 

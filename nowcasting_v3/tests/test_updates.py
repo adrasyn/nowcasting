@@ -38,8 +38,9 @@ def test_update_vol_reproduces_octave_stage_by_stage(fixture, suffix):
         # against NaN. np.allclose defaults to equal_nan=False, which would
         # fail on agreeing values. It still fails if the NaN patterns differ.
         assert np.allclose(np.reshape(getattr(got, name), want.shape), want,
-                           rtol=1e-10, equal_nan=True), f"{name}{suffix}"
-    assert np.allclose(got.sigma, d[f"sigma_out{suffix}"].ravel(), rtol=1e-10)
+                           rtol=1e-10, atol=0.0, equal_nan=True), f"{name}{suffix}"
+    assert np.allclose(got.sigma, d[f"sigma_out{suffix}"].ravel(), rtol=1e-10,
+                       atol=0.0)
 
 
 @pytest.mark.fixtures
@@ -48,7 +49,7 @@ def test_update_scl_posterior_weights_match_octave(fixture, suffix):
     d = fixture("update_scl")
     got = update_scl(d[f"x{suffix}"].ravel(), d["vals"].ravel(), d["probs"].ravel(),
                      return_posteriors=True)
-    assert np.allclose(got, d[f"posteriors{suffix}"], rtol=1e-10)
+    assert np.allclose(got, d[f"posteriors{suffix}"], rtol=1e-10, atol=0.0)
 
 
 def test_update_scl_falls_back_to_the_prior_where_data_is_missing():

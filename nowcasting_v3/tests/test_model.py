@@ -39,7 +39,7 @@ def test_construct_ssm_matches_octave_on_every_matrix(fixture):
     for name in ("D", "H", "Sigma_eps", "F", "G", "Sigma_eta", "mu_1", "Sigma_1"):
         want = d[f"SSM__{name}"]
         assert np.allclose(np.reshape(getattr(got, name), want.shape), want,
-                           rtol=1e-10), name
+                           rtol=1e-10, atol=0.0), name
 
 
 @pytest.mark.fixtures
@@ -63,7 +63,7 @@ def test_quarterly_rows_carry_the_mariano_murasawa_weights(fixture):
     h0 = got.H[:, :, 0]
     isq = restrict.isquart
     expected_q = np.outer(restrict.iota[isq], np.array([1.0, 2, 3, 2, 1]) / 9)
-    assert np.allclose(h0[isq, :5], expected_q, rtol=1e-10)
+    assert np.allclose(h0[isq, :5], expected_q, rtol=1e-10, atol=0.0)
     assert np.allclose(h0[~isq, 1:5], 0.0)
 
 
@@ -91,7 +91,7 @@ def test_construct_prior_matches_octave(fixture):
                  "m_phi", "P_phi"):
         want = d[f"prior__{name}"]
         assert np.allclose(np.reshape(getattr(got, name), want.shape), want,
-                           rtol=1e-10), name
+                           rtol=1e-10, atol=0.0), name
     for name in ("nu_g", "s2_g", "nu_f", "s2_f", "nu_e", "s2_e",
                  "a_f", "b_f", "a_e", "b_e"):
         assert float(np.ravel(getattr(got, name))[0]) == pytest.approx(

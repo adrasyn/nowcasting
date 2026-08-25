@@ -147,7 +147,7 @@ def test_conditional_posterior_moments_match_octave(fixture, name, block):
     for key in (f"m_{block}", f"Pinv_{block}"):
         want = d[key]
         assert np.allclose(np.reshape(getattr(got, key), want.shape), want,
-                           rtol=1e-10), key
+                           rtol=1e-10, atol=0.0), key
 
 
 @pytest.mark.fixtures
@@ -161,7 +161,7 @@ def test_lambda_design_and_detrended_data_match_octave(fixture, name, key):
     d = fixture(name)
     want = d[key]
     got = np.reshape(getattr(_moments(d), key), want.shape)
-    assert np.allclose(got, want, rtol=1e-10), key
+    assert np.allclose(got, want, rtol=1e-10, atol=0.0), key
 
 
 @pytest.mark.fixtures
@@ -169,7 +169,7 @@ def test_lambda_design_matrix_matches_octave(fixture):
     """Stored for the joint path only: concatenated over the five US factors
     R_Lambda is 1550x72 and would dominate the fixture budget."""
     d = fixture("gibbs_update_cond_small")
-    assert np.allclose(_moments(d).R_Lambda, d["R_Lambda"], rtol=1e-10)
+    assert np.allclose(_moments(d).R_Lambda, d["R_Lambda"], rtol=1e-10, atol=0.0)
 
 
 @pytest.mark.fixtures
@@ -183,7 +183,7 @@ def test_volatility_update_arguments_match_octave(fixture, name, key):
     d = fixture(name)
     want = d[key]
     got = np.reshape(getattr(_moments(d), key), want.shape)
-    assert np.allclose(got, want, rtol=1e-10, equal_nan=True), key
+    assert np.allclose(got, want, rtol=1e-10, atol=0.0, equal_nan=True), key
 
 
 @pytest.mark.fixtures

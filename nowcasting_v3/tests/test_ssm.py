@@ -34,10 +34,12 @@ def test_kalman_matches_octave_on_small_system(fixture):
     d = fixture("kalman_small")
     got = kalman_filter(d["Y"], _ssm(d), need_loglik=True)
     assert got.loglik == pytest.approx(float(d["loglik"].item()), rel=1e-10)
-    assert np.allclose(got.error, d["prediction__error"], rtol=1e-10, equal_nan=True)
-    assert np.allclose(got.gain, d["prediction__gain"], rtol=1e-10, equal_nan=True)
-    assert np.allclose(got.filter_mu, d["filter__mu"], rtol=1e-10)
-    assert np.allclose(got.filter_sigma, d["filter__Sigma"], rtol=1e-10)
+    assert np.allclose(got.error, d["prediction__error"], rtol=1e-10, atol=0.0,
+                       equal_nan=True)
+    assert np.allclose(got.gain, d["prediction__gain"], rtol=1e-10, atol=0.0,
+                       equal_nan=True)
+    assert np.allclose(got.filter_mu, d["filter__mu"], rtol=1e-10, atol=0.0)
+    assert np.allclose(got.filter_sigma, d["filter__Sigma"], rtol=1e-10, atol=0.0)
 
 
 @pytest.mark.fixtures
@@ -48,8 +50,8 @@ def test_kalman_matches_octave_with_an_entirely_missing_period(fixture):
     got = kalman_filter(d["Y_allmiss"], _ssm(d), need_loglik=True)
     assert got.loglik == pytest.approx(float(d["loglik_allmiss"].item()), rel=1e-10)
     assert np.allclose(got.error, d["prediction_allmiss__error"],
-                       rtol=1e-10, equal_nan=True)
-    assert np.allclose(got.filter_mu, d["filter_allmiss__mu"], rtol=1e-10)
+                       rtol=1e-10, atol=0.0, equal_nan=True)
+    assert np.allclose(got.filter_mu, d["filter_allmiss__mu"], rtol=1e-10, atol=0.0)
     assert np.isfinite(got.filter_mu).all()
 
 
@@ -58,9 +60,19 @@ def test_kalman_matches_octave_on_the_us_panel(fixture):
     """73 states, time-varying H and Sigma_eta, ragged edge, 60-period window."""
     d = fixture("kalman_us")
     got = kalman_filter(d["Y"], _ssm(d))
-    assert np.allclose(got.error, d["prediction__error"], rtol=1e-10, equal_nan=True)
-    assert np.allclose(got.inv_mse, d["prediction__invMSE"], rtol=1e-10, equal_nan=True)
-    assert np.allclose(got.gain, d["prediction__gain"], rtol=1e-10, equal_nan=True)
+    assert np.allclose(got.error, d["prediction__error"], rtol=1e-10, atol=0.0,
+                       equal_nan=True)
+    assert np.allclose(got.inv_mse, d["prediction__invMSE"], rtol=1e-10, atol=0.0,
+                       equal_nan=True)
+    # Relative tolerance is meaningless on this array's near-zero entries: the
+    # worst offending cell has |want| ~ 5e-07 against a gain scale of ~4.2, where
+    # a 3.8e-16 absolute difference (about one double-precision ulp) reads as
+    # 7.8e-10 relative. Floor atol at 1e-12 of the array's own scale, which still
+    # fails on any error at 1e-11 of scale or worse. Measured max abs deviation
+    # here: 3.0e-13, about 14x inside this floor.
+    gain_scale = np.nanmax(np.abs(d["prediction__gain"]))
+    assert np.allclose(got.gain, d["prediction__gain"], rtol=1e-10,
+                       atol=1e-12 * gain_scale, equal_nan=True)
 
 
 @pytest.mark.fixtures
@@ -70,7 +82,7 @@ def test_transition_matrices_are_indexed_one_period_back(fixture):
     wrong by one month. filter_sub__mu is stored at full length."""
     d = fixture("kalman_us")
     got = kalman_filter(d["Y"], _ssm(d))
-    assert np.allclose(got.filter_mu, d["filter_sub__mu"], rtol=1e-10)
+    assert np.allclose(got.filter_mu, d["filter_sub__mu"], rtol=1e-10, atol=0.0)
 
 
 @pytest.mark.fixtures
@@ -80,16 +92,16 @@ def test_filter_covariance_matches_at_the_subsampled_periods(fixture):
     d = fixture("kalman_us")
     got = kalman_filter(d["Y"], _ssm(d))
     assert np.allclose(got.filter_sigma[:, :, _idx(d, "sub_t_py")],
-                       d["filter_sub__Sigma"], rtol=1e-10)
+                       d["filter_sub__Sigma"], rtol=1e-10, atol=0.0)
 
 
 @pytest.mark.fixtures
 def test_fast_smoother_matches_octave(fixture):
     d = fixture("fast_smoother_us")
     got = fast_smoother(d["Y"], _ssm(d))
-    assert np.allclose(got.states, d["states"], rtol=1e-10)
-    assert np.allclose(got.m_errors, d["disturbances__m_errors"], rtol=1e-10)
-    assert np.allclose(got.shocks, d["disturbances__shocks"], rtol=1e-10)
+    assert np.allclose(got.states, d["states"], rtol=1e-10, atol=0.0)
+    assert np.allclose(got.m_errors, d["disturbances__m_errors"], rtol=1e-10, atol=0.0)
+    assert np.allclose(got.shocks, d["disturbances__shocks"], rtol=1e-10, atol=0.0)
 
 
 @pytest.mark.fixtures
@@ -98,9 +110,24 @@ def test_smoother_mses_match_at_the_subsampled_periods(fixture):
     got = fast_smoother(d["Y"], _ssm(d))
     t = _idx(d, "sub_t_py")
     ts = _idx(d, "sub_t_shocks_py")
-    assert np.allclose(got.mses.states[:, :, t], d["MSEs_sub__states"], rtol=1e-10)
-    assert np.allclose(got.mses.m_errors[:, :, t], d["MSEs_sub__m_errors"], rtol=1e-10)
-    assert np.allclose(got.mses.shocks[:, :, ts], d["MSEs_sub__shocks"], rtol=1e-10)
+    # Relative tolerance is meaningless on this array's near-zero entries: the
+    # worst offending cell has |want| ~ 2.4e-07 against a states scale of ~37.6,
+    # where a 2.6e-17 absolute difference reads as 1.1e-10 relative. Floor atol
+    # at 1e-12 of the array's own scale, which still fails on any error at 1e-11
+    # of scale or worse. Measured max abs deviation here: 7.7e-14.
+    states_scale = np.nanmax(np.abs(d["MSEs_sub__states"]))
+    assert np.allclose(got.mses.states[:, :, t], d["MSEs_sub__states"], rtol=1e-10,
+                       atol=1e-12 * states_scale)
+    assert np.allclose(got.mses.m_errors[:, :, t], d["MSEs_sub__m_errors"],
+                       rtol=1e-10, atol=0.0)
+    # Same near-zero-entry issue as states above: worst cell |want| ~ 8.3e-06
+    # against a shocks scale of ~8.6, where a 2.9e-15 absolute difference reads
+    # as 3.6e-10 relative. Floor atol at 1e-12 of the array's own scale, which
+    # still fails on any error at 1e-11 of scale or worse. Measured max abs
+    # deviation here: 1.6e-12.
+    shocks_scale = np.nanmax(np.abs(d["MSEs_sub__shocks"]))
+    assert np.allclose(got.mses.shocks[:, :, ts], d["MSEs_sub__shocks"], rtol=1e-10,
+                       atol=1e-12 * shocks_scale)
 
 
 def test_simulation_smoother_mean_converges_to_the_smoothed_state():

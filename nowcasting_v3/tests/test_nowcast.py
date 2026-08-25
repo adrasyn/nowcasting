@@ -136,12 +136,12 @@ def test_news_table_rows_are_the_releases_in_original_units(fixture):
     # `actual` is the raw new-vintage datum, de-standardised.
     raw = d["Y_location"] + d["Y_scale"] * d["Y_new"]
     assert np.allclose(np.sort(table["actual"].to_numpy()),
-                       np.sort(raw[released]), rtol=1e-10)
+                       np.sort(raw[released]), rtol=1e-10, atol=0.0)
 
     # impact = (actual - forecast) * weight, as example_nowcast.m computes it.
     assert np.allclose(table["impact"].to_numpy(),
                        (table["actual"] - table["forecast"]).to_numpy()
-                       * table["weight"].to_numpy(), rtol=1e-10)
+                       * table["weight"].to_numpy(), rtol=1e-10, atol=0.0)
 
 
 @pytest.mark.fixtures

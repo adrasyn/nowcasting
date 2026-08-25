@@ -1784,6 +1784,19 @@ Written to task level once Plan A's gate passes.
   higher lags of *both* factors, not on the inactive factor. The Python port reproduces this
   faithfully. Anyone reasoning about "the initial prior on the COVID factor" is reasoning about
   something the code does not do. Which series fixes each factor's scale (`100` in the spec CSV) is a modelling decision, not a translation. Also: whether a COVID block is still warranted for Australia, and over what window.
+
+  **Second landmine, found in Task 7 and confirmed by execution.** `Gibbs_update.m:156-158` reads
+  `if i_f == 5, sigma(i_f,:) = 1; end` — it switches stochastic volatility **off** for the fifth
+  factor, by hard-coded index, because in the US panel the fifth factor is the COVID factor. The
+  Python port reproduces this literally, as it must to reproduce the US result. **An Australian
+  panel with five or more factors silently loses that factor's stochastic volatility**, whichever
+  factor happens to land in slot five. Nothing downstream would flag it: Task 9's end-to-end gate
+  nowcasts from stored estimates and never runs the sampler, and the value does reach the published
+  nowcast through `GibbsResult.sigmas`. Task 7 added
+  `test_the_fifth_factors_volatility_is_pinned_at_one` so the index cannot drift unnoticed, but
+  that test pins the *US* behaviour — it is not a guard for Australia. Whoever designs the AU
+  blocks must decide deliberately: an explicit `restrict` field naming the no-SV factor is the
+  obvious fix, and it is a change to the model's interface, not a translation choice.
 - **B3** **The quarterly aggregation weights.** `construct_ssm` uses `[1,2,3,2,1]/9`, the Mariano-Murasawa filter for *annualised* quarterly growth. Australian headline GDP is QoQ. Either re-derive the filter for QoQ or keep the model annualised internally and convert on emit. This is a short derivation with total consequence — Fable, and write the derivation into the docs.
 
   **Landmine, found in Task 5 and confirmed in the source.** `construct_SSM.m:131` pads the *quarterly* branch of `H` using `length(vec_m)*n_f`, where `length(vec_q)*n_f` is meant — the surrounding terms on that same line all use `vec_q`. It is harmless in the US model only because `vec_m = [1,0,0,0,0]` and `vec_q = [1,2,3,2,1]/9` are both length 5.

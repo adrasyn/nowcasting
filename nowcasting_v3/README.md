@@ -476,7 +476,7 @@ looking at.
 
 ```python
 from nyfed.au.build import build_panel, estimate_short, quick_nowcast
-panel = build_panel(asof="2026-07-01")          # fetches, guards, assembles
+panel = build_panel(asof="2026-06-01")          # fetches, guards, assembles
 ```
 
 ### The 15 series
@@ -536,32 +536,63 @@ Job ads, the AiG PMI and NAB business conditions originate in media releases and
 PDFs. v3 does not run v2's R code; it reads the CSVs v2's **weekly laptop
 routine** commits to `nowcasting_v2/data_raw/`. If that routine stops, those
 files go stale, and `nyfed/au/freshness.py` is what turns silent staleness into a
-refusal. It has already happened: `aig_pmi` stopped updating in May 2026 when Ai
-Group folded its PMI into a broader index, and **a live build today correctly
-refuses**. The fix is to replace the series, not to widen the budget.
+refusal. It has already happened: `aig_pmi.csv` was last committed on 2026-06-11
+with its last observation at 2026-05-01, and **a live build today correctly
+refuses on that series and nothing else**.
 
-### Freshness budgets, and how they are set
+Ai Group has *not* stopped publishing — sourcing the publication lag turned up
+releases for May, June and July 2026, the last still reporting a separate
+manufacturing headline. What broke is v2's scraper, when the publication changed
+shape. So the fix is a working fetcher, and there is a trap waiting in it: the
+index is now a **net balance centred on zero** (−19.6 in July 2026), not the
+50-centred diffusion index the committed history carries. Repairing the scraper
+without handling that puts a level break into the Soft block.
 
-Budgets are per series, in `sources.py`, and they are set from the **publication
-cycle**, not from the reference period. This has been got wrong twice, both
-times in the same direction, because Australian series are dated to the START of
-the period they cover while publication lags by weeks:
+### Freshness budgets are derived, not typed
 
-* monthly: **75 days**. Measured 2026-08-26 — job ads and NAB conditions healthy
-  at 56 days, `aig_pmi` dead at 117.
-* quarterly: **200 days**. A quarterly observation sits at the last month of its
-  quarter and the national accounts appear about two months after the quarter
-  ends, so a completely current `gdp` reaches ~186 days just before the next
-  release; measured at 178 on 2026-08-26. The earlier 120-day budget refused
-  three healthy series, the nowcast target among them, on every build between
-  late June and early September.
+`max_age_days` is not a field. It is
 
-**Known and not yet fixed:** the 75-day monthly budget is still too tight for the
-ABS monthly series that publish about two months in arrears — building approvals,
-household spending, exports and imports were all 86 days old and perfectly
-healthy on 2026-08-26. They need their own budgets, derived per series from the
-release calendar. `test_a_build_today_is_refused_because_the_pmi_is_dead`
-records the measurement so it is not rediscovered.
+```
+publication_lag_days + release_interval_days + SLACK_DAYS
+```
+
+where `publication_lag_days` is the only timing fact the registry stores: days
+from an observation's panel date — the **start** of the period it covers — to
+the day it was actually released. Each one was read off a release page or a
+publisher's release-date list on 2026-08-26, and `SeriesSource.lag_source` says
+which. An unsourced lag would be the same failure mode one layer down: a number
+that looks measured and is not.
+
+Typing the budget in directly got it wrong three times in this project, always in
+the same direction, always because Australian series are dated to the start of
+the period they cover while publication lags by weeks. 45–60 days for monthlies
+halted healthy data; 75 still refused the four ABS monthlies that publish two
+months in arrears; 120 for quarterlies refused `gdp` itself for two months out of
+every three. The formula reproduces the numbers those guesses were reaching for
+— `gdp` at 94 + 91 = 185 against an observed healthy 178–186, building approvals
+at 62 + 31 = 93 against an observed 86 — and it is checkable against the ABS
+calendar rather than against anyone's judgement.
+
+One inequality has to hold: **`SLACK_DAYS` must stay below the shortest release
+interval.** At or above it, a series that skipped a release outright still sits
+inside its budget and the guard stops guarding.
+`test_the_slack_cannot_swallow_a_missed_release` pins it for every series.
+
+### A vintage is cut by release date, not reference date
+
+`build_panel(asof=...)` drops every observation whose **release** date —
+`observation date + publication_lag_days` — falls after `asof`. Cutting on the
+observation's own date instead, which this code did until the first review of
+Task 10, admits data nobody had yet: up to nine weeks of it on `gdp`. At
+`asof="2026-07-01"` seven of the fifteen series carried a 2026-07-01
+observation, and this repo pins the release date of one of them — the 2026-07
+commodity index came out on 4 August 2026.
+
+`build_panel` is the primitive Plan C's backtest will call. A backtest whose
+vintage at date *T* contains indicators published after *T* is the classic
+forward-looking evaluation error: it does not fail loudly, it flatters every
+result. `test_the_vintage_cut_is_by_release_date_not_by_reference_date` asserts
+the invariant for every row, and pins the commodity instance.
 
 ### The normalisation Australia had to choose for itself
 
@@ -581,7 +612,7 @@ Two things about that seed are easy to get silently wrong, and both were:
    real GDP loaded the Global factor at **−0.76 after 3,000 sweeps** while real
    consumption was pinned at +1, on a panel where the two correlate +0.12.
    `seed_lambda` now orients each column to its block's normalising series, and
-   GDP's Global loading comes out at +1.15.
+   GDP's Global loading comes out at +1.33.
 2. **Restricted loadings must start at their restriction value.** The sampler
    draws only the entries the restriction marks free and keeps the rest verbatim
    for the whole chain, so a normalising loading seeded from PCA would stay at an
@@ -600,14 +631,42 @@ toward one. What that gate does establish:
 * the engine accepts the panel and the sampler moves every free parameter and no
   restricted one;
 * the target quarter's own months drive the nowcast, and months after it move it
-  ~250 times less.
+  ~160 times less;
+* the vintage contains nothing that had not been released at `asof`.
 
-That last pair is a *consistency* check, not a leak detector, and the test says
-so: at this vintage only one post-target month exists, published by seven of
-fifteen series, which is measurably too little signal to catch a one-month
-misalignment. The structural no-leak guarantee comes from the Octave-pinned
-quarterly aggregation in `construct_ssm` plus the panel's deterministic
-alignment tests. A vintage-pair leakage test belongs to Plan C.
+That fourth point is a *consistency* check, not a leak detector, and the test
+says so. Writing April's observation into March's column — an off-by-one in
+`panel._align` — leaves the ratio above the asserted threshold at **all six
+seeds measured**, and at two of them makes it look better. One post-target
+month, published by eight of fifteen series, carries too little signal for the
+statistic to separate the cases. The structural no-leak guarantee comes from the
+Octave-pinned quarterly aggregation in `construct_ssm` plus the panel's
+deterministic alignment and release-date tests. A vintage-pair leakage test
+belongs to Plan C.
+
+### GDP's posterior is bimodal, and the gate says which mode it is in
+
+The clearest finding from running the model end to end. GDP loads only the
+Global factor and the COVID factor, and the COVID factor is active for the 22
+months (March 2020 – December 2021) containing by far the largest moves in the
+target series. It can fit those quarters almost perfectly — and when it does,
+the Global factor is left explaining a much quieter series and GDP's loading on
+it collapses toward zero, leaving a "nowcast" driven by GDP's own idiosyncratic
+dynamics that barely reads the monthly panel.
+
+These are separate basins, not tails of one distribution. A chain picks one in
+its first sweeps and stays; lengthening it to 2,000 sweeps does not resolve it.
+Measured over 400 stored draws, GDP's Global loading has a 5–95% range of
+−0.45…0.31 at seed 321 and 1.22…1.55 at seed 1, with each chain's first and last
+fifty draws in the same place. Three of six seeds land in each basin.
+
+The NY Fed does not face this: `initval.mat` ships a *fitted* starting point that
+puts the chain in the right basin. Australia starts from a bland one, so the
+gate declares its seed, runs in the identified basin, and pins the bimodality
+itself in `test_the_gdp_loading_is_bimodal_across_seeds` so it is a measured
+property rather than a footnote. **Plan C cannot leave this to the seed:** it
+needs a starting point doing `initval.mat`'s job, or a spec that does not make a
+22-month factor compete with the Global factor for the target series.
 
 ### The gate replays a recorded vintage
 

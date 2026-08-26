@@ -69,11 +69,21 @@ from nyfed.au.fetch_abs import fetch_abs_series
 
 @dataclass(frozen=True)
 class DeflatorSource:
-    """One tier of the spliced deflator."""
+    """One tier of the spliced deflator.
+
+    ``publication_lag_days`` and ``lag_source`` carry the same meaning, and
+    exist for the same reason, as the fields of ``sources.SeriesSource``:
+    ``build.build_panel`` cuts each tier at ``asof`` by RELEASE date, not by
+    observation date. A deflator that saw prices published after ``asof`` would
+    put look-ahead into the row that normalises the Global factor -- the same
+    error one layer down, and the harder one to notice.
+    """
 
     key: str
     locator: str      # "<catalogue>:<series id>", as in sources.py
     frequency: str    # "m" | "q"
+    publication_lag_days: int
+    lag_source: str
     note: str
 
 
@@ -84,6 +94,10 @@ DEFLATOR_SOURCES: tuple[DeflatorSource, ...] = (
         "cpi_monthly_live",
         "6401.0:A130607789R",
         "m",
+        58,
+        "ABS 6401.0 CPI, Australia: June 2026 released 29/07/2026 (58 days), "
+        "July 2026 released 26/08/2026 (56). Same release as the registry's "
+        "`cpi`, and the same lag.",
         "All groups CPI, seasonally adjusted, monthly, ABS 6401.0 table 640106. "
         "The same series the registry fetches as `cpi`, and deliberately so: "
         "the panel's price row and the consumption deflator should not be two "
@@ -94,6 +108,12 @@ DEFLATOR_SOURCES: tuple[DeflatorSource, ...] = (
         "cpi_monthly_ceased",
         "6484.0:A128481587A",
         "m",
+        58,
+        "ABS 6484.0 Monthly CPI Indicator, September 2025 -- its FINAL release "
+        "-- published 29/10/2025 (the frozen page `fetch_abs."
+        "CEASED_CATALOGUE_URLS` already points at). The lag still matters even "
+        "though the series is dead: a vintage built before October 2025 must "
+        "not see it.",
         "All groups CPI, seasonally adjusted, monthly, ABS 6484.0 table 648401 "
         "-- the Monthly CPI Indicator, CEASED after September 2025. Its frozen "
         "release page still serves the spreadsheet, which is why it can be "
@@ -105,6 +125,12 @@ DEFLATOR_SOURCES: tuple[DeflatorSource, ...] = (
         "cpi_quarterly",
         "6401.0:A2325846C",
         "q",
+        58,
+        "ABS 6401.0 CPI, Australia, June 2026, released 29/07/2026: \"Data for "
+        "the most recent quarter will be added to tables 17 and 18 when the "
+        "monthly CPI is published for the months of March, June, September and "
+        "December\", so the quarterly series is released with the monthly one "
+        "and carries the monthly lag, not a quarterly one.",
         "All groups CPI, Australia, quarterly, ABS 6401.0 -- 312 observations "
         "back to 1948Q3. Interpolated to monthly, so it INVENTS within-quarter "
         "movement; it is the fallback tier and covers only the months no "

@@ -23,16 +23,34 @@ before ``assemble``. ``nyfed/au/panel.py`` deliberately does not deflate --
 ``assemble`` takes whatever it is handed -- so this line is the only thing
 standing between the registry's nominal series and the Global factor.
 
-AS OF MEANS AS OF
------------------
-Every series and every deflator tier is truncated to ``asof`` before anything
-else happens. Two consequences, both wanted:
+AS OF MEANS AS OF -- BY RELEASE DATE, NOT BY REFERENCE DATE
+------------------------------------------------------------
+Every series and every deflator tier is cut at ``asof`` before anything else
+happens, and the cut is on the observation's **release** date --
+``observation date + source.publication_lag_days`` -- not on the observation's
+own date.
 
-* the panel is a real vintage -- a build at 2026-07-01 cannot see the August
-  releases, whether it is fetching live or replaying a recording made later;
+The distinction is the whole point. Australian series are dated to the START of
+the period they cover and are published weeks later, so cutting on the
+observation date admits data that had not been published at ``asof``: at
+``asof="2026-07-01"`` under the observation-date rule, seven of the fifteen
+series carried a 2026-07-01 observation, and this repo pins the release date of
+one of them -- ``tests/test_au_fetch_rba.py`` records the 2026-07 commodity
+index as released 4 August 2026, five weeks after the vintage claimed to stop.
+Against ``gdp``'s 94-day lag the gap reaches nine weeks.
+
+``build_panel`` is the primitive Plan C's backtest will call, and a backtest
+whose vintage at date T contains indicators published after T is the classic
+forward-looking evaluation error. It does not fail loudly; it flatters every
+result.
+
+Two consequences, both wanted:
+
+* the panel is a real vintage -- a build at 2026-06-01 sees exactly what a
+  person sitting at a desk on 2026-06-01 could have seen, whether it is
+  fetching live or replaying a recording made months later;
 * ``check_freshness`` measures age from the last observation **at that
-  vintage**, so a build dated to a Tuesday in July is judged on what was
-  published by that Tuesday, not on what exists now.
+  vintage**, so the guard judges the same data the model gets.
 
 Freshness is checked on the series that actually enter the panel, which means
 ``household_spending`` is checked *after* deflation: if the deflator ran out
@@ -40,20 +58,12 @@ before the nominal series did, the real row's trailing months are NaN and that
 is a genuine staleness of the row the model sees.
 
 There is no flag to skip the freshness check, and there must not be. A build
-today refuses -- ``aig_pmi``'s last observation is 2026-05-01, roughly 117 days
-against a 75-day budget, because Ai Group folded its PMI into a broader index
-in May 2026. That refusal is the guard working. The way to nowcast anyway is to
-fix or replace the dead series, not to widen the budget or add a bypass.
-
-It is not the only series named, and the rest of that message is a separate,
-open finding rather than more dead data: building approvals, household
-spending, exports and imports were all 86 days old on 2026-08-26 and entirely
-current, because they are dated to the start of their reference month and
-published about two months later. The 75-day monthly budget is too tight for
-that publication profile and those four series need their own budgets, derived
-per series from the release calendar. Reported with Task 10; recorded in
-``test_a_build_today_is_refused_because_the_pmi_is_dead`` so it is met rather
-than rediscovered.
+today refuses, and on exactly one series: ``aig_pmi`` is 117 days old against
+an 86-day budget because ``nowcasting_v2/data_raw/aig_pmi.csv`` stopped
+updating in May 2026. Ai Group is still publishing -- see ``sources.py``; it is
+v2's scraper that stopped -- so the fix is a working fetcher, and in the
+meantime the refusal is the guard doing its job. The way to nowcast anyway is
+not to widen the budget or add a bypass.
 
 VINTAGES: WHY THE GATE DOES NOT FETCH
 -------------------------------------
@@ -94,7 +104,9 @@ from nyfed.au.panel import Panel, assemble
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH, SeriesSource
 from nyfed.gibbs import GibbsResult, gibbs_sampler
-from nyfed.model import InitVal, Latent, Restrict, construct_prior, construct_ssm
+from nyfed.model import (
+    InitVal, Latent, Prior, Restrict, construct_prior, construct_ssm,
+)
 from nyfed.nowcast import point_nowcast
 from nyfed.parameters import Params, map_parameter, vec_parameter
 from nyfed.settings import GibbsSettings
@@ -158,6 +170,27 @@ class Vintage:
     series: dict[str, pd.Series]
     deflator_sources: dict[str, pd.Series]
     recorded_at: str | None = None
+
+    def as_of(self, asof) -> "Vintage":
+        """This vintage as it stood on ``asof``, cut by RELEASE date.
+
+        Public because the cut is a claim worth checking from outside, not an
+        implementation detail: ``build_panel`` applies it, and
+        ``tests/test_au_end_to_end.py`` reproduces it to verify that what
+        reaches the model is what a person at a desk that day could have seen.
+        """
+        asof = pd.Timestamp(asof)
+        return Vintage(
+            series=_as_of(
+                self.series, asof,
+                {s.key: s.publication_lag_days for s in AU_SERIES},
+            ),
+            deflator_sources=_as_of(
+                self.deflator_sources, asof,
+                {d.key: d.publication_lag_days for d in DEFLATOR_SOURCES},
+            ),
+            recorded_at=self.recorded_at,
+        )
 
 
 def fetch_vintage(sources: tuple[SeriesSource, ...] = AU_SERIES) -> Vintage:
@@ -271,9 +304,29 @@ def load_vintage(directory: str | Path) -> Vintage:
 # --------------------------------------------------------------------------- #
 
 
-def _truncate(series: dict[str, pd.Series], asof: pd.Timestamp) -> dict[str, pd.Series]:
-    """Drop every observation dated after ``asof``. See AS OF MEANS AS OF."""
-    return {key: s[s.index <= asof] for key, s in series.items()}
+def _as_of(
+    series: dict[str, pd.Series],
+    asof: pd.Timestamp,
+    lags: dict[str, int],
+) -> dict[str, pd.Series]:
+    """Drop every observation not yet RELEASED at ``asof``.
+
+    ``lags[key]`` is the series' ``publication_lag_days``, so the release date
+    of an observation is its own date plus that. Cutting on the observation date
+    instead is a nine-week look-ahead on the slowest series; see AS OF MEANS
+    AS OF.
+    """
+    missing = sorted(set(series) - set(lags))
+    if missing:
+        raise KeyError(
+            f"no publication lag for {missing}; a vintage cut-off cannot be "
+            "computed without one, and cutting on the observation date instead "
+            "would silently admit unreleased data"
+        )
+    return {
+        key: s[s.index + pd.Timedelta(days=lags[key]) <= asof]
+        for key, s in series.items()
+    }
 
 
 def build_panel(
@@ -295,8 +348,8 @@ def build_panel(
     else:
         v = load_vintage(vintage)
 
-    series = _truncate(v.series, asof_ts)
-    deflator_sources = _truncate(v.deflator_sources, asof_ts)
+    vintage_asof = v.as_of(asof_ts)
+    series, deflator_sources = vintage_asof.series, vintage_asof.deflator_sources
 
     # THE DEFLATED SERIES IS WHAT ENTERS THE PANEL, NOT THE NOMINAL ONE.
     # `assemble` will take the nominal series without complaint and the model
@@ -317,7 +370,7 @@ def build_panel(
 
 def _initial_point(
     panel: Panel, spec: ModelSpec, restrict: Restrict
-) -> tuple[np.ndarray, InitVal]:
+) -> tuple[Prior, InitVal]:
     """A neutral starting point for the sampler, and the prior mean it implies.
 
     ``InitVal`` needs a full parameter draw and a full latent draw

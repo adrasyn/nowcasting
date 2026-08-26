@@ -30,9 +30,10 @@ Two problems, and the second one is fatal:
 So the instrument is a one-sigma SHOCK, applied to the same rows, through the
 same state space, in two places:
 
-* the target quarter's own months (April-June 2026) -> the nowcast moves
-  1.087pp;
-* the months after it (July 2026) -> it moves 0.004pp, some 250 times less.
+* the target quarter's own months (January-March 2026) -> the nowcast moves
+  2.169pp;
+* the months after it (April 2026, the only post-target month this vintage
+  contains) -> it moves 0.013pp, some 160 times less.
 
 WHERE THE NO-LEAK GUARANTEE ACTUALLY COMES FROM. Not from the number above.
 Structurally, a post-target observation can only reach the Q2 fitted value
@@ -98,26 +99,56 @@ from nyfed.au.panel import Panel
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
 from nyfed.model import construct_ssm
+from nyfed.parameters import map_parameter
 from nyfed.spec import load_spec
 
 FIXTURES = Path(__file__).parent / "fixtures" / "au"
 VINTAGE = FIXTURES / "vintage"
 
-# The vintage the model path is built at. Chosen by measurement, not taste:
-# `aig_pmi` died in May 2026, so any later vintage is refused by the freshness
-# guard (correctly -- see `test_a_build_today_is_refused_because_the_pmi_is
-# _dead`), and any earlier one ends inside the target quarter and leaves no
-# post-target month to shock. 2026-07-01 is the only vintage at which every
-# series passes its budget honestly AND a month beyond the target quarter
-# exists.
-ASOF = "2026-07-01"
+# The vintage the model path is built at. Chosen by measurement, and it moved
+# once already: 2026-07-01 was picked while `build_panel` cut vintages by
+# reference date, and under an honest release-date cut that vintage contains no
+# data at all from after its target quarter -- the fastest series in the panel
+# has a 34-day lag, so nothing published inside Q2 2026 has arrived by
+# 2026-07-01 that is not itself a Q2 month.
+#
+# 2026-06-01 is the vintage that works, and there is exactly one window like it:
+#   * Q1 2026 GDP is released 2026-06-03, so at 2026-06-01 the last observed
+#     GDP is Q4 2025 and the target quarter is Q1 2026;
+#   * April 2026 is then a post-target month, and eight series had published it
+#     by 2026-06-01;
+#   * every series passes its budget -- `aig_pmi`, the binding one, is 61 days
+#     old against 86.
+# `aig_pmi` stopped updating on 2026-05-01, so no vintage after 2026-07-26
+# passes at all; that is what makes the window unique.
+ASOF = "2026-06-01"
 
-# GDP is observed through 2026-03, so the target quarter is Q2 2026.
-TARGET_QUARTER = (pd.Timestamp("2026-04-01"), pd.Timestamp("2026-06-01"))
+# GDP is observed through 2025-12, so the target quarter is Q1 2026.
+TARGET_QUARTER = (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-03-01"))
 
 # A short run: enough to show the sampler completes and does not collapse. Not
 # an accuracy check -- there is nothing to check against.
-N_GS, N_BURN, SEED = 200, 100, 321
+#
+# THE SEED IS PART OF THE MEASUREMENT, NOT A TUNING KNOB, and it is disclosed
+# rather than quietly chosen. GDP's posterior on this panel is BIMODAL: the
+# Global factor and the COVID factor compete to explain the target series, a
+# chain settles into one basin within its first sweeps and stays there, and
+# lengthening the chain does not resolve it (measured to 2,000 sweeps). Three of
+# six seeds land in the basin where GDP loads Global at ~1.3, three in the one
+# where it loads ~0.1 and the COVID factor takes ~1.4 instead. In the second
+# basin the nowcast is driven by GDP's own idiosyncratic dynamics and barely
+# reads the monthly panel at all.
+#
+# `test_the_gdp_loading_is_bimodal_across_seeds` pins that finding directly, so
+# it is a measured property of this panel rather than a footnote, and the gate
+# runs at a seed in the identified basin so that the discriminator below is
+# testing the pipeline rather than the coin flip. If the seed changes,
+# `test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor` fails and
+# names the reason.
+N_GS, N_BURN, SEED = 200, 100, 1
+
+# The Global block, column 0 of `spec.blocks`.
+I_GLOBAL = 0
 
 
 @pytest.fixture(scope="module")
@@ -215,8 +246,12 @@ def test_the_engine_accepts_the_australian_panel(panel, spec):
 def test_the_nowcast_target_is_the_quarter_after_the_last_observed_gdp(panel):
     t_now = target_periods(panel)
     last_gdp = panel.dates[np.isfinite(panel.Y[panel.i_now])][-1]
-    assert last_gdp == pd.Timestamp("2026-03-01")
-    assert list(panel.dates[t_now]) == [pd.Timestamp("2026-06-01")]
+    # Q1 2026 is released 2026-06-03, two days after this vintage, so Q4 2025
+    # is still the latest observed quarter and Q1 2026 is what is nowcast.
+    assert last_gdp == pd.Timestamp("2025-12-01")
+    assert panel.dates[t_now[0]] == TARGET_QUARTER[1]
+    assert list(panel.dates[t_now]) == [pd.Timestamp("2026-03-01"),
+                                        pd.Timestamp("2026-06-01")]
 
 
 # --------------------------------------------------------------------------- #
@@ -240,13 +275,9 @@ def test_the_household_spending_row_is_the_deflated_series_not_the_nominal_one(p
     by up to 1.47pp in a single month, which is roughly five times the panel's
     median absolute monthly move.
     """
-    vintage = load_vintage(VINTAGE)
-    asof = pd.Timestamp(ASOF)
+    vintage = load_vintage(VINTAGE).as_of(ASOF)
     nominal = vintage.series["household_spending"]
-    nominal = nominal[nominal.index <= asof]
-    real = real_household_spending(
-        nominal, {k: s[s.index <= asof] for k, s in vintage.deflator_sources.items()}
-    )
+    real = real_household_spending(nominal, vintage.deflator_sources)
     assert real.iloc[-1] < 0.8 * nominal.iloc[-1], (
         "the deflated series is not materially below the nominal one; the "
         "deflator did nothing"
@@ -278,32 +309,64 @@ def test_the_household_spending_row_is_the_deflated_series_not_the_nominal_one(p
 def test_a_build_today_is_refused_because_the_pmi_is_dead():
     """Not a bug: the guard doing its job, pinned so it cannot be quietly lost.
 
-    ``aig_pmi``'s last observation is 2026-05-01. Ai Group folded its
-    Manufacturing PMI into a broader index in May 2026 with no separate release
-    since, and v2's scraper stopped seeing releases; the series is dead, not
-    late. Against a 75-day monthly budget every build from mid-July 2026 onward
-    refuses, and the way to nowcast again is to replace the series, not to widen
-    the budget or add a bypass.
+    ``nowcasting_v2/data_raw/aig_pmi.csv`` was last committed on 2026-06-11 with
+    its last observation at 2026-05-01, so the row v3 reads stopped months ago.
+    Ai Group itself has NOT stopped -- sourcing the publication lag turned up
+    releases for May, June and July 2026, the last of which still reports a
+    separate manufacturing headline -- so what is dead is v2's scraper, and the
+    fix is a working fetcher rather than a replacement series. Either way the
+    build must refuse, and the way to nowcast again is not to widen the budget.
 
-    Four healthy ABS monthly series -- building approvals, household spending,
-    exports and imports -- are ALSO named at 86 days on 2026-08-26, and they
-    are not dead: all four are dated to the start of their reference month and
-    published about two months later, so 86 days is an ordinary age for them
-    and the 75-day budget is too tight. That is a separate finding, reported
-    with Task 10 rather than fixed here, and it is asserted below so the next
-    reader meets it rather than rediscovering it.
+    IT REFUSES ON THAT SERIES AND NOTHING ELSE, which is the round-1 finding
+    closed. Under the old hand-typed 75-day monthly budget this build also named
+    building approvals, household spending, exports and imports -- all four
+    entirely current, all four dated to the start of their reference month and
+    published about two months later. Deriving the budget from a sourced
+    publication lag passes them and still catches the dead row, so the negative
+    assertion below is the load-bearing half of this test.
     """
     with pytest.raises(StaleSeriesError) as excinfo:
         build_panel(asof=str(pd.Timestamp.today().date()), vintage=VINTAGE)
 
     stale = {key: age for key, age, _ in excinfo.value.stale}
-    assert "aig_pmi" in stale
+    assert set(stale) == {"aig_pmi"}, f"expected only aig_pmi, got {sorted(stale)}"
     assert stale["aig_pmi"] > 100
     assert "aig_pmi" in str(excinfo.value)
-    assert {"building_approvals", "exports", "imports"} <= set(stale), (
-        "the monthly-budget finding this test records has changed; re-measure "
-        "before editing the assertion"
+
+
+def test_the_vintage_cut_is_by_release_date_not_by_reference_date(panel):
+    """The look-ahead this task shipped in round 1, now a standing check.
+
+    Australian series are dated to the START of the period they cover and are
+    published weeks later, so cutting a vintage at ``asof`` on the observation's
+    own date admits data nobody had yet -- up to nine weeks of it on ``gdp``.
+    The invariant is the one a person at a desk would recognise: nothing in the
+    panel can have a release date after the vintage.
+
+    The instance is pinned as well as the rule, against a release date this repo
+    verified independently: ``test_commodity_prices_reproduces_the_published
+    _release`` records the 2026-07 commodity index as released 4 August 2026,
+    a 34-day lag, which puts the 2026-05 observation at 2026-06-04 -- three days
+    after this vintage. So April is the last commodity month a 2026-06-01
+    vintage may contain, and the reference-date rule would have given it May.
+    """
+    asof = pd.Timestamp(ASOF)
+    lags = {s.key: s.publication_lag_days for s in AU_SERIES}
+
+    unreleased = []
+    for row, key in enumerate(panel.series_id):
+        observed = panel.dates[np.isfinite(panel.Y[row])]
+        released = observed[-1] + pd.Timedelta(days=lags[key])
+        if released > asof:
+            unreleased.append((key, str(observed[-1].date()), str(released.date())))
+    assert not unreleased, (
+        f"observations in the panel that had not been released at {ASOF}: "
+        f"{unreleased}"
     )
+
+    commodity = panel.series_id.index("commodity_prices")
+    observed = panel.dates[np.isfinite(panel.Y[commodity])]
+    assert observed[-1] == pd.Timestamp("2026-04-01")
 
 
 # --------------------------------------------------------------------------- #
@@ -327,6 +390,12 @@ def test_the_recorded_vintage_agrees_with_the_payloads_verified_against_ABS(spec
     overlap they must agree exactly. Without this, a vintage recorded from the
     wrong series -- or corrupted in the CSV round trip -- would build a panel,
     standardise cleanly and estimate happily.
+
+    THIS COVERS 13 OF THE 15 ROWS. ``job_ads``, ``aig_pmi`` and
+    ``nab_conditions`` are recorded in the vintage like everything else, but
+    they come from v2's committed CSVs and have no release-pinned payload in
+    this repo to be checked against -- so for those three the recording is
+    trusted, not checked, and that is the honest description of it.
     """
     period_freq = {"m": "M", "q": "Q-DEC"}
     vintage = load_vintage(VINTAGE)
@@ -344,7 +413,10 @@ def test_the_recorded_vintage_agrees_with_the_payloads_verified_against_ABS(spec
                                 parse_dates=True)
             recorded = parse_rba_frame(frame, source.locator.split(":")[1])
         else:
-            continue      # the v2 CSVs are read from v2's tree, not recorded here
+            # The v2 rows ARE in the recording; what they lack is a
+            # release-pinned payload to check against, so "checked, not
+            # trusted" holds for 13 of the 15 rows and is stated as such.
+            continue
         overlap = recorded.index.intersection(vintage.series[source.key].index)
         assert len(overlap) >= 24, f"{source.key}: only {len(overlap)} months overlap"
         np.testing.assert_allclose(
@@ -452,11 +524,15 @@ def test_the_target_quarters_own_months_drive_the_nowcast(panel, spec, fitted):
     nowcast did not move" test. This is the arm that fails in that case, and it
     is why the sensitivity comparison below means anything at all.
 
-    Threshold from measurement across six sampler seeds, not from the one seed
-    this runs at: a one-sigma shock across April-June 2026 moved the nowcast by
-    0.149, 0.350, 0.573, 1.087, 2.115 and 2.855pp. The spread is large because
-    300 sweeps from a bland start is a short chain; the floor is set an order of
-    magnitude below the smallest of them.
+    Threshold from measurement, and the measurement has TWO populations, which
+    is the point of ``test_the_gdp_loading_is_bimodal_across_seeds``. In the
+    basin this gate runs in -- GDP loading the Global factor -- a one-sigma
+    shock across January-March 2026 moved the nowcast by 2.169, 2.345 and
+    1.833pp at seeds 1, 3 and 7. In the other basin it moved 0.015, 0.316 and
+    0.185pp at seeds 321, 2 and 99, because there GDP barely loads the factor
+    the monthly series feed. The floor is set well below the first population
+    and well above the second, so this test asserts that the gate is in the
+    basin it says it is in as much as it asserts that the pipeline reads data.
 
     CONFIRMED BY BREAKING IT, in the shape the bug would really take: with the
     target quarter's months dropped from the panel -- the alignment failure Task
@@ -470,9 +546,10 @@ def test_the_target_quarters_own_months_drive_the_nowcast(panel, spec, fitted):
     base = quick_nowcast(panel, ssm=ssm, t_now=t_now)
 
     move = _shock_move(panel, ssm, t_now, monthly, inside, base)
-    assert move > 0.10, (
+    assert move > 0.5, (
         f"a one-sigma shock to the target quarter's own months moved the "
-        f"nowcast by only {move:.4f}pp; the model is not reading them"
+        f"nowcast by only {move:.4f}pp; either the model is not reading them or "
+        "the chain is in the basin where GDP does not load the Global factor"
     )
 
     # The break, run here rather than described: with those months emptied the
@@ -498,25 +575,34 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
     the factor path in June.
 
     WHAT THIS DOES NOT ESTABLISH. It does not detect a one-month misalignment.
-    Measured, by writing July's observation into June's column -- what an
-    off-by-one in ``panel._align`` would do -- the ratio falls from 252 to 25 at
-    seed 321 and from 30 to 7 at seed 1, but stays at 47 and 29 at seeds 3 and
-    7, inside the healthy range. One post-target month, published by seven of
-    fifteen series, is not enough signal to separate the cases. The structural
+    Measured across six sampler seeds, the probe is caught at NONE of them: the
+    healthy ratios are 17.6, 162.5, 52.6, 365.2, 395.4 and 17.5, and with
+    April's observation written into March's column they become 49.5, 37.8,
+    16.9, 22.9, 109.8 and 320.4 -- every one still above the asserted 10, and
+    two of them higher than the healthy value. (Round 1 of this task reported
+    "2 of 4 seeds" on a different vintage; the correct count there was 1 of 4,
+    and on an honest vintage it is 0 of 6.) One post-target month, published by
+    eight of the fifteen series, is not enough signal for this statistic to
+    separate the cases. The structural
     guarantee is elsewhere (the Octave-pinned quarterly aggregation, plus the
     panel's deterministic alignment tests); this is a consistency check on top
     of it, and Plan C should add a vintage-pair test when more than one
     post-target month exists.
 
-    Thresholds from the same six seeds: the post-target move was 0.003, 0.007,
-    0.013, 0.038 and 0.071pp, and the ratio never fell below 29.6.
+    Thresholds from the same six seeds: the post-target move was 0.0008, 0.0046,
+    0.0060, 0.0064, 0.0106 and 0.0134pp, and the ratio never fell below 17.5 --
+    in EITHER basin, which is why the ratio rather than the level is what this
+    test asserts.
     """
     _, ssm, t_now = fitted
     monthly = np.array([f == "m" for f in spec.frequency])
     inside = (panel.dates >= TARGET_QUARTER[0]) & (panel.dates <= TARGET_QUARTER[1])
     after = panel.dates > TARGET_QUARTER[1]
-    assert after.sum() == 1
-    assert np.isfinite(panel.Y[np.ix_(monthly, after)]).sum() >= 5, (
+    # Three columns after the target quarter, but only April carries data: the
+    # fastest series in the panel has a 34-day lag, so May and June had not been
+    # published at this vintage. Eight of the twelve monthly series had April.
+    assert after.sum() == 3
+    assert np.isfinite(panel.Y[np.ix_(monthly, after)]).sum() == 8, (
         "no post-target observations to shock; the comparison would be vacuous"
     )
 
@@ -531,4 +617,92 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
     assert inside_move > 10 * after_move, (
         f"target-quarter shock {inside_move:.4f}pp against post-target "
         f"{after_move:.4f}pp: the two are too close to tell apart"
+    )
+
+
+@pytest.mark.slow
+def test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor(panel, spec, fitted):
+    """Pin the OUTCOME of the seed-orientation fix, not only its rule.
+
+    ``test_the_seed_agrees_in_sign_with_each_block_s_normalising_series`` enforces
+    the rule that produced this -- orient each PCA column to its block's
+    normalising series -- but a rule test cannot see the symptom the defect
+    produced, which was real GDP growth loading the broadest factor against real
+    consumption growth. This is that symptom, measured on the estimated model.
+
+    It is also the gate's declaration of which posterior mode it is in. See
+    ``test_the_gdp_loading_is_bimodal_across_seeds``: at ``SEED`` the chain
+    settles with GDP's Global loading near 1.3, and every sensitivity number in
+    this module is a number from that basin.
+
+    The normalising loadings are checked in the same breath. They are restricted,
+    so they must come back at EXACTLY 1.0; anything else means a normaliser
+    drifted and the factor it defines has silently rescaled.
+    """
+    result, _, _ = fitted
+    n, n_f = spec.blocks.shape
+    param = map_parameter(np.median(result.params, axis=1), (n, n_f, P_F, P_E))
+
+    i_gdp = panel.series_id.index("gdp")
+    assert param.Lambda[i_gdp, I_GLOBAL] > 0.5, (
+        f"GDP's Global loading is {param.Lambda[i_gdp, I_GLOBAL]:.3f}; before the "
+        "seed-orientation fix it was -0.76 after 3,000 sweeps, against a "
+        "normaliser pinned at +1"
+    )
+    i_hh = panel.series_id.index("household_spending")
+    assert param.Lambda[i_hh, I_GLOBAL] == 1.0
+
+    normalising = np.nan_to_num(spec.blocks) == 1.0
+    assert normalising.sum() == 4
+    np.testing.assert_array_equal(param.Lambda[normalising], np.ones(4))
+
+
+@pytest.mark.slow
+def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec):
+    """A finding, pinned as a measurement so it cannot be mistaken for noise.
+
+    GDP loads only the Global factor and the COVID factor. The COVID factor is
+    active for 22 months (March 2020 to December 2021) that contain by far the
+    largest moves in the target series, so it can fit those quarters almost
+    perfectly -- and when it does, the Global factor is left explaining a much
+    quieter series and GDP's loading on it collapses toward zero. The two
+    outcomes are separate basins, not tails of one distribution, and a chain
+    picks one in its first sweeps and stays: measured at seed 321 over 400 stored
+    draws, GDP's Global loading has a 5-95% range of -0.45..0.31 with the first
+    and last fifty draws averaging -0.16 and -0.01, while at seed 1 the same
+    range is 1.22..1.55. Lengthening the chain to 2,000 sweeps does not resolve
+    it.
+
+    THIS IS WHY THE GATE DECLARES ITS SEED. The NY Fed does not face the coin
+    flip because ``initval.mat`` ships a fitted starting point that puts the
+    chain in the right basin; Australia starts from a bland one. Plan C's
+    backtest cannot leave this to the seed -- it needs a starting point with the
+    same job as ``initval.mat``, or a spec that does not make one factor's
+    22-month window compete with the other for the target series.
+
+    Two seeds, one from each basin, so the test costs two short chains.
+    """
+    n, n_f = spec.blocks.shape
+    i_gdp, i_covid = panel.series_id.index("gdp"), spec.block_names.index("COVID")
+
+    loadings = {}
+    for seed in (SEED, 321):
+        result = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=seed)
+        param = map_parameter(np.median(result.params, axis=1), (n, n_f, P_F, P_E))
+        loadings[seed] = (float(param.Lambda[i_gdp, I_GLOBAL]),
+                          float(param.Lambda[i_gdp, i_covid]))
+
+    identified, collapsed = loadings[SEED], loadings[321]
+    assert identified[0] > 0.5, f"seed {SEED} is no longer in the identified basin"
+    assert collapsed[0] < 0.5, (
+        "seed 321 no longer lands in the collapsed basin -- if that is a real "
+        "improvement, re-measure the spread before relaxing anything that "
+        "depends on it"
+    )
+    # The trade-off is the mechanism, so check it rather than only the symptom:
+    # the basin that loses the Global loading gains the COVID one.
+    assert collapsed[1] > identified[1], (
+        f"GDP's COVID loading is {collapsed[1]:.3f} in the collapsed basin "
+        f"against {identified[1]:.3f} in the identified one; the two factors "
+        "were expected to be competing for the same variance"
     )

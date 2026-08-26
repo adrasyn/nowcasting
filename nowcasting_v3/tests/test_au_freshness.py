@@ -10,7 +10,9 @@ import pandas as pd
 import pytest
 
 from nyfed.au.freshness import StaleSeriesError, check_freshness, series_age_days
-from nyfed.au.sources import AU_SERIES, SeriesSource
+from nyfed.au.sources import (
+    RELEASE_INTERVAL_DAYS, SLACK_DAYS, AU_SERIES, SeriesSource,
+)
 
 ASOF = pd.Timestamp("2026-08-01")
 
@@ -21,8 +23,16 @@ def _series(last: str, n: int = 24, freq: str = "MS") -> pd.Series:
 
 
 def _sources(*specs) -> tuple[SeriesSource, ...]:
+    """Synthetic registry rows. ``specs`` are ``(key, frequency, lag)``.
+
+    The third element is the PUBLICATION LAG, not the budget: ``max_age_days``
+    is derived (``lag + release interval + slack``) and is not a field any more.
+    A test that wants a particular budget has to choose a lag, which is the
+    point -- the budget is not a number anybody types.
+    """
     return tuple(
-        SeriesSource(k, k, k, "abs", "x:y", f, age) for k, f, age in specs
+        SeriesSource(k, k, k, "abs", "x:y", f, lag, "synthetic, for this test")
+        for k, f, lag in specs
     )
 
 
@@ -39,13 +49,13 @@ def test_trailing_nans_do_not_count_as_observations():
 
 
 def test_a_fresh_panel_passes():
-    sources = _sources(("a", "m", 45), ("b", "m", 45))
+    sources = _sources(("a", "m", 14), ("b", "m", 14))
     check_freshness({"a": _series("2026-07-01"), "b": _series("2026-07-01")},
                     ASOF, sources=sources)
 
 
 def test_a_stale_series_raises_and_names_itself():
-    sources = _sources(("fresh", "m", 45), ("dead", "m", 45))
+    sources = _sources(("fresh", "m", 14), ("dead", "m", 14))
     with pytest.raises(StaleSeriesError) as excinfo:
         check_freshness({"fresh": _series("2026-07-01"), "dead": _series("2026-01-01")},
                         ASOF, sources=sources)
@@ -56,7 +66,7 @@ def test_a_stale_series_raises_and_names_itself():
 
 def test_every_stale_series_is_reported_not_just_the_first():
     """Reporting one at a time turns one broken feed into three debug cycles."""
-    sources = _sources(("a", "m", 45), ("b", "m", 45), ("c", "m", 45))
+    sources = _sources(("a", "m", 14), ("b", "m", 14), ("c", "m", 14))
     with pytest.raises(StaleSeriesError) as excinfo:
         check_freshness(
             {"a": _series("2026-01-01"), "b": _series("2026-07-01"),
@@ -67,7 +77,7 @@ def test_every_stale_series_is_reported_not_just_the_first():
 
 
 def test_a_missing_series_is_stale_not_absent():
-    sources = _sources(("a", "m", 45), ("gone", "m", 45))
+    sources = _sources(("a", "m", 14), ("gone", "m", 14))
     with pytest.raises(StaleSeriesError) as excinfo:
         check_freshness({"a": _series("2026-07-01")}, ASOF, sources=sources)
     assert "gone" in str(excinfo.value)
@@ -116,3 +126,42 @@ def test_the_quarterly_budget_passes_a_healthy_series_and_still_catches_a_dead_o
     with pytest.raises(StaleSeriesError) as excinfo:
         check_freshness(missed, pd.Timestamp("2026-09-02"), sources=tuple(quarterly))
     assert {k for k, _, _ in excinfo.value.stale} == {s.key for s in quarterly}
+
+
+def test_the_budget_is_derived_from_the_publication_lag_not_typed_in():
+    """``max_age_days`` was a hand-typed field and was wrong three times running.
+
+    It is now a property, so there is no number to mistype -- but a property can
+    be reimplemented wrongly too, so check the arithmetic against the registry's
+    own two primitives, and check that the lags themselves carry a source.
+    """
+    for source in AU_SERIES:
+        assert source.max_age_days == (
+            source.publication_lag_days
+            + RELEASE_INTERVAL_DAYS[source.frequency]
+            + SLACK_DAYS
+        ), source.key
+        assert source.publication_lag_days > 0, source.key
+        assert len(source.lag_source) > 40, (
+            f"{source.key}'s lag has no usable provenance; an unsourced lag is "
+            "a number that looks measured and is not"
+        )
+
+
+def test_the_slack_cannot_swallow_a_missed_release():
+    """The one inequality the budget formula has to satisfy.
+
+    ``max_age_days = lag + interval + slack``. A series that missed a release
+    outright reaches ``lag + 2 * interval``. So the guard only guards while
+    ``slack < interval``; at or above it a skipped release sits inside the
+    budget for ever and the whole mechanism is decorative.
+    """
+    assert SLACK_DAYS < min(RELEASE_INTERVAL_DAYS.values())
+
+    for source in AU_SERIES:
+        missed = source.publication_lag_days + 2 * source.release_interval_days
+        assert missed > source.max_age_days, (
+            f"{source.key}: a series that skipped a release would be {missed} "
+            f"days old against a {source.max_age_days}-day budget, and would "
+            "never be caught"
+        )

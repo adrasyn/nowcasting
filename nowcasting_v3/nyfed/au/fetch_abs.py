@@ -7,8 +7,6 @@ else. Every test in this project exercises the second half only.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 
 
@@ -46,6 +44,19 @@ def parse_abs_frame(frame: pd.DataFrame, series_id: str) -> pd.Series:
     if series_id in frame.columns:
         column = frame[series_id]
     elif frame.shape[1] == 1:
+        # Every ABS payload is single-column, so this branch is the normal path
+        # for an unlabelled frame -- but it must not launder a labelled one. A
+        # frame carrying some *other* series id would otherwise be accepted and
+        # then renamed to the requested id, which is exactly how a fixture
+        # recorded under a superseded id parses clean and pins the stale
+        # series' values. This session sat in that state: the registry moved to
+        # 6401.0 while the recorded CPI payloads still said 6484.0.
+        only = frame.columns[0]
+        if isinstance(only, str) and only.strip() and only != series_id:
+            raise KeyError(
+                f"frame is labelled {only!r} but {series_id!r} was requested; "
+                "refusing to rename it -- re-record the payload, or fix the locator"
+            )
         column = frame.iloc[:, 0]
     else:
         raise KeyError(
@@ -62,8 +73,14 @@ def parse_abs_frame(frame: pd.DataFrame, series_id: str) -> pd.Series:
     return series
 
 
-def fetch_abs_series(locator: str, *, cache_dir: Path | None = None) -> pd.Series:
-    """Retrieve one ABS series. ``locator`` is ``"<catalogue>:<series id>"``."""
+def fetch_abs_series(locator: str) -> pd.Series:
+    """Retrieve one ABS series. ``locator`` is ``"<catalogue>:<series id>"``.
+
+    There is deliberately no ``cache_dir``: readabs 0.2.6 takes no such
+    argument, so a parameter here could not be forwarded and would silently
+    leave every caller writing to the ``.readabs_cache/`` directory readabs
+    creates in the working tree.
+    """
     import readabs as ra  # imported lazily: tests never need it
 
     cat, series_id = locator.split(":", 1)

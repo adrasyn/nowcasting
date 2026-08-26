@@ -1036,17 +1036,48 @@ Queried against the ABS catalogue, the available variants are:
 **There is no monthly real seasonally-adjusted series**, so a monthly panel row mirroring
 `PCEC96` must be derived by deflation.
 
-**Deflate by the quarterly CPI All-groups index (`6401.0:A2325846C`) interpolated to
-monthly** — `real = nominal / cpi * 100` — mirroring v2's method. Not by the monthly CPI
-indicator already in the panel: catalogue `6484.0` is absent from the ABS Time Series
-Directory and resolves only through a URL override, and its history is short enough to
-truncate a series that starts in 2012-07 and sets the Global factor's scale. `6401.0` carries
-312 observations back to 1948Q3 and resolves normally.
+**Deflate by a spliced monthly CPI, falling back to the quarterly index only where no
+monthly one exists.** Amended 2026-08-26 on James's instruction, replacing an earlier ruling
+that mirrored v2's quarterly-interpolated method.
 
-Add a test that the deflated series is **below** the nominal one for every month after the
-deflator's base period, and that its history still starts at the nominal series' start —
-a deflation that silently truncates history would quietly shrink the panel's longest
-consumption record.
+v2 deflates with the quarterly All-groups CPI interpolated to monthly. That invents
+within-quarter price movement that never happened — its derived `cpi_monthly.csv` runs back to
+1948-09, and no monthly Australian CPI reaches 1948. v2 will be fixed separately; v3 should
+not ship the same method.
+
+**Australia's monthly CPI history is split across a dead publication and a live one**, verified
+by querying the catalogue:
+
+| source | series | coverage |
+|---|---|---|
+| `6484.0` Monthly CPI Indicator — **ceased Sept 2025**, frozen page still serves data | All-groups monthly | ~2018 → Sept 2025 |
+| `6401.0` live | `A130607789R`, All groups CPI, seasonally adjusted | 2024-04 → current (28 obs at 2026-08) |
+| `6401.0` quarterly | `A2325846C`, All groups CPI | 1948Q3 → current (312 obs) |
+
+Household spending (`A130200584T`) starts **2012-07**, so a monthly-only deflator would cut six
+years off the series that normalises the Global factor. Hence the hybrid.
+
+**Build the deflator in this precedence, most-preferred first:**
+
+1. `6401.0:A130607789R` where present (2024-04 onward)
+2. the `6484.0` monthly indicator where present (~2018 → 2025-09) — needs a URL override, the
+   same mechanism the ceased Retail Trade catalogue required; it was removed from
+   `fetch_abs.py` when CPI moved catalogues and must come back for this
+3. `6401.0:A2325846C` interpolated to monthly, for everything earlier
+
+**Splice by ratio, not by concatenation.** The three sources are index numbers on different
+bases. Joining them end-to-end puts a step change in the deflator at each seam, which becomes
+a spurious spike in deflated household spending — and `pch` turns a spike into a large false
+month. At each join, rescale the older series by the ratio of the two series over their
+overlap, so the level is continuous.
+
+**Two tests, both of which must be able to fail:**
+
+- The spliced monthly deflator and the quarterly-interpolated one agree within 1% across their
+  overlap. A bad rebase shows up here immediately.
+- The deflated household spending series **starts at the same month as the nominal one**
+  (2012-07). A deflator that silently truncates history would quietly shorten the panel's
+  longest consumption record, and the model would run.
 
 - [ ] **Step 1: Write the failing test**
 

@@ -1,4 +1,4 @@
-"""The 17-series Australian panel registry.
+"""The 16-series Australian panel registry.
 
 One entry per series, in spec CSV row order: monthly first, then quarterly.
 ``load_spec`` permutes its fields by frequency and raises if that permutation
@@ -9,10 +9,35 @@ raw CSV order and is never permuted with it. So this order is load-bearing.
 fetcher's argument: an ABS series id, an RBA table code, or a v2 CSV stem.
 
 ``max_age_days`` is the staleness budget enforced in ``freshness.py``. It is
-set from the publication cycle plus a tolerance, not from convenience: three
+set from the publication cycle plus a tolerance, not from convenience: four
 Australian monthly indicators were discontinued between March 2025 and June
 2026, and a discontinued series does not raise an error, it just stops
 updating.
+
+No ``retail_sales`` entry: ABS ceased "Retail Trade, Australia" (cat. 8501.0)
+after the June 2025 release, published 31 July 2025 as its final edition --
+the fourth Australian monthly indicator this project has lost, after Weekly
+Payroll Jobs (Mar 2025), the Monthly Business Turnover Indicator (Nov 2025)
+and the Monthly Employee Earnings Indicator (Jun 2026). A permanently frozen
+series would fail ``check_freshness`` on every run rather than the runs
+where staleness is a real signal, so the series is dropped rather than kept
+and exempted. ``household_spending`` (the Monthly Household Spending
+Indicator, ABS's own replacement) already covers this ground and covers it
+better: ~68% of household consumption against Retail Trade's ~33%, and a
+stronger pre-COVID GDP correlation in v2's panel notes (+0.29 vs +0.06). Do
+not add retail sales back without first checking whether ABS has resumed it.
+
+``cpi`` and ``cpi_trimmed`` locators point at catalogue 6401.0, not 6484.0.
+ABS retired the standalone "Monthly CPI Indicator" (6484.0) in favour of
+folding monthly data into the main "Consumer Price Index, Australia"
+(6401.0) collection from the October 2025 (pre-basis-change) release
+onward; 6484.0's series stop dead at 2025-09-01 and will never update. The
+replacement monthly, seasonally-adjusted analytical series (table 640106)
+only goes back to 2024-04-01 -- about 28 months of history as of this task,
+against 6484.0's ~8 years. That is a real short-history constraint on the
+Nominal block's normaliser and on the price factor generally; it is not a
+substitution of something close, it is what currently exists. Re-check ABS
+for a longer back series before this becomes a problem for estimation.
 """
 
 from __future__ import annotations
@@ -52,27 +77,25 @@ AU_SERIES: tuple[SeriesSource, ...] = (
                  "v2", "nab_cond", "m", 45),
     SeriesSource("building_approvals", "building_approvals", "Building Approvals",
                  "abs", "8731.0:A422070J", "m", 60),
-    SeriesSource("retail_sales", "retail_sales", "Retail Sales",
-                 "abs", "8501.0:A3348585R", "m", 60),
     SeriesSource("household_spending", "household_spending",
                  "Household Spending (real)",
                  "abs", "5682.0:A130200584T", "m", 60),
     SeriesSource("exports", "exports", "Exports",
                  "abs", "5368.0:A2718577A", "m", 60),
     SeriesSource("imports", "imports", "Imports",
-                 "abs", "5368.0:RESOLVE_IMPORTS", "m", 60),
+                 "abs", "5368.0:A2718603V", "m", 60),
     SeriesSource("commodity_prices", "commodity_prices",
                  "RBA Index of Commodity Prices",
                  "rba", "I2", "m", 45),
     SeriesSource("cpi", "cpi", "Monthly CPI",
-                 "abs", "6484.0:RESOLVE_CPI", "m", 60),
+                 "abs", "6401.0:A130607789R", "m", 60),
     SeriesSource("cpi_trimmed", "cpi_trimmed", "Monthly CPI trimmed mean",
-                 "abs", "6484.0:RESOLVE_CPI_TRIMMED", "m", 60),
+                 "abs", "6401.0:A130400381L", "m", 60),
     # --- quarterly ---------------------------------------------------------
     SeriesSource("unit_labour_cost", "unit_labour_cost", "Unit labour cost",
-                 "abs", "5206.0:RESOLVE_ULC", "q", 120),
+                 "abs", "5206.0:A2433074L", "q", 120),
     SeriesSource("gdi", "gdi", "Real gross domestic income",
-                 "abs", "5206.0:RESOLVE_GDI", "q", 120),
+                 "abs", "5206.0:A2304410X", "q", 120),
     SeriesSource("gdp", "gdp", "Real gross domestic product",
-                 "abs", "5206.0:RESOLVE_GDP", "q", 120),
+                 "abs", "5206.0:A2304402X", "q", 120),
 )

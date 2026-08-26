@@ -6,7 +6,6 @@ vacancy_index,Internet Vacancy Index,m,0,1,0,0,1,1,1,Index,chg,Labor
 aig_pmi,AiG Manufacturing PMI,m,0,1,1,0,0,1,1,Index,lin,Surveys
 nab_conditions,NAB Business Conditions,m,0,1,1,0,0,1,1,Index,lin,Surveys
 building_approvals,Building Approvals,m,0,1,0,0,0,1,1,Number,chg,Housing and Construction
-retail_sales,Retail Sales,m,0,1,0,1,0,1,1,Millions of Dollars,pch,Retail and Consumption
 household_spending,Household Spending (real),m,0,100,0,0,0,1,1,Millions of Dollars,pch,Retail and Consumption
 exports,Exports,m,0,1,0,1,0,1,1,Millions of Dollars,pch,International Trade
 imports,Imports,m,0,1,0,1,0,1,1,Millions of Dollars,pch,International Trade

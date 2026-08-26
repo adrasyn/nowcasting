@@ -319,7 +319,7 @@ AU_SERIES: tuple[SeriesSource, ...] = (
 )
 ```
 
-Five locators carry a `RESOLVE_` placeholder. **These are resolved in Task 2, not invented here** — Task 2's first step is a discovery step with a test that pins each resolved id. Leaving them visibly unresolved is deliberate: a wrong ABS series id silently returns a different economic series, so it must be a step with its own gate rather than a value copied from memory.
+Six locators carry a `RESOLVE_` placeholder — `imports`, `cpi`, `cpi_trimmed`, `unit_labour_cost`, `gdi` and `gdp`. **These are resolved in Task 2, not invented here** — Task 2's first step is a discovery step with a test that pins each resolved id. Leaving them visibly unresolved is deliberate: a wrong ABS series id silently returns a different economic series, so it must be a step with its own gate rather than a value copied from memory.
 
 - [ ] **Step 4: Write the spec CSV**
 
@@ -381,9 +381,9 @@ git commit -m "feat(v3): Australian series registry and spec CSV"
   - `fetch_abs_series(locator: str, *, cache_dir: Path | None = None) -> pd.Series` — a `DatetimeIndex`-keyed float series, index normalised to first-of-month, sorted ascending, no duplicate dates
   - `parse_abs_frame(frame: pd.DataFrame, series_id: str) -> pd.Series` — the pure parsing half, unit-testable from a fixture with no network
 
-### Resolving the five unknown ids
+### Resolving the six unknown ids
 
-`readabs` retrieves by catalogue and series id. The five unresolved series are imports (5368.0), monthly CPI and its trimmed mean (6484.0), and unit labour cost, GDI and GDP (5206.0).
+`readabs` retrieves by catalogue and series id. The six unresolved series are imports (5368.0), monthly CPI and its trimmed mean (6484.0), and unit labour cost, GDI and GDP (5206.0).
 
 Resolve each with `readabs.read_abs_cat` and a description match, then **pin the resolved id in a test** so it cannot drift:
 

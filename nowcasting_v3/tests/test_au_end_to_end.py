@@ -37,8 +37,9 @@ same state space, in two places:
   contains) -> it moves 0.013pp, some 160 times less.
 
 WHERE THE NO-LEAK GUARANTEE ACTUALLY COMES FROM. Not from the number above.
-Structurally, a post-target observation can only reach the Q2 fitted value
-through the smoothed state, because the Mariano-Murasawa aggregation in
+Structurally, a post-target observation can only reach the target quarter's
+fitted value -- Q1 2026 at this vintage -- through the smoothed state, because
+the Mariano-Murasawa aggregation in
 ``construct_ssm`` -- weights ``[1 2 3 2 1]/9`` over the quarter's own months --
 is what maps months onto a quarterly observation, and that is engine code
 pinned against Octave in Task 1. What is left to check on the Australian side
@@ -575,6 +576,10 @@ def test_the_target_quarters_own_months_drive_the_nowcast(panel, spec, fitted):
     assert inside.sum() == 3
     base = quick_nowcast(panel, ssm=ssm, t_now=t_now)
 
+    # 0.5 PERCENTAGE POINTS OF NOWCAST RESPONSE -- not the 0.75 loading floor in
+    # `COLLAPSED_GLOBAL_LOADING`, which shares two digits and nothing else. This
+    # one is measured from the identified basin's responses (1.833, 2.169,
+    # 2.345pp); do not "unify" the two.
     move = _shock_move(panel, ssm, t_now, monthly, inside, base)
     assert move > 0.5, (
         f"a one-sigma shock to the target quarter's own months moved the "
@@ -674,10 +679,14 @@ def test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor(panel, spe
     param = map_parameter(np.median(result.params, axis=1), (n, n_f, P_F, P_E))
 
     i_gdp = panel.series_id.index("gdp")
-    assert param.Lambda[i_gdp, I_GLOBAL] > 0.5, (
-        f"GDP's Global loading is {param.Lambda[i_gdp, I_GLOBAL]:.3f}; before the "
-        "seed-orientation fix it was -0.76 after 3,000 sweeps, against a "
-        "normaliser pinned at +1"
+    # The guard's own constant, not a literal: this test predates the guard, and
+    # a copy of the number here could drift away from the threshold that
+    # actually refuses without either side failing.
+    assert param.Lambda[i_gdp, I_GLOBAL] > COLLAPSED_GLOBAL_LOADING, (
+        f"GDP's Global loading is {param.Lambda[i_gdp, I_GLOBAL]:.3f}, at or "
+        f"below the {COLLAPSED_GLOBAL_LOADING} floor `state_space` refuses at; "
+        "before the seed-orientation fix it was -0.76 after 3,000 sweeps, "
+        "against a normaliser pinned at +1"
     )
     i_hh = panel.series_id.index("household_spending")
     assert param.Lambda[i_hh, I_GLOBAL] == 1.0

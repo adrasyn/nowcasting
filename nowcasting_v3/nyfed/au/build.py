@@ -600,9 +600,16 @@ def target_periods(panel: Panel) -> np.ndarray:
     """Panel columns to nowcast: the quarters after the last observed GDP.
 
     ``example_nowcast.m`` steps three months at a time from the quarter after
-    the target series' last observation. With GDP observed through 2026-03 and
-    a panel ending 2026-07, that is a single horizon, June 2026 -- the last
-    month of Q2, which is where ``panel._align`` puts a quarterly observation.
+    the target series' last observation, and each step lands on the LAST month
+    of a quarter, which is where ``panel._align`` puts a quarterly observation.
+
+    Worked through at the vintage the gate uses, 2026-06-01: GDP is observed
+    through 2025-12, so the steps are 2026-03 and 2026-06 -- Q1 2026, which is
+    the nowcast, and Q2 2026, which is a forecast. :func:`quick_nowcast` takes
+    the first. How many horizons there are is a property of the vintage, not a
+    constant: it depends on how far the panel runs past the target series' last
+    observation, and under the release-date cut that distance is itself a
+    function of the publication lags.
     """
     observed = np.flatnonzero(np.isfinite(panel.Y[panel.i_now]))
     if observed.size == 0:

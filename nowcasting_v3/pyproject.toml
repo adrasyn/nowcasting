@@ -3,7 +3,7 @@ name = "nowcasting-v3"
 version = "0.1.0"
 description = "NY Fed Staff Nowcast 2.0, ported to Python and refitted to Australian data"
 requires-python = ">=3.11"
-dependencies = ["numpy>=2.0", "scipy>=1.14", "pandas>=2.2"]
+dependencies = ["numpy>=2.0", "scipy>=1.14", "pandas>=2.2", "readabs>=0.2.6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-xdist>=3.6"]

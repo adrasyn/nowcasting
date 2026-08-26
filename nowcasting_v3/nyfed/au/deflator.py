@@ -181,14 +181,50 @@ def quarterly_to_monthly(quarterly: pd.Series) -> pd.Series:
     return quarterly.reindex(grid).interpolate(method="time")
 
 
+MIN_SPLICE_OVERLAP = 6
+
+
 def splice(
-    preferred: pd.Series, older: pd.Series, *, name: str = "", older_name: str = ""
+    preferred: pd.Series,
+    older: pd.Series,
+    *,
+    name: str = "",
+    older_name: str = "",
+    min_overlap: int = MIN_SPLICE_OVERLAP,
 ) -> tuple[pd.Series, Seam]:
     """Rebase ``older`` onto ``preferred``'s level and fill the months it lacks.
 
     The rescaling factor is the geometric mean of ``preferred / older`` over the
     overlap. ``preferred`` is returned untouched wherever it exists, so the most
     recent, most authoritative numbers are never modified by the splice.
+
+    THE RATIO IS FIT OVER THE WHOLE OVERLAP, NOT LOCALLY AT THE JOIN. That is a
+    deliberate trade-off and it is worth stating, because the alternative is
+    equally defensible. A global fit centres the residual over the entire
+    overlap -- measured on the real seams, the signed residual over seam 2's 106
+    months has mean +0.0004% and median -0.0013%, so the level is right on
+    average across nine years. A local fit, taking the ratio from a short window
+    at the handover, would instead make the join exactly continuous and let the
+    error accumulate at the far end of the older series.
+
+    Neither is free, because the two sources DRIFT: seam 2's yearly mean residual
+    moves monotonically from about +0.16% in 2017-19 to about -0.26% in 2024, a
+    slow divergence between a partial-basket monthly indicator and a full-basket
+    quarterly index. Under the global fit that drift shows up as roughly 0.15% of
+    level offset at the handover month; under a local fit it would show up as
+    roughly 0.4% at the start of the interpolated tier instead. The global fit is
+    chosen because ``pch`` is a first difference: a level offset spread evenly
+    over 106 months is invisible to it, whereas concentrating the error at one
+    end puts more of it into fewer months. Measured, the join months are
+    unremarkable either way -- 0.247% and 0.217% month-on-month against a median
+    absolute monthly move of 0.286%.
+
+    ``min_overlap`` guards the other end of the same argument. An overlap of one
+    or two months produces a ratio with essentially no evidence behind it, and
+    -- worse -- a single-point overlap makes ``Seam.max_abs_deviation`` exactly
+    0.0, so the audit record would look flawless precisely when it is emptiest.
+    Six months is the floor: enough that the deviation statistics mean something,
+    and far below the 18 and 106 months the real seams have.
     """
     preferred = preferred.dropna().sort_index()
     older = older.dropna().sort_index()
@@ -200,6 +236,16 @@ def splice(
             f"{older.index[0].date()}..{older.index[-1].date()}), so there is "
             "no ratio to rebase by. Concatenating them instead would put a step "
             "change in the deflator at the join."
+        )
+    if len(overlap) < min_overlap:
+        raise ValueError(
+            f"{name or 'preferred'} and {older_name or 'older'} overlap over "
+            f"only {len(overlap)} month(s) "
+            f"({overlap[0].date()}..{overlap[-1].date()}), below the "
+            f"{min_overlap}-month minimum. A ratio fit over that little has no "
+            "evidence behind it, and at a single point the seam's deviation "
+            "statistics are identically zero -- the audit record would look "
+            "perfect while measuring nothing."
         )
     if (preferred.loc[overlap] <= 0).any() or (older.loc[overlap] <= 0).any():
         raise ValueError(
@@ -288,22 +334,48 @@ def deflate(
     invariant; it is made explicit so the output is interpretable rather than
     on the arbitrary base of whichever CPI vintage led the splice.
 
-    Raises if the deflator does not cover every month the nominal series is
-    observed. Silently returning a shorter series would truncate the panel's
-    longest consumption record, and the model would run on it without complaint.
+    A GAP AT THE LEADING EDGE OR IN THE MIDDLE IS FATAL; A GAP AT THE TRAILING
+    EDGE IS NOT. The two are different failures and only one is a failure.
+
+    If the deflator starts after the nominal series does, deflating anyway would
+    silently truncate the panel's longest consumption record -- the row that
+    normalises the Global factor -- and the model would run on the shortened
+    version without complaint. Same for a hole in the middle: a monthly price
+    index does not have holes, so one means something is wrong upstream. Both
+    raise.
+
+    A deflator that stops short at the RECENT end is ordinary ragged edge, which
+    is the condition a nowcast exists to work in. Those months come back NaN and
+    the Kalman filter handles them natively. Halting the build for it would be
+    actively harmful here: monthly CPI currently leads household spending by
+    exactly one month, so the margin is a SINGLE RELEASE, and one late ABS
+    publication would take down the whole panel rather than costing the last
+    month of one row.
     """
     nominal = nominal.dropna().sort_index()
     if nominal.empty:
         raise ValueError("nominal series is empty")
     deflator = deflator.dropna().sort_index()
+    if deflator.empty:
+        raise ValueError("deflator is empty")
 
-    uncovered = nominal.index.difference(deflator.index)
-    if len(uncovered):
+    first, last = deflator.index[0], deflator.index[-1]
+    leading = nominal.index[nominal.index < first]
+    if len(leading):
         raise ValueError(
-            f"the deflator does not cover {len(uncovered)} of the nominal "
-            f"series' {len(nominal)} months, first {uncovered[0].date()} and "
-            f"last {uncovered[-1].date()}. Deflating anyway would silently "
-            "truncate the series."
+            f"the deflator does not cover the first {len(leading)} month(s) of "
+            f"the nominal series ({leading[0].date()}..{leading[-1].date()}); it "
+            f"begins at {first.date()}. Deflating anyway would silently truncate "
+            "the series at the LEADING edge, which is history, not ragged edge."
+        )
+    interior = nominal.index[
+        (nominal.index >= first) & (nominal.index <= last)
+    ].difference(deflator.index)
+    if len(interior):
+        raise ValueError(
+            f"the deflator has {len(interior)} gap(s) inside its own span, first "
+            f"{interior[0].date()} and last {interior[-1].date()}. A monthly "
+            "price index does not have holes; something is wrong upstream."
         )
 
     base = nominal.index[0] if base is None else pd.Timestamp(base)

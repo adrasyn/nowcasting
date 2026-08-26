@@ -135,6 +135,25 @@ def assemble(
 ) -> Panel:
     """Build one standardised vintage from fetched series."""
     spec = load_spec(spec_path)
+
+    # The rows are STACKED from `sources` and LABELLED from `spec`. Nothing else
+    # ties the two together, so if they ever diverge every series label -- and
+    # `i_now`, which feeds the point nowcast, the weights and the impacts --
+    # attaches to the wrong panel row, quietly and with the model still running.
+    # A test pins it, but a test only covers the default arguments; this covers
+    # the call. `load_spec` already refuses a spec whose rows are not in
+    # frequency order, so the two guards together mean the panel cannot be
+    # mislabelled by a spec edit or by a registry edit.
+    if list(spec.series_id) != [s.series_id for s in sources]:
+        raise ValueError(
+            f"the spec has {len(spec.series_id)} rows and the registry "
+            f"{len(sources)}, and they are not the same series in the same "
+            f"order:\n  spec     {list(spec.series_id)}\n  registry "
+            f"{[s.series_id for s in sources]}\nThe panel is stacked from the "
+            "registry and labelled from the spec, so a mismatch attaches every "
+            "label -- and i_now -- to the wrong row."
+        )
+
     dates = pd.date_range(start, end, freq="MS")
 
     aligned: dict[str, np.ndarray] = {}

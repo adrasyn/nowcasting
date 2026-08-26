@@ -131,6 +131,24 @@ def test_a_ragged_edge_is_preserved():
     assert panel.dates[-1] == pd.Timestamp(END)
 
 
+def test_assembly_refuses_to_label_rows_it_did_not_stack():
+    """`Y` is stacked from the registry and `series_id`/`i_now` come from the
+    spec. Nothing else ties them together, so a divergence would attach every
+    label -- and the nowcast target -- to the wrong row, silently, with the
+    model still running. Drop one registry entry and the guard must fire rather
+    than produce a 14-row panel carrying 15 labels."""
+    sources = tuple(s for s in AU_SERIES if s.key != "cpi_trimmed")
+    inputs = _panel_inputs()
+    with pytest.raises(ValueError, match="wrong row"):
+        assemble(inputs, start=START, end=END, sources=sources)
+
+
+def test_assembly_refuses_a_registry_reordered_against_the_spec():
+    sources = (AU_SERIES[1], AU_SERIES[0], *AU_SERIES[2:])
+    with pytest.raises(ValueError, match="same order"):
+        assemble(_panel_inputs(), start=START, end=END, sources=sources)
+
+
 def test_assembly_refuses_a_panel_missing_a_registered_series():
     inputs = _panel_inputs()
     del inputs["exports"]

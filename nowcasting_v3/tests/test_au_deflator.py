@@ -165,6 +165,34 @@ def test_splice_refuses_two_series_that_do_not_overlap():
         splice(b, a)
 
 
+def test_splice_refuses_an_overlap_too_short_to_fit_a_ratio_over():
+    """A one-month overlap is the dangerous case, not the obviously broken one.
+
+    It yields a ratio with no evidence behind it AND a `Seam` whose
+    `max_abs_deviation` is identically 0.0 -- so the audit record looks flawless
+    exactly when it is emptiest. Both seams in the real deflator have 18 and 106
+    months, so the floor costs nothing.
+    """
+    older = pd.Series(
+        np.arange(100.0, 112.0), index=pd.date_range("2020-01-01", periods=12, freq="MS")
+    )
+    single = older.iloc[11:] * 2.0
+    with pytest.raises(ValueError, match="only 1 month"):
+        splice(single, older)
+
+    # And the seam it would have produced would have looked perfect.
+    _, seam = splice(single, older, min_overlap=1)
+    assert seam.n_overlap == 1
+    assert seam.max_abs_deviation == 0.0
+
+    three = older.iloc[9:] * 2.0
+    with pytest.raises(ValueError, match="only 3 month"):
+        splice(three, older)
+
+    six = older.iloc[6:] * 2.0
+    assert splice(six, older)[1].n_overlap == 6   # the floor itself is accepted
+
+
 # --- the built deflator ----------------------------------------------------
 
 
@@ -192,7 +220,8 @@ def test_every_tier_contributes_the_coverage_the_precedence_implies():
 
 def test_the_deflator_is_a_gapless_positive_monthly_index():
     index = build_deflator(_sources()).index
-    assert index.index.freqstr is None or True   # a plain DatetimeIndex is fine
+    assert isinstance(index.index, pd.DatetimeIndex)
+    assert index.index.is_monotonic_increasing and index.index.is_unique
     assert not index.isna().any()
     assert (index > 0).all()
     assert (index.index == pd.date_range(index.index[0], index.index[-1], freq="MS")).all()
@@ -340,11 +369,49 @@ def test_no_seam_shows_up_as_a_spike_in_the_deflated_series():
         )
 
 
-def test_deflate_refuses_rather_than_truncating_when_the_deflator_is_short():
+def test_deflate_refuses_rather_than_truncating_when_the_deflator_starts_late():
+    """A LEADING gap is lost history, and it must halt."""
     nominal = _nominal_household_spending()
     short = build_deflator(_sources()).index.loc["2015-01-01":]
-    with pytest.raises(ValueError, match="does not cover"):
+    with pytest.raises(ValueError, match="LEADING edge"):
         deflate(nominal, short)
+
+
+def test_deflate_leaves_a_trailing_gap_as_nan_instead_of_halting_the_build():
+    """A TRAILING gap is ragged edge, which is the condition a nowcast lives in.
+
+    The margin here is one release: monthly CPI leads household spending by
+    exactly one month, so halting on a short tail would let a single late ABS
+    publication take down the whole panel build rather than cost the last month
+    of one row. The Kalman filter handles NaN natively.
+    """
+    nominal = _nominal_household_spending()
+    full = build_deflator(_sources()).index
+    truncated = full.loc[: pd.Timestamp("2026-03-01")]
+    assert truncated.index[-1] == pd.Timestamp("2026-03-01")
+
+    real = deflate(nominal, truncated)
+
+    assert len(real) == len(nominal)
+    assert real.index[0] == nominal.index[0]
+    assert real.index[-1] == nominal.index[-1]
+    missing = real.index[real.isna()]
+    assert list(missing) == [
+        pd.Timestamp("2026-04-01"), pd.Timestamp("2026-05-01"), pd.Timestamp("2026-06-01")
+    ]
+    # Everything the deflator does cover is unchanged by the truncation.
+    covered = real.index[real.notna()]
+    pd.testing.assert_series_equal(
+        real[covered], deflate(nominal, full)[covered], check_names=False
+    )
+
+
+def test_deflate_refuses_a_hole_in_the_middle_of_the_deflator():
+    """Not ragged edge. A monthly price index does not have holes."""
+    nominal = _nominal_household_spending()
+    holed = build_deflator(_sources()).index.drop(pd.Timestamp("2019-05-01"))
+    with pytest.raises(ValueError, match="gap"):
+        deflate(nominal, holed)
 
 
 def test_build_deflator_refuses_a_missing_tier():

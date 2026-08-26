@@ -1,5 +1,7 @@
 """Restrictions, and the COVID window that spec decision D3 specifies."""
 
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -96,3 +98,57 @@ def test_f_active_spans_the_whole_panel():
     panel = _panel(T=300)
     r = build_restrict(panel, spec)
     assert r.f_active.shape == (5, 300)
+
+
+def _renamed_covid_block(name: str | None):
+    """The loaded spec with its COVID block renamed, or dropped from the names.
+
+    ``load_spec`` derives ``block_names`` from the CSV headers by stripping the
+    ``Block\\d+_`` prefix, so a spec written ``Block4_Covid`` produces the block
+    name ``Covid``. Rebuilding the whole CSV to test that is more machinery than
+    the question needs.
+    """
+    spec = load_spec(SPEC_PATH)
+    names = list(spec.block_names)
+    i = names.index("COVID")
+    if name is None:
+        names[i] = "Pandemic"
+    else:
+        names[i] = name
+    return replace(spec, block_names=names), i
+
+
+@pytest.mark.parametrize("written_as", ["COVID", "Covid", "covid", "CoViD"])
+def test_the_covid_block_is_matched_without_regard_to_case(written_as):
+    """``example_estimate.m:76`` uses ``strcmpi``, and the difference is silent.
+
+    A case-sensitive membership test reads identically and is not: a spec column
+    headed ``Block4_Covid`` would match nothing, the isolation and the window
+    would both be skipped, and the pandemic factor would run active over the
+    whole sample distorting every other factor. Nothing would raise.
+    """
+    spec, i = _renamed_covid_block(written_as)
+    r = build_restrict(_panel(), spec, p_f=4)
+
+    assert np.isnan(r.Phi[i, i, :]).all()
+    assert (np.delete(r.Phi[i, :, :], i, axis=0) == 0).all()
+    assert not r.f_active[i, :].all(), (
+        f"a COVID block written {written_as!r} was not recognised, so the "
+        "pandemic factor is active over the whole sample"
+    )
+
+
+def test_a_spec_with_no_covid_block_is_refused_rather_than_silently_unrestricted():
+    """``build.state_space`` sets the precedent for the Global block: a guard
+    that cannot find what it guards raises instead of passing through."""
+    spec, _ = _renamed_covid_block(None)
+    with pytest.raises(ValueError, match="no COVID block"):
+        build_restrict(_panel(), spec)
+
+
+def test_two_covid_blocks_are_refused():
+    spec = load_spec(SPEC_PATH)
+    names = list(spec.block_names)
+    names[0] = "covid"
+    with pytest.raises(ValueError, match="2 COVID blocks"):
+        build_restrict(_panel(), replace(spec, block_names=names))

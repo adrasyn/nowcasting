@@ -5,8 +5,8 @@ quarterly series observed in the last month of each quarter and NaN elsewhere.
 Missing data stays NaN: the Kalman filter handles it natively, and filling it
 would be inventing observations.
 
-TWO THINGS THIS MODULE IS RESPONSIBLE FOR NOT LOSING SILENTLY
--------------------------------------------------------------
+THREE THINGS THIS MODULE IS RESPONSIBLE FOR NOT LOSING SILENTLY
+---------------------------------------------------------------
 **Quarterly alignment.** ``_align`` keeps only months ``{3, 6, 9, 12}``, which
 agrees with ``fetch_abs.parse_abs_frame`` dating a quarterly observation to the
 LAST month of its quarter. The two halves have to be changed together. Task 2

@@ -35,20 +35,26 @@ def test_every_rba_series_has_a_recorded_fixture():
 
 @pytest.mark.parametrize("source", RBA_SERIES, ids=lambda s: s.key)
 def test_the_fixture_header_carries_the_registry_column(source):
-    """Table I2 carries 21 columns -- three currencies each for the all-items
-    index and five sub-indices (rural, non-rural, base metals, bulk, and a
-    bulk-spot variant). Every one of them parses to a plausible-looking float
-    series, so shape and dtype alone cannot catch a fixture recorded against,
-    or a fetch dispatcher pointed at, the wrong column -- and GRCPAISAD, the
-    bulk-commodities-spot variant, is one character away from the correct
-    GRCPAIAD and would pass every other test in this file.
+    """The registry names a column; the fixture must actually carry it.
 
-    Derive the expected column from the registry, the same discipline Task 2
-    applied to a mislabelled ABS payload: this checks that ``sources.py`` and
-    the recorded fixture agree, not merely that some column parses. A
-    hardcoded expectation in this test file would not catch the registry
-    itself drifting to the wrong column -- only the registry-derived
-    assertion does.
+    Table I2 has 21 columns -- three currencies each for the all-items index and
+    five sub-indices (rural, non-rural, base metals, bulk, and a bulk-spot
+    variant) -- and the committed fixture holds all 21, whole. So be precise
+    about which failure this catches and which it does not.
+
+    IT CATCHES a fixture that no longer has the registry's column at all: a
+    re-record trimmed to a few columns, a payload taken from the wrong RBA
+    table, or a registry locator naming a column that does not exist. Those
+    would otherwise surface as a KeyError deep in ``_parse``.
+
+    IT DOES NOT CATCH the registry drifting from ``GRCPAIAD`` to a sibling --
+    ``GRCPAISAD``, the bulk-commodities-spot variant, is one character away and
+    is in the fixture, so this assertion would pass on it. What catches that is
+    ``test_commodity_prices_reproduces_the_published_release``, which pins the
+    all-items index against the values RBA published on 4 August 2026; a
+    different column parses to an equally plausible float series and misses
+    those numbers. The two tests are complementary and neither substitutes for
+    the other.
     """
     expected = source.locator.split(":")[1]
     assert expected in _fixture_frame(source).columns, (

@@ -16,9 +16,12 @@ this matters concretely.
 
 ``publication_lag_days`` is the ONE fact this registry records about timing,
 and everything else about timing is derived from it. It is the number of days
-from an observation's panel date -- the START of the period it covers, which is
-where ``fetch_abs._first_of_month_index`` puts it -- to the day that
-observation was actually released.
+from an observation's PANEL DATE to the day that observation was actually
+released. The panel date is where ``fetch_abs._first_of_month_index`` puts it:
+the start of the period for a monthly series, and the LAST month of the quarter
+for the three quarterly ones (``to_timestamp(how="end")``, which is what
+``panel._align``'s ``{3, 6, 9, 12}`` mask requires). Every lag below was
+measured against that date, whichever convention applies to the series.
 
 TWO THINGS ARE DERIVED FROM IT, AND BOTH WERE PREVIOUSLY TYPED IN BY HAND
 --------------------------------------------------------------------------
@@ -30,30 +33,70 @@ A series is at its oldest just before its next release, which is
 ``publication_lag_days + release_interval_days`` after the observation date;
 ``SLACK_DAYS`` covers a release moved by a public holiday. Typing the budget in
 directly got it wrong twice in this project, both times in the same direction
-and both times because Australian series are dated to the start of the period
-they cover while publication lags by weeks: 45-60 days for monthlies (halts
-healthy data), then 75 (still halts the four ABS monthlies that publish two
-months in arrears), then 120 for quarterlies (refuses ``gdp`` itself for two
-months out of every three). The formula reproduces the numbers those guesses
-were reaching for: ``gdp``'s 94 + 91 = 185 against an observed healthy 178-186,
+and both times because the panel date runs weeks ahead of the release -- a
+monthly is dated to the first of its reference month and published about two
+months later, a quarterly to the last month of its quarter and published about
+three: 45-60 days for monthlies (halts healthy data), then 75 (still halts the
+four ABS monthlies that publish two months in arrears), then 120 for quarterlies
+(refuses ``gdp`` itself for two months out of every three). The formula
+reproduces the numbers those guesses were reaching for: ``gdp``'s
+94 + 91 = 185 against an observed healthy 178-186,
 ``building_approvals``' 62 + 31 = 93 against an observed 86.
 
-**A genuine vintage.** ``build.build_panel`` drops an observation whose RELEASE
-date -- ``observation date + publication_lag_days`` -- falls after ``asof``.
-Truncating on the observation date instead, which is what this module's first
-end-to-end consumer did, admits data published up to nine weeks after ``asof``:
-at ``asof="2026-07-01"`` seven series carried a 2026-07-01 observation that had
-not been released yet, and this repo proves it against itself --
-``tests/test_au_fetch_rba.py`` pins the 2026-07 commodity observation to a
-release date of 4 August 2026. That is the classic forward-looking evaluation
-error, and ``build_panel`` is the primitive a backtest will call, so it would
-flatter every result Plan C produces.
+**WHICH OBSERVATIONS EXISTED at a vintage.** ``build.build_panel`` drops an
+observation whose RELEASE date -- ``observation date +
+publication_lag_days`` -- falls after ``asof``. Truncating on the observation
+date instead, which is what this module's first end-to-end consumer did, admits
+data published up to nine weeks after ``asof``: at ``asof="2026-07-01"`` seven
+series carried a 2026-07-01 observation that had not been released yet, and this
+repo proves it against itself -- ``tests/test_au_fetch_rba.py`` pins the 2026-07
+commodity observation to a release date of 4 August 2026. That is the classic
+forward-looking evaluation error, and ``build_panel`` is the primitive a
+backtest will call, so it would flatter every result Plan C produces.
 
-``SLACK_DAYS`` MUST STAY BELOW THE SHORTEST RELEASE INTERVAL. At
-``SLACK_DAYS >= release_interval_days`` a series that missed a release outright
-still sits inside its budget and the guard stops guarding. 21 days against a
-31-day monthly interval leaves ten days of margin;
-``test_the_slack_cannot_swallow_a_missed_release`` pins it.
+THAT IS THE SET OF OBSERVATIONS, NOT THEIR PUBLISHED VALUES. The cut reproduces
+which observations a person at a desk on ``asof`` could have seen; it does not
+reproduce what those observations said on that day. ABS revises seasonally
+adjusted series routinely, so a recording made later and replayed at an earlier
+``asof`` carries revisions that desk could not have seen. A backtest built on
+this primitive is therefore revision-aware in its DATING and revision-blind in
+its VALUES, and Plan C inherits both halves.
+
+RELEASE INTERVALS ARE NOT ALWAYS THE FREQUENCY
+----------------------------------------------
+``RELEASE_INTERVAL_DAYS`` gives 31 days to a monthly and 91 to a quarterly, and
+for thirteen of the fifteen series the budget that produces ABSORBS the worst
+gap their recorded history contains -- 31 days for the monthlies, 92 for the
+quarterlies against a 91-day interval plus 21 days of slack. Two publishers skip
+a month on their ordinary calendar and would be refused for behaving exactly as
+they always have, so they carry a per-series ``release_interval_override`` with
+its own sourced note:
+
+* ``aig_pmi`` -- Ai Group publishes no PMI for one December or January in most
+  years. The routine case is a 62-day gap, worst age 96 against the 86-day
+  budget the frequency default gives, so the build would have refused **every
+  February** once the AiG fetcher is repaired.
+* ``nab_conditions`` -- skipped September 2020, a 61-day gap, worst age 104
+  against 95.
+
+An override widens the ORDINARY calendar, not the guard's tolerance for
+anything: Ai Group missed December 2022 *and* January 2023, a 92-day gap and a
+126-day worst age, and that is outside the sourced calendar and still refuses.
+
+An override is also a widened staleness budget, and it is paid for: ``aig_pmi``'s
+budget goes 86 -> 117, so a genuinely dead AiG feed is caught 31 days later than
+it used to be. That is the right trade. This branch's operating premise is that
+a refusal means something is wrong, and a guard that cries wolf every February
+trains the operator to do the one thing ``build.py`` forbids -- widen the budget
+by hand -- which costs far more than a month of detection latency.
+
+``SLACK_DAYS`` MUST STAY BELOW EVERY RELEASE INTERVAL, the overrides included.
+At ``SLACK_DAYS >= release_interval_days`` a series that missed a release
+outright still sits inside its budget and the guard stops guarding. 21 days
+against a 31-day monthly interval leaves ten days of margin;
+``SeriesSource.__post_init__`` refuses an override that breaks the inequality
+and ``test_the_slack_cannot_swallow_a_missed_release`` pins it for the registry
+as it stands.
 
 ``lag_source`` NAMES WHERE THE LAG CAME FROM, and it is not decoration. Every
 lag below was read off a release page or a publisher's release-date list, on
@@ -72,8 +115,10 @@ Australian PMI (manufacturing) declined 5.7 points to -19.6". What stopped is
 ``nowcasting_v2/data_raw/aig_pmi.csv``, last committed 2026-06-11 with its
 last observation at 2026-05-01: v2's scraper stopped seeing releases when the
 publication changed shape. So the freshness guard is right to refuse and the
-fix is a working fetcher, not a replacement series -- but note the trap
-before writing one: the index is now reported as a NET BALANCE centred on
+fix is a working fetcher, not a replacement series. (It refuses from
+2026-08-27, not from 2026-07-27: the skipped-month override above widened this
+series' budget from 86 days to 117, which is the disclosed price of not
+refusing every February.) Note the trap before writing one: the index is now reported as a NET BALANCE centred on
 zero (-19.6), not the 50-centred diffusion index the ``aig_pmi.csv`` history
 carries. Repairing the scraper without handling that puts a level break into
 the panel's Soft block.
@@ -142,9 +187,12 @@ from pathlib import Path
 SPEC_PATH = Path(__file__).resolve().parents[2] / "model_spec_AU.csv"
 
 
-# Days between one release of a series and the next. A month is 31 days and a
-# quarter 91: the LONGEST ordinary gap, because a budget built on the average
-# would halt on the long months.
+# Days between one release of a series and the next, BY FREQUENCY. A month is
+# 31 days and a quarter 91: the LONGEST ordinary gap, because a budget built on
+# the average would halt on the long months.
+#
+# This is the default, not the rule. A publisher whose ordinary calendar skips a
+# month overrides it per series -- see `SeriesSource.release_interval_override`.
 RELEASE_INTERVAL_DAYS: dict[str, int] = {"m": 31, "q": 91}
 
 # Tolerance on top of "lag + interval", for a release moved by a public holiday
@@ -171,9 +219,39 @@ class SeriesSource:
     frequency: str    # "m" | "q"
     publication_lag_days: int
     lag_source: str
+    # Set only where the publisher's ORDINARY calendar is longer than its
+    # frequency implies. Sourced like `publication_lag_days` is, and for the
+    # same reason. See RELEASE INTERVALS ARE NOT ALWAYS THE FREQUENCY above.
+    release_interval_override: int | None = None
+    release_interval_source: str = ""
+
+    def __post_init__(self) -> None:
+        if (self.release_interval_override is None) != (
+            not self.release_interval_source
+        ):
+            raise ValueError(
+                f"{self.key}: release_interval_override and "
+                "release_interval_source go together. A widened interval is a "
+                "widened staleness budget, and an unsourced one is a number "
+                "that looks measured and is not."
+            )
+        if (
+            self.release_interval_override is not None
+            and self.release_interval_override <= SLACK_DAYS
+        ):
+            raise ValueError(
+                f"{self.key}: a release interval of "
+                f"{self.release_interval_override} days is at or below "
+                f"SLACK_DAYS ({SLACK_DAYS}), so a series that skipped a release "
+                "outright would still sit inside its budget and the freshness "
+                "guard would stop guarding this series. See the module "
+                "docstring and test_the_slack_cannot_swallow_a_missed_release."
+            )
 
     @property
     def release_interval_days(self) -> int:
+        if self.release_interval_override is not None:
+            return self.release_interval_override
         return RELEASE_INTERVAL_DAYS[self.frequency]
 
     @property
@@ -207,12 +285,30 @@ AU_SERIES: tuple[SeriesSource, ...] = (
                  "mtsinsights economic calendar (mtsinsights.com/events/3815/): "
                  "May 2026 released 02/06, June 30/06, July 04/08 -- 29 to 34 "
                  "days. THIRD-PARTY: Ai Group publishes no release-date list of "
-                 "its own, so this is the weakest-sourced lag in the registry"),
+                 "its own, so this is the weakest-sourced lag in the registry",
+                 62,
+                 "AI GROUP SKIPS THE TURN OF THE YEAR. Measured over the "
+                 "recorded vintage's own history, 2015-01 to 2026-05 (v2's "
+                 "aig_pmi.csv): the months absent are 2017-06, 2020-12, "
+                 "2022-01, 2022-12, 2023-01, 2024-01, 2025-01 and 2025-12 -- "
+                 "one December or January missing in seven of the eleven years. "
+                 "A single skipped month is a 61- or 62-day gap depending on "
+                 "which pair of months it spans, so 62 is the ordinary worst "
+                 "case. 2022-12 AND 2023-01 were both missed, a 92-day gap; "
+                 "that is outside the ordinary calendar and still refuses"),
     SeriesSource("nab_conditions", "nab_conditions", "NAB Business Conditions",
                  "v2", "nab_cond", "m", 43,
                  "NAB Monthly Business Survey (nab.com.au/news/economy-markets): "
                  "June 2026 released 14/07/2026 (43 days), July 2026 released "
-                 "11/08/2026 (41)"),
+                 "11/08/2026 (41)",
+                 62,
+                 "NAB SKIPPED SEPTEMBER 2020. Measured over the recorded "
+                 "vintage's own history, 2015-01 to 2026-07 (v2's "
+                 "nab_cond.csv): 2020-09 is the ONLY month absent, a 61-day gap "
+                 "from 2020-08 to 2020-10. Recorded as 62 for the same reason "
+                 "as `aig_pmi` -- 62 is what one skipped month costs across the "
+                 "longest month pairs, so a 61-day instance needs a 62-day "
+                 "interval to have no margin of its own"),
     SeriesSource("building_approvals", "building_approvals", "Building Approvals",
                  "abs", "8731.0:A422070J", "m", 62,
                  "ABS 8731.0 Building Approvals: June 2026 released 30/07/2026 "

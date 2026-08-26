@@ -30,9 +30,11 @@ happens, and the cut is on the observation's **release** date --
 ``observation date + source.publication_lag_days`` -- not on the observation's
 own date.
 
-The distinction is the whole point. Australian series are dated to the START of
-the period they cover and are published weeks later, so cutting on the
-observation date admits data that had not been published at ``asof``: at
+The distinction is the whole point. An Australian series' panel date runs weeks
+ahead of its release -- a monthly is dated to the first of its reference month
+and published about two months later, a quarterly to the LAST month of its
+quarter and published about three -- so cutting on the observation date admits
+data that had not been published at ``asof``: at
 ``asof="2026-07-01"`` under the observation-date rule, seven of the fifteen
 series carried a 2026-07-01 observation, and this repo pins the release date of
 one of them -- ``tests/test_au_fetch_rba.py`` records the 2026-07 commodity
@@ -46,11 +48,23 @@ result.
 
 Two consequences, both wanted:
 
-* the panel is a real vintage -- a build at 2026-06-01 sees exactly what a
-  person sitting at a desk on 2026-06-01 could have seen, whether it is
-  fetching live or replaying a recording made months later;
+* the panel holds the observations a real vintage held -- a build at 2026-06-01
+  contains exactly the observations a person sitting at a desk on 2026-06-01
+  could have seen, whether it is fetching live or replaying a recording;
 * ``check_freshness`` measures age from the last observation **at that
   vintage**, so the guard judges the same data the model gets.
+
+WHICH OBSERVATIONS EXISTED IS NOT WHAT THEY SAID
+------------------------------------------------
+The release-date cut reproduces the SET of observations available at ``asof``.
+It does not reproduce their VALUES as published then: ABS revises seasonally
+adjusted series, so a recording made on 2026-08-26 and replayed at 2026-06-01
+carries two months of revisions that desk could not have seen. Harmless for the
+gate, which only asks that the pipeline runs on a vintage-shaped panel. Not
+harmless as a specification: a backtest built on this primitive is
+**revision-aware in its dating and revision-blind in its values**, and Plan C
+inherits both halves. A true real-time evaluation needs recorded vintages, one
+per ``asof``, not one recording replayed at many.
 
 Freshness is checked on the series that actually enter the panel, which means
 ``household_spending`` is checked *after* deflation: if the deflator ran out
@@ -58,12 +72,19 @@ before the nominal series did, the real row's trailing months are NaN and that
 is a genuine staleness of the row the model sees.
 
 There is no flag to skip the freshness check, and there must not be. A build
-today refuses, and on exactly one series: ``aig_pmi`` is 117 days old against
-an 86-day budget because ``nowcasting_v2/data_raw/aig_pmi.csv`` stopped
-updating in May 2026. Ai Group is still publishing -- see ``sources.py``; it is
-v2's scraper that stopped -- so the fix is a working fetcher, and in the
-meantime the refusal is the guard doing its job. The way to nowcast anyway is
-not to widen the budget or add a bypass.
+today refuses, and on exactly one series: ``aig_pmi`` is past its 117-day budget
+because ``nowcasting_v2/data_raw/aig_pmi.csv`` stopped updating in May 2026 --
+its last observation is 2026-05-01, so the refusal starts on 2026-08-27. Ai
+Group is still publishing -- see ``sources.py``; it is v2's scraper that
+stopped -- so the fix is a working fetcher, and in the meantime the refusal is
+the guard doing its job. The way to nowcast anyway is not to widen the budget or
+add a bypass.
+
+That budget is 117 rather than 86 because Ai Group skips one December or
+January in most years, so
+a 31-day release interval refused a healthy series every February; ``sources.py``
+carries the measurement and the per-series override. The cost is disclosed
+there: the dead feed is caught 31 days later than it would have been.
 
 TWO GUARDS, NOT ONE
 -------------------
@@ -402,8 +423,17 @@ def build_panel(
     # `assemble` will take the nominal series without complaint and the model
     # will run on it; see this module's docstring for the three reasons that is
     # wrong, and `nyfed/au/deflator.py` for how the deflator is built.
+    #
+    # THE UNCUT TIERS GO WITH THE CUT ONES. A vintage earlier than a deflator
+    # tier's first release leaves that tier legitimately empty -- the live
+    # 6401.0 monthly series does not exist before 2024 -- and `build_deflator`
+    # needs the recording to tell that apart from a fetcher that returned
+    # nothing. Without it the earliest buildable vintage was 2024-11-01, which
+    # is most of the range Plan C's backtest wants.
     series["household_spending"] = real_household_spending(
-        series["household_spending"], deflator_sources
+        series["household_spending"],
+        deflator_sources,
+        recorded=v.deflator_sources,
     )
 
     check_freshness(series, asof_ts)

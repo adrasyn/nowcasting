@@ -59,7 +59,7 @@ you splice in.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -169,6 +169,11 @@ class Deflator:
     index: pd.Series
     seams: tuple[Seam, ...]
     contributed: dict[str, pd.DatetimeIndex]   # tier key -> months it supplied
+    # Tier key -> why this vintage could not use it. Empty for a full-history
+    # build; populated for an early vintage, where a tier that had not started
+    # publishing yet (or had not published enough to be rebased) is skipped
+    # rather than fatal. See `build_deflator`.
+    skipped: dict[str, str] = field(default_factory=dict)
 
     def coverage(self) -> dict[str, tuple[pd.Timestamp, pd.Timestamp, int]]:
         """First month, last month and count each tier actually contributed."""
@@ -298,48 +303,178 @@ def splice(
     return preferred.combine_first(rescaled).sort_index(), seam
 
 
-def build_deflator(sources: dict[str, pd.Series]) -> Deflator:
+def _explain_or_refuse(
+    key: str,
+    complaint: str,
+    cut: pd.Series,
+    recorded: dict[str, pd.Series] | None,
+) -> None:
+    """Let a tier be skipped only when the VINTAGE CUT is what emptied it.
+
+    THE TWO CASES THIS SEPARATES ARE NOT THE SAME FAILURE, AND ONLY ONE IS ONE.
+
+    A tier that has nothing to say at this vintage is ordinary. The precedence
+    list says "each entry supplies only the months no earlier entry covers", so
+    a tier that supplies nothing supplies nothing; the live 6401.0 monthly
+    series did not exist before 2024 and at ``asof="2018-06-01"`` it is
+    correctly, legitimately empty. Refusing there made ``build_panel`` -- the
+    primitive Plan C's backtest calls -- unable to build any vintage earlier
+    than 2024-11-01 (measured against the committed recording), and it named the
+    wrong cause while doing it: ``deflator source cpi_monthly_live is empty``.
+
+    A tier that is empty when it SHOULD have data is a broken feed: a fetcher
+    that returned nothing, or a series id that has moved. Dropping that one
+    silently is the hazard the original guard was written for -- the deflator
+    would quietly fall back to interpolated quarterly prices for the recent
+    months, which is exactly the approximation the hybrid exists to avoid, and
+    nothing would say so.
+
+    The discriminator is the recording itself, so no date is typed in here: if
+    the tier holds fewer observations after the cut than the recording holds
+    before it, the cut is the reason and the tier is skipped. If the cut removed
+    nothing and the tier is still unusable, the source is the reason and this
+    raises. With no recording to compare against (``recorded=None``, which is
+    what a direct call passes) there is no way to tell, so it raises -- the
+    conservative half.
+    """
+    n_cut = len(cut)
+    if recorded is not None:
+        n_recorded = len(recorded[key].dropna())
+        if n_recorded > n_cut:
+            return
+        raise ValueError(
+            f"deflator source {key} {complaint}, and the vintage cut does not "
+            f"explain it: the recording holds {n_recorded} observation(s) and "
+            f"{n_cut} survived the cut, so nothing was removed. That is the "
+            "source, not the vintage -- a fetcher that returned nothing, or a "
+            "series id that has moved. Skipping the tier would drop the "
+            "deflator back to interpolated quarterly prices without a word."
+        )
+    raise ValueError(
+        f"deflator source {key} {complaint}. build_deflator was given no "
+        "recording to compare against (`recorded=`), so it cannot tell a tier "
+        "that had not started publishing at this vintage from a fetcher that "
+        "returned nothing, and refuses rather than guessing. `build.build_panel`"
+        " passes the uncut vintage and gets the distinction."
+    )
+
+
+def _admit(
+    prepared: dict[str, pd.Series],
+    cut: dict[str, pd.Series],
+    recorded: dict[str, pd.Series] | None,
+) -> tuple[list[str], dict[str, str]]:
+    """Which tiers this vintage can actually splice, in precedence order.
+
+    Walked from the OLDEST tier to the newest, which is the direction the
+    question runs in: the last tier is the base -- the one that covers the
+    months no monthly series reaches -- and each newer tier has to earn its
+    place by overlapping the tier it will be rebased against.
+
+    THE OVERLAP CHECKED HERE IS A LOWER BOUND ON THE ONE ``splice`` WILL SEE,
+    which is what makes admitting a tier here safe. ``build_deflator`` splices
+    newest-first, so the overlap ``splice`` measures for tier *k* is against the
+    UNION of the admitted tiers newer than it; that union contains the single
+    adjacent newer tier this pass compares against, so it can only be larger.
+    ``splice``'s own ``min_overlap`` therefore stays as the backstop rather than
+    the working guard, and a vintage where a tier has not yet published enough
+    history to be rebased is skipped here instead of raising there.
+    """
+    admitted_oldest_first: list[str] = []
+    skipped: dict[str, str] = {}
+    previous: pd.DatetimeIndex | None = None      # the last admitted tier
+
+    for source in reversed(DEFLATOR_SOURCES):
+        tier = prepared[source.key]
+        if tier.empty:
+            complaint = "supplies no observation at this vintage"
+        elif previous is None:
+            previous = tier.index
+            admitted_oldest_first.append(source.key)
+            continue
+        else:
+            overlap = len(previous.intersection(tier.index))
+            if overlap >= MIN_SPLICE_OVERLAP:
+                previous = tier.index
+                admitted_oldest_first.append(source.key)
+                continue
+            complaint = (
+                f"overlaps {admitted_oldest_first[-1]} over only {overlap} "
+                f"month(s) at this vintage, below the {MIN_SPLICE_OVERLAP}-month "
+                "minimum a ratio splice needs"
+            )
+        _explain_or_refuse(source.key, complaint, cut[source.key], recorded)
+        skipped[source.key] = complaint
+
+    return list(reversed(admitted_oldest_first)), skipped
+
+
+def build_deflator(
+    sources: dict[str, pd.Series],
+    *,
+    recorded: dict[str, pd.Series] | None = None,
+) -> Deflator:
     """Splice ``DEFLATOR_SOURCES`` into one monthly index, best tier first.
 
     ``sources`` is keyed by ``DeflatorSource.key``. Quarterly tiers are
     interpolated to monthly first; every tier after the first is rebased onto
     what has already been built, then supplies only the months still missing.
+
+    ``recorded`` is the same dictionary BEFORE ``build.Vintage.as_of`` cut it by
+    release date. It is what lets an early vintage skip a tier that had not
+    started publishing yet instead of dying on it, without losing the refusal
+    for a tier that is empty when it should have data -- see
+    :func:`_explain_or_refuse` for why those are different failures. A caller
+    with no vintage context leaves it ``None`` and gets the strict behaviour.
     """
     missing = [s.key for s in DEFLATOR_SOURCES if s.key not in sources]
     if missing:
         raise KeyError(f"deflator source(s) not supplied: {missing}")
+    if recorded is not None:
+        absent = [s.key for s in DEFLATOR_SOURCES if s.key not in recorded]
+        if absent:
+            raise KeyError(f"recorded deflator source(s) not supplied: {absent}")
+
+    cut = {s.key: sources[s.key].dropna().sort_index() for s in DEFLATOR_SOURCES}
+    prepared = {
+        s.key: (
+            quarterly_to_monthly(cut[s.key])
+            if s.frequency == "q" and not cut[s.key].empty
+            else cut[s.key]
+        )
+        for s in DEFLATOR_SOURCES
+    }
+    admitted, skipped = _admit(prepared, cut, recorded)
+    if not admitted:
+        raise ValueError(
+            "no deflator tier is usable at this vintage: "
+            + "; ".join(f"{key} {why}" for key, why in skipped.items())
+        )
 
     built: pd.Series | None = None
     built_from: list[str] = []
     seams: list[Seam] = []
     contributed: dict[str, pd.DatetimeIndex] = {}
 
-    for source in DEFLATOR_SOURCES:
-        tier = sources[source.key].dropna().sort_index()
-        if tier.empty:
-            raise ValueError(f"deflator source {source.key} is empty")
-        if source.frequency == "q":
-            tier = quarterly_to_monthly(tier)
-
+    for key in admitted:
+        tier = prepared[key]
         if built is None:
-            built, contributed[source.key] = tier, tier.index
+            built, contributed[key] = tier, tier.index
         else:
             already = built.index
             built, seam = splice(
-                built,
-                tier,
-                name="+".join(built_from),
-                older_name=source.key,
+                built, tier, name="+".join(built_from), older_name=key
             )
             seams.append(seam)
-            contributed[source.key] = built.index.difference(already)
-        built_from.append(source.key)
+            contributed[key] = built.index.difference(already)
+        built_from.append(key)
 
-    assert built is not None  # DEFLATOR_SOURCES is never empty
+    assert built is not None  # `admitted` is non-empty
     return Deflator(
         index=built.rename("cpi_spliced"),
         seams=tuple(seams),
         contributed=contributed,
+        skipped=skipped,
     )
 
 
@@ -353,7 +488,7 @@ def deflate(
 ) -> pd.Series:
     """Convert a nominal series to real terms with ``deflator``.
 
-    The deflator is renormalised to 100 at ``base`` -- by default the first
+    The deflator is renormalised to 1.0 at ``base`` -- by default the first
     month ``nominal`` is observed -- so the real series equals the nominal one
     in the base month and diverges from it thereafter by exactly the cumulative
     price change. The choice of base does not affect ``pch``, which is scale
@@ -416,7 +551,10 @@ def deflate(
 
 
 def real_household_spending(
-    nominal: pd.Series, sources: dict[str, pd.Series]
+    nominal: pd.Series,
+    sources: dict[str, pd.Series],
+    *,
+    recorded: dict[str, pd.Series] | None = None,
 ) -> pd.Series:
     """The panel's ``household_spending`` row: nominal MHSI, deflated.
 
@@ -424,5 +562,7 @@ def real_household_spending(
     ``5682.0:A130200584T`` straight from the registry, which is NOMINAL -- pass
     it through here before it reaches ``assemble``, or the Global factor's
     normaliser carries inflation.
+
+    ``recorded`` is passed straight to :func:`build_deflator`; see there.
     """
-    return deflate(nominal, build_deflator(sources).index)
+    return deflate(nominal, build_deflator(sources, recorded=recorded).index)

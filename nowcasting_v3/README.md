@@ -543,8 +543,9 @@ PDFs. v3 does not run v2's R code; it reads the CSVs v2's **weekly laptop
 routine** commits to `nowcasting_v2/data_raw/`. If that routine stops, those
 files go stale, and `nyfed/au/freshness.py` is what turns silent staleness into a
 refusal. It has already happened: `aig_pmi.csv` was last committed on 2026-06-11
-with its last observation at 2026-05-01, and **a live build today correctly
-refuses on that series and nothing else**.
+with its last observation at 2026-05-01, and from 2026-08-27 — 117 days later,
+its widened budget — **a live build correctly refuses on that series and nothing
+else**.
 
 Ai Group has *not* stopped publishing — sourcing the publication lag turned up
 releases for May, June and July 2026, the last still reporting a separate
@@ -563,15 +564,18 @@ publication_lag_days + release_interval_days + SLACK_DAYS
 ```
 
 where `publication_lag_days` is the only timing fact the registry stores: days
-from an observation's panel date — the **start** of the period it covers — to
-the day it was actually released. Each one was read off a release page or a
-publisher's release-date list on 2026-08-26, and `SeriesSource.lag_source` says
-which. An unsourced lag would be the same failure mode one layer down: a number
-that looks measured and is not.
+from an observation's **panel date** to the day it was actually released. The
+panel date is the start of the reference month for a monthly series and the
+**last** month of the quarter for the three quarterly ones, which is where
+`fetch_abs` puts them and what `panel._align`'s `{3, 6, 9, 12}` mask requires;
+every lag was measured against whichever convention applies to its series. Each
+one was read off a release page or a publisher's release-date list on
+2026-08-26, and `SeriesSource.lag_source` says which. An unsourced lag would be
+the same failure mode one layer down: a number that looks measured and is not.
 
 Typing the budget in directly got it wrong three times in this project, always in
-the same direction, always because Australian series are dated to the start of
-the period they cover while publication lags by weeks. 45–60 days for monthlies
+the same direction, always because the panel date runs weeks ahead of the
+release. 45–60 days for monthlies
 halted healthy data; 75 still refused the four ABS monthlies that publish two
 months in arrears; 120 for quarterlies refused `gdp` itself for two months out of
 every three. The formula reproduces the numbers those guesses were reaching for
@@ -579,9 +583,26 @@ every three. The formula reproduces the numbers those guesses were reaching for
 at 62 + 31 = 93 against an observed 86 — and it is checkable against the ABS
 calendar rather than against anyone's judgement.
 
-One inequality has to hold: **`SLACK_DAYS` must stay below the shortest release
-interval.** At or above it, a series that skipped a release outright still sits
-inside its budget and the guard stops guarding.
+`release_interval_days` defaults to the frequency — 31 days monthly, 91
+quarterly — but **two publishers skip a month on their ordinary calendar**, and
+the default would refuse them for behaving exactly as they always have. Ai Group
+publishes no PMI for one December or January in most years (2020-12, 2022-01,
+2022-12, 2023-01, 2024-01, 2025-01, 2025-12, plus 2017-06), so the routine case
+is a 62-day gap and a worst age of 96 against an 86-day budget: once the AiG
+fetcher is repaired the build would refuse **every February**. NAB skipped
+September 2020 and would have refused then. Both now carry a per-series
+`release_interval_override` of 62 with its own sourced note, measured on the
+recorded vintage's own history since 2015. The price is disclosed: `aig_pmi`'s
+budget goes 86 → 117, so a genuinely dead feed is caught 31 days later. That is
+the right trade — an annual false refusal trains the operator to widen the
+budget by hand, which is the one thing the guard forbids. The override widens
+the *ordinary* calendar and nothing else: December 2022 and January 2023 were
+both missed, a 92-day gap, and that is still refused.
+
+One inequality has to hold: **`SLACK_DAYS` must stay below every release
+interval, the overrides included.** At or above it, a series that skipped a
+release outright still sits inside its budget and the guard stops guarding.
+`SeriesSource.__post_init__` refuses an override that breaks it and
 `test_the_slack_cannot_swallow_a_missed_release` pins it for every series.
 
 ### A vintage is cut by release date, not reference date
@@ -599,6 +620,21 @@ vintage at date *T* contains indicators published after *T* is the classic
 forward-looking evaluation error: it does not fail loudly, it flatters every
 result. `test_the_vintage_cut_is_by_release_date_not_by_reference_date` asserts
 the invariant for every row, and pins the commodity instance.
+
+**What the cut does not do is reproduce the values.** It reproduces *which
+observations existed* at `asof`, not *what they said* on that day: ABS revises
+seasonally adjusted series, so a recording made on 2026-08-26 and replayed at
+2026-06-01 carries two months of revisions nobody had then. A backtest on this
+primitive is revision-aware in its dating and revision-blind in its values. A
+true real-time evaluation needs one recording per `asof`, not one recording
+replayed at many.
+
+An early `asof` also loses deflator tiers that had not started publishing yet:
+the live 6401.0 monthly CPI does not exist before 2024-04, so at
+`asof="2018-06-01"` that tier is legitimately empty and `build_deflator` skips
+it, recording the skip in `Deflator.skipped`. A tier that is empty when the
+recording says it should have data is still refused — the discriminator is the
+uncut recording, so no date is typed in.
 
 ### The normalisation Australia had to choose for itself
 

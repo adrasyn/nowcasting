@@ -38,14 +38,51 @@ COVID_START = pd.Timestamp("2020-03-01")
 COVID_END = pd.Timestamp("2021-12-01")
 
 
+def _covid_block(spec: ModelSpec) -> int:
+    """Index of the pandemic block, matched WITHOUT REGARD TO CASE.
+
+    ``example_estimate.m:76`` is ``find(strcmpi(spec.BlockNames, 'COVID'))`` --
+    ``strcmpi``, the case-insensitive comparison. A case-sensitive ``in`` test
+    reads the same and is not: a spec column headed ``Block4_Covid`` would find
+    no pandemic block, and everything below this would silently be skipped. The
+    COVID factor would then be active over the whole sample and distort every
+    other factor -- the failure this module exists to prevent, arrived at from
+    a capital letter.
+
+    Absence RAISES rather than passing through, which is the precedent
+    ``build.state_space`` sets for the Global block: this module's whole job is
+    the pandemic factor, so a spec without one needs a different restriction
+    builder, not this one quietly doing nothing.
+    """
+    matches = [i for i, name in enumerate(spec.block_names)
+               if name.casefold() == "covid"]
+    if not matches:
+        raise ValueError(
+            f"the spec has no COVID block (blocks: {spec.block_names}), so the "
+            "pandemic factor cannot be isolated or confined to its window. "
+            "Building restrictions anyway would leave whichever factor is meant "
+            "to be the pandemic one active over the whole sample, distorting "
+            "every other factor -- see this module's docstring."
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            f"the spec names {len(matches)} COVID blocks ({spec.block_names}); "
+            "the pandemic restrictions apply to exactly one factor"
+        )
+    return matches[0]
+
+
 def build_restrict(panel: Panel, spec: ModelSpec, *, p_f: int = 4) -> Restrict:
     """Build the restriction struct for one assembled panel.
 
     Mirrors ``example_estimate.m:70-85``: ``Lambda`` is the spec's block
     pattern verbatim, ``Phi`` starts fully free (``NaN``) and then has the
-    COVID factor's row/column zeroed if a COVID block is present, ``iota`` is
-    the spec's trend on the panel's own scale, and ``f_active`` confines the
-    COVID factor to ``[COVID_START, COVID_END]`` inclusive.
+    COVID factor's row/column zeroed, ``iota`` is the spec's trend on the
+    panel's own scale, and ``f_active`` confines the COVID factor to
+    ``[COVID_START, COVID_END]`` inclusive.
+
+    A spec with no COVID block is refused rather than restricted -- see
+    :func:`_covid_block`.
     """
     n, n_f = spec.blocks.shape
     T = panel.Y.shape[1]
@@ -58,17 +95,16 @@ def build_restrict(panel: Panel, spec: ModelSpec, *, p_f: int = 4) -> Restrict:
     isquart = np.array([f == "q" for f in spec.frequency], dtype=bool)
     f_active = np.ones((n_f, T), dtype=bool)
 
-    if "COVID" in spec.block_names:
-        i_cov = spec.block_names.index("COVID")
-        # Isolate the pandemic factor in the factor VAR: it neither drives
-        # nor is driven by the others (example_estimate.m:80-82, docstring
-        # point 2).
-        Phi[i_cov, :, :] = 0.0
-        Phi[:, i_cov, :] = 0.0
-        Phi[i_cov, i_cov, :] = np.nan
-        # False OUTSIDE the window, not inside it -- docstring point 3.
-        outside = (panel.dates < COVID_START) | (panel.dates > COVID_END)
-        f_active[i_cov, outside] = False
+    i_cov = _covid_block(spec)
+    # Isolate the pandemic factor in the factor VAR: it neither drives
+    # nor is driven by the others (example_estimate.m:80-82, docstring
+    # point 2).
+    Phi[i_cov, :, :] = 0.0
+    Phi[:, i_cov, :] = 0.0
+    Phi[i_cov, i_cov, :] = np.nan
+    # False OUTSIDE the window, not inside it -- docstring point 3.
+    outside = (panel.dates < COVID_START) | (panel.dates > COVID_END)
+    f_active[i_cov, outside] = False
 
     return Restrict(
         Lambda=Lambda, Phi=Phi, iota=iota, f_active=f_active, isquart=isquart

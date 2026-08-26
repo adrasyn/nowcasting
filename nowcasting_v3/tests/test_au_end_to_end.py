@@ -96,7 +96,12 @@ from nyfed.au.build import (
     state_space,
     target_periods,
 )
-from nyfed.au.deflator import DEFLATOR_SOURCES, real_household_spending
+from nyfed.au.deflator import (
+    DEFLATOR_SOURCES,
+    MIN_SPLICE_OVERLAP,
+    build_deflator,
+    real_household_spending,
+)
 from nyfed.au.emit import annualised_to_qoq
 from nyfed.au.fetch_abs import parse_abs_frame
 from nyfed.au.fetch_rba import parse_rba_frame
@@ -124,9 +129,12 @@ VINTAGE = FIXTURES / "vintage"
 #   * April 2026 is then a post-target month, and eight series had published it
 #     by 2026-06-01;
 #   * every series passes its budget -- `aig_pmi`, the binding one, is 61 days
-#     old against 86.
-# `aig_pmi` stopped updating on 2026-05-01, so no vintage after 2026-07-26
-# passes at all; that is what makes the window unique.
+#     old against 117.
+# What makes the window unique is the post-target data, not the budgets. Later
+# vintages build too -- `COMPOSED_BUILDS` exercises 2026-07-01 -- but the panel's
+# fastest series has a 34-day lag, so a vintage inside a quarter carries no
+# month from after the quarter it is nowcasting. `aig_pmi` stopped updating on
+# 2026-05-01, so from 2026-08-27 every vintage is refused on that series alone.
 ASOF = "2026-06-01"
 
 # GDP is observed through 2025-12, so the target quarter is Q1 2026.
@@ -273,6 +281,79 @@ def test_the_nowcast_target_is_the_quarter_after_the_last_observed_gdp(panel):
                                         pd.Timestamp("2026-06-01")]
 
 
+# One composed build per row, from the SAME committed recording. Each entry is
+# (asof, last observed GDP month, the quarters `target_periods` returns).
+#
+# WHY MORE THAN ONE. Until this table existed the whole composed pipeline --
+# cut, deflate, guard, assemble -- had exactly one passing end-to-end instance,
+# at ASOF, plus one asserting a refusal. That is what let `build_deflator`
+# refuse every vintage before 2024-11 without anything noticing: the one asof
+# that was exercised happened to be one where all three deflator tiers were
+# available. It costs about a second of runtime and no new fixture.
+#
+# The expectations are not free parameters. `last_gdp` follows from the national
+# accounts' 94-day lag and the number of horizons from how far the panel runs
+# past it, so the rows alternate 1, 1, 2 with the quarterly calendar -- a
+# property of the vintage, not a constant, which is exactly what a single
+# instance could not show.
+COMPOSED_BUILDS = [
+    # Early enough that the live 6401.0 CPI tier has only three released months
+    # and cannot be rebased, so `build_deflator` must SKIP it. Under the tier
+    # guard this task replaced, every asof before 2024-11-01 died here.
+    ("2024-08-01", "2024-03-01", ["2024-06-01"]),
+    ("2024-11-01", "2024-06-01", ["2024-09-01"]),
+    ("2025-09-01", "2025-03-01", ["2025-06-01", "2025-09-01"]),
+    # February: `aig_pmi` is 92 days old across Ai Group's missing January,
+    # which the frequency-default budget of 86 refused. See
+    # test_au_freshness.py.
+    ("2026-02-01", "2025-09-01", ["2025-12-01"]),
+    ("2026-03-01", "2025-09-01", ["2025-12-01", "2026-03-01"]),
+    ("2026-05-01", "2025-12-01", ["2026-03-01"]),
+    ("2026-07-01", "2026-03-01", ["2026-06-01"]),
+]
+
+
+@pytest.mark.parametrize("asof,last_gdp,horizons", COMPOSED_BUILDS)
+def test_the_composed_build_works_across_vintages(asof, last_gdp, horizons):
+    """The whole pipeline at seven vintages, not one. See COMPOSED_BUILDS."""
+    built = build_panel(asof=asof, vintage=VINTAGE)
+
+    assert built.series_id == [s.series_id for s in AU_SERIES]
+    assert built.dates[-1] == pd.Timestamp(asof)
+    assert built.series_id[built.i_now] == "gdp"
+
+    observed_gdp = built.dates[np.isfinite(built.Y[built.i_now])]
+    assert observed_gdp[-1] == pd.Timestamp(last_gdp)
+    assert [str(d.date()) for d in built.dates[target_periods(built)]] == horizons
+
+    # The deflated household spending row survived whatever the deflator had to
+    # skip at this vintage: a tier dropped silently would show up as a short or
+    # empty row here, not as an error.
+    spending = built.series_id.index("household_spending")
+    finite = built.dates[np.isfinite(built.Y[spending])]
+    assert finite[0] <= pd.Timestamp("2012-09-01"), (
+        f"household spending starts {finite[0].date()} at {asof}; the deflator "
+        "truncated the row that normalises the Global factor"
+    )
+    assert len(finite) > 130
+
+    # Nothing in the panel had a release date after the vintage -- the same
+    # invariant test_the_vintage_cut_is_by_release_date_not_by_reference_date
+    # pins at ASOF, checked at every asof in the table.
+    lags = {s.key: s.publication_lag_days for s in AU_SERIES}
+    for row, key in enumerate(built.series_id):
+        last = built.dates[np.isfinite(built.Y[row])][-1]
+        assert last + pd.Timedelta(days=lags[key]) <= pd.Timestamp(asof), key
+
+
+def test_the_composed_builds_cover_more_than_one_horizon_count():
+    """The table has to contain the variation it claims to, or it is one case
+    written seven times."""
+    counts = {len(h) for _, _, h in COMPOSED_BUILDS}
+    assert counts == {1, 2}
+    assert len({a for a, _, _ in COMPOSED_BUILDS}) == len(COMPOSED_BUILDS)
+
+
 # --------------------------------------------------------------------------- #
 # The deflated row
 # --------------------------------------------------------------------------- #
@@ -348,29 +429,130 @@ def test_a_build_at_the_vintages_own_date_is_refused_because_the_pmi_is_dead():
     meaning: scanned day by day, the stale set stays ``{aig_pmi}`` through
     2026-09-23, becomes five series on 2026-09-24 and all fifteen by 2026-10-20
     -- at which point the gate would fail looking like a freshness regression
-    instead of "the vintage needs re-recording". Measuring at the vintage's own
-    ``recorded_at`` asks the question the frozen data can actually answer: on
-    the day this was fetched, what did the guard say?
+    instead of "the vintage needs re-recording". Measuring against the vintage's
+    own ``recorded_at`` asks the question the frozen data can actually answer.
+
+    A WEEK AFTER THE RECORDING, NOT ON ITS OWN DATE, AND THE WEEK IS THE POINT.
+    ``aig_pmi``'s budget widened from 86 days to 117 when the registry took on
+    Ai Group's skipped December or January (``sources.py``), so the last
+    observation at 2026-05-01 first breaches it on 2026-08-27 -- one day after
+    this recording was made. That is the disclosed cost of not refusing every February: the
+    dead feed is still caught, 31 days later than before. The offset is small
+    and deliberate; if it ever has to grow, the budget is what changed.
     """
     vintage = load_vintage(VINTAGE)
     assert vintage.recorded_at is not None, "the recording has no date to test at"
     recorded_on = pd.Timestamp(vintage.recorded_at).tz_convert(None).normalize()
+    asof = recorded_on + pd.Timedelta(days=7)
+
+    pmi = next(s for s in AU_SERIES if s.key == "aig_pmi")
+    assert pmi.max_age_days == 117, (
+        "the skipped-month override moved; re-check the offset above"
+    )
 
     with pytest.raises(StaleSeriesError) as excinfo:
-        build_panel(asof=str(recorded_on.date()), vintage=vintage)
+        build_panel(asof=str(asof.date()), vintage=vintage)
 
     stale = {key: age for key, age, _ in excinfo.value.stale}
     assert set(stale) == {"aig_pmi"}, f"expected only aig_pmi, got {sorted(stale)}"
-    assert stale["aig_pmi"] > 100
+    assert stale["aig_pmi"] > pmi.max_age_days
     assert "aig_pmi" in str(excinfo.value)
+
+
+def test_a_2018_vintage_deflates_household_spending_over_its_whole_span():
+    """The deflator at a vintage six years before its most preferred tier exists.
+
+    At ``asof="2018-06-01"`` the live 6401.0 monthly CPI has not been published
+    -- it begins in 2024-04 -- so tier 1 is legitimately empty, tier 2 (the
+    ceased 6484.0 indicator, 2017-09 onward) leads, and the interpolated
+    quarterly tier covers everything before it. That is the precedence design
+    working, and until this task it raised ``deflator source cpi_monthly_live is
+    empty`` instead.
+
+    69 months, 2012-07 to 2018-03: household spending's entire released span at
+    that vintage, deflated, with nothing truncated at the leading edge.
+    """
+    vintage = load_vintage(VINTAGE)
+    cut = vintage.as_of("2018-06-01")
+
+    deflator = build_deflator(cut.deflator_sources, recorded=vintage.deflator_sources)
+    assert list(deflator.skipped) == ["cpi_monthly_live"]
+    assert set(deflator.coverage()) == {"cpi_monthly_ceased", "cpi_quarterly"}
+
+    real = real_household_spending(
+        cut.series["household_spending"],
+        cut.deflator_sources,
+        recorded=vintage.deflator_sources,
+    ).dropna()
+    assert (real.index[0], real.index[-1]) == (
+        pd.Timestamp("2012-07-01"), pd.Timestamp("2018-03-01")
+    )
+    assert len(real) == 69
+    assert (real > 0).all()
+
+
+def test_the_deflator_builds_at_every_monthly_vintage_and_never_hits_the_splice_floor():
+    """``_admit``'s load-bearing claim, checked rather than argued.
+
+    The admission pass compares each tier against the single adjacent older tier,
+    while ``splice`` measures the overlap against the UNION of everything newer.
+    The union contains the adjacent tier, so the admitted overlap is a lower
+    bound and ``splice``'s ``min_overlap`` should never be what refuses -- it is
+    a backstop, not the working guard. That is an argument; this is the
+    measurement, over 164 consecutive monthly vintages of the real recording.
+
+    It also pins the other half of I1: at every one of those vintages the
+    deflator BUILDS. The failures that remain before 2024-08 are the panel's
+    (``cpi`` has no history before 2024-04), not the deflator's.
+    """
+    vintage = load_vintage(VINTAGE)
+    thin = []
+    for asof in pd.date_range("2013-01-01", "2026-08-01", freq="MS"):
+        cut = vintage.as_of(asof)
+        deflator = build_deflator(
+            cut.deflator_sources, recorded=vintage.deflator_sources
+        )
+        index = deflator.index
+        assert not index.isna().any() and (index > 0).all(), asof
+        assert (index.index == pd.date_range(
+            index.index[0], index.index[-1], freq="MS"
+        )).all(), f"the deflator has a hole at {asof.date()}"
+        thin += [
+            (str(asof.date()), seam.older, seam.n_overlap)
+            for seam in deflator.seams
+            if seam.n_overlap < MIN_SPLICE_OVERLAP
+        ]
+    assert not thin, f"splice's floor was reached after admission: {thin}"
+
+
+def test_a_2018_vintage_now_refuses_for_the_reason_it_actually_has():
+    """The build still cannot go back to 2018, and that is a different fact.
+
+    Two panel rows -- ``cpi`` and ``cpi_trimmed`` -- are fetched from 6401.0's
+    monthly analytical series, which begins in 2024-04 (see ``sources.py``).
+    Before then those rows have no observations at all, and the freshness guard
+    says so by name. What it no longer does is die inside the deflator naming a
+    tier whose emptiness was correct.
+
+    So the honest boundary on Plan C's backtest is the registry's monthly CPI
+    history, not the deflator. If ABS publishes a longer back series the range
+    moves; nothing else has to change.
+    """
+    with pytest.raises(StaleSeriesError) as excinfo:
+        build_panel(asof="2018-06-01", vintage=VINTAGE)
+    assert {key for key, _, _ in excinfo.value.stale} == {
+        "job_ads", "cpi", "cpi_trimmed"
+    }
 
 
 def test_the_vintage_cut_is_by_release_date_not_by_reference_date(panel):
     """The look-ahead this task shipped in round 1, now a standing check.
 
-    Australian series are dated to the START of the period they cover and are
-    published weeks later, so cutting a vintage at ``asof`` on the observation's
-    own date admits data nobody had yet -- up to nine weeks of it on ``gdp``.
+    An Australian series' panel date runs weeks ahead of its release -- a
+    monthly is dated to the first of its reference month, a quarterly to the
+    LAST month of its quarter -- so cutting a vintage at ``asof`` on the
+    observation's own date admits data nobody had yet, up to nine weeks of it
+    on ``gdp``.
     The invariant is the one a person at a desk would recognise: nothing in the
     panel can have a release date after the vintage.
 
@@ -422,8 +604,8 @@ def test_the_recorded_vintage_agrees_with_the_payloads_verified_against_ABS(spec
     wrong series -- or corrupted in the CSV round trip -- would build a panel,
     standardise cleanly and estimate happily.
 
-    THIS COVERS 13 OF THE 15 ROWS. ``job_ads``, ``aig_pmi`` and
-    ``nab_conditions`` are recorded in the vintage like everything else, but
+    THIS COVERS 12 OF THE 15 ROWS -- 11 ABS and 1 RBA. ``job_ads``, ``aig_pmi``
+    and ``nab_conditions`` are recorded in the vintage like everything else, but
     they come from v2's committed CSVs and have no release-pinned payload in
     this repo to be checked against -- so for those three the recording is
     trusted, not checked, and that is the honest description of it.
@@ -446,7 +628,7 @@ def test_the_recorded_vintage_agrees_with_the_payloads_verified_against_ABS(spec
         else:
             # The v2 rows ARE in the recording; what they lack is a
             # release-pinned payload to check against, so "checked, not
-            # trusted" holds for 13 of the 15 rows and is stated as such.
+            # trusted" holds for 12 of the 15 rows and is stated as such.
             continue
         overlap = recorded.index.intersection(vintage.series[source.key].index)
         assert len(overlap) >= 24, f"{source.key}: only {len(overlap)} months overlap"

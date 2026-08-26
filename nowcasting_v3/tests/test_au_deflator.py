@@ -414,6 +414,102 @@ def test_deflate_refuses_a_hole_in_the_middle_of_the_deflator():
         deflate(nominal, holed)
 
 
+# --- tiers that this vintage does not have ---------------------------------
+
+
+def _cut(key: str, months: int | None) -> dict[str, pd.Series]:
+    """The full tiers, with one of them truncated to its first ``months``.
+
+    ``months=None`` empties it. This is what ``build.Vintage.as_of`` does to a
+    tier at a vintage earlier than its history: the live 6401.0 monthly series
+    begins in 2024-04, so at ``asof="2018-06-01"`` it is legitimately empty, and
+    between 2024-06 and 2024-10 it is present but too short to be rebased.
+    """
+    sources = _sources()
+    sources[key] = sources[key].iloc[: 0 if months is None else months]
+    return sources
+
+
+@pytest.mark.parametrize("months", [None, 0, 3])
+def test_a_tier_the_vintage_predates_is_skipped_not_fatal(months):
+    """The guard that made every vintage before 2024-11 unbuildable.
+
+    ``DEFLATOR_SOURCES`` is explicitly "each entry supplies only the months no
+    earlier entry covers", so a tier that supplies nothing supplies nothing.
+    Refusing there stopped ``build_panel`` -- the primitive Plan C's backtest
+    calls -- from building any vintage before roughly November 2024, and it
+    named the wrong cause on the way out.
+
+    Both the empty case and the too-short-to-rebase case are the same
+    situation seen a few months apart, so both skip, and the skip is RECORDED
+    rather than silent.
+    """
+    sources = _cut("cpi_monthly_live", months)
+    deflator = build_deflator(sources, recorded=_sources())
+
+    assert list(deflator.skipped) == ["cpi_monthly_live"]
+    assert set(deflator.coverage()) == {"cpi_monthly_ceased", "cpi_quarterly"}
+    assert deflator.index.index[0] == pd.Timestamp("1948-09-01")
+    # The fallback tier still reaches the present, so dropping the live one
+    # costs precision at the recent end, not coverage. That is the whole reason
+    # skipping is safe here and refusing a genuinely broken feed is not.
+    assert deflator.index.index[-1] == pd.Timestamp("2026-06-01")
+    assert not deflator.index.isna().any()
+    assert (deflator.index > 0).all()
+
+    # What is built is exactly the two-tier splice, not a damaged three-tier one.
+    expected, _ = splice(
+        _series("cpi_monthly_ceased"),
+        quarterly_to_monthly(_series("cpi_quarterly")),
+    )
+    pd.testing.assert_series_equal(
+        deflator.index, expected.rename("cpi_spliced"), check_names=False
+    )
+
+
+@pytest.mark.parametrize("months", [None, 0, 3])
+def test_a_tier_that_is_empty_when_it_should_have_data_is_still_refused(months):
+    """The hazard the original guard was written for, kept.
+
+    A fetcher that returned nothing, or a series id that has moved, produces the
+    same empty tier an early vintage does -- and dropping THAT one silently
+    would fall the deflator back to interpolated quarterly prices for the recent
+    months, which is the approximation the hybrid exists to avoid.
+
+    The discriminator is the recording: here the cut removed nothing, so the
+    shortfall is the source's and it raises. Nothing about a date is typed in.
+    """
+    sources = _cut("cpi_monthly_live", months)
+    with pytest.raises(ValueError, match="cut does not explain it"):
+        build_deflator(sources, recorded=sources)
+
+
+@pytest.mark.parametrize("months", [None, 0, 3])
+def test_without_a_recording_to_compare_against_an_unusable_tier_refuses(months):
+    """No ``recorded=``, no way to tell the two apart, so the strict half wins.
+
+    This is what a direct call gets. ``build.build_panel`` passes the uncut
+    vintage and gets the distinction; anyone else gets the behaviour this
+    module had before.
+    """
+    with pytest.raises(ValueError, match="no recording to compare against"):
+        build_deflator(_cut("cpi_monthly_live", months))
+
+
+def test_the_full_history_build_skips_nothing():
+    """The ordinary case is unchanged: three tiers in, three tiers used."""
+    assert build_deflator(_sources()).skipped == {}
+    assert build_deflator(_sources(), recorded=_sources()).skipped == {}
+
+
+def test_a_recording_missing_a_tier_is_refused_rather_than_ignored():
+    sources = _sources()
+    recorded = _sources()
+    del recorded["cpi_quarterly"]
+    with pytest.raises(KeyError, match="cpi_quarterly"):
+        build_deflator(sources, recorded=recorded)
+
+
 def test_build_deflator_refuses_a_missing_tier():
     sources = _sources()
     del sources["cpi_monthly_ceased"]

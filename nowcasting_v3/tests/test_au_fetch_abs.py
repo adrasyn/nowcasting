@@ -199,11 +199,16 @@ def test_parse_abs_frame_handles_every_index_shape_a_source_can_hand_it():
         ),
         (
             "unit_labour_cost", "2026-03-01", 108.9, 0.05,
-            "ABS 5206.0 National Accounts, March quarter 2026, table Unit "
-            "Labour Costs: nominal non-farm unit labour costs rose 0.8% in "
-            "the quarter and 3.2% over the year, both of which reproduce from "
-            "this level. Non-farm is a deliberate choice over the farm "
-            "variant -- farm ULC tracks weather, not the labour market",
+            "SECOND-HAND, and the only pin in this table that is. The movement "
+            "-- nominal non-farm unit labour costs up 0.8% in the quarter and "
+            "3.2% over the year, both of which reproduce from this level -- was "
+            "quoted from commentary on the March quarter 2026 national "
+            "accounts, NOT read off an ABS page: ABS 5206.0's Unit Labour Costs "
+            "table publishes only the REAL variant, so the nominal series this "
+            "row fetches (A2433074L) has no published movement to cite. Weaker "
+            "provenance than the rest of this table, and recorded as such. "
+            "Non-farm is a deliberate choice over the farm variant -- farm ULC "
+            "tracks weather, not the labour market",
         ),
     ],
 )

@@ -89,6 +89,12 @@ def test_a_real_quarterly_payload_survives_the_alignment_mask():
     That disagreement is not hypothetical: Task 2's first parser dated 2017Q2 to
     2017-04, every quarterly observation was dropped by this mask, and the model
     ran on an all-NaN target without complaint.
+
+    The count is one BELOW the payload's, not equal to it: since Task 5A the
+    panel applies the spec's ``pca`` to GDP, and the first quarter in the window
+    has no predecessor to grow from. That is arithmetic, not a dropped
+    observation -- the failure this test exists for still shows as 0, or as
+    months outside ``{3, 6, 9, 12}``.
     """
     from nyfed.au.fetch_abs import parse_abs_frame
 
@@ -102,7 +108,7 @@ def test_a_real_quarterly_payload_survives_the_alignment_mask():
 
     row = panel.series_id.index("gdp")
     observed = panel.dates[~np.isnan(panel.Y[row])]
-    assert len(observed) == len(gdp.loc["2018":"2026-03"]), (
+    assert len(observed) == len(gdp.loc["2018":"2026-03"]) - 1, (
         "the alignment mask dropped real quarterly observations"
     )
     assert set(observed.month) == {3, 6, 9, 12}
@@ -192,7 +198,11 @@ def test_assembly_accepts_the_real_negative_imports_series():
     inputs["exports"] = _recorded("exports", "A2718577A")
     panel = assemble(inputs, start="2023-07-01", end="2026-06-01")
     row = panel.series_id.index("imports")
-    assert np.isfinite(panel.Y[row]).sum() == 36
+    # 36 months in the window, less the first: since Task 5A the panel applies
+    # the spec's `pch` to imports and the first month has no predecessor. A log
+    # difference would leave 0, not 35.
+    assert np.isfinite(panel.Y[row]).sum() == 35
+    assert np.isnan(panel.Y[row, 0])
 
 
 def test_assembly_refuses_a_panel_whose_imports_row_was_swallowed():
@@ -219,3 +229,62 @@ def test_the_imports_guard_also_catches_a_partial_loss():
 
     with pytest.raises(ValueError, match="imports"):
         assemble(inputs, start="2023-07-01", end="2026-06-01")
+
+
+# --- the spec's transformations, applied (Task 5A) -------------------------
+
+
+def test_the_assembled_gdp_row_is_a_growth_rate_not_a_level():
+    """The panel must reach the engine transformed.
+
+    `Y` itself proves nothing here -- standardising a level gives z-scores that
+    are just as small as standardising a growth rate, so a magnitude test on
+    `Y` passes whether or not the transform ran. `y_location` and `y_scale` are
+    computed from whatever `standardise` was handed, so they are what actually
+    distinguishes the two: real GDP in millions of dollars centres near 600,000,
+    an annualised quarterly growth rate near 2.
+
+    That also pins the ORDER. Standardise first and difference after, and
+    `y_location` would carry the level's mean.
+    """
+    frame = pd.read_csv(FIXTURES / "abs_gdp.csv", index_col=0)
+    frame.index = pd.PeriodIndex(frame.index.astype(str), freq="Q-DEC")
+    from nyfed.au.fetch_abs import parse_abs_frame
+
+    gdp = parse_abs_frame(frame, "A2304402X")
+    assert gdp.max() > 100_000, "the fixture is not a level; this test is void"
+
+    inputs = _panel_inputs()
+    inputs["gdp"] = gdp
+    panel = assemble(inputs, start="2018-01-01", end="2026-03-01")
+    i = panel.i_now
+
+    assert abs(panel.y_location[i, 0]) < 100
+    assert panel.y_scale[i, 0] < 100
+
+
+def test_the_assembled_gdp_row_is_annualised_by_four_not_twelve():
+    """Recover the transformed value from the standardised panel and check it
+    against the quarter-on-quarter growth of the recorded level.
+
+    Annualising by 12 would put the last cell near 3.7 instead of 1.1 -- still a
+    number a reader would accept, which is why this is checked against the
+    arithmetic rather than by eye."""
+    from nyfed.au.fetch_abs import parse_abs_frame
+
+    frame = pd.read_csv(FIXTURES / "abs_gdp.csv", index_col=0)
+    frame.index = pd.PeriodIndex(frame.index.astype(str), freq="Q-DEC")
+    gdp = parse_abs_frame(frame, "A2304402X")
+
+    inputs = _panel_inputs()
+    inputs["gdp"] = gdp
+    panel = assemble(inputs, start="2018-01-01", end="2026-03-01")
+    i = panel.i_now
+
+    recovered = panel.Y[i] * panel.y_scale[i, 0] + panel.y_location[i, 0]
+    last = gdp.loc[pd.Timestamp("2026-03-01")].item()
+    previous = gdp.loc[pd.Timestamp("2025-12-01")].item()
+    expected = 100.0 * ((last / previous) ** 4 - 1.0)
+
+    assert recovered[-1] == pytest.approx(expected, abs=1e-9)
+    assert expected != pytest.approx(100.0 * ((last / previous) ** 12 - 1.0))

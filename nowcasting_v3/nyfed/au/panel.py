@@ -23,10 +23,16 @@ fatal for a log-difference one: ``np.log`` of a negative number is NaN and
 raises nothing, so the panel would quietly carry fourteen live series instead of
 fifteen. ``_check_imports_survived`` turns that into a refusal.
 
+**The transform runs before standardisation.** ``assemble`` applies the spec's
+``Transformation`` column (``nyfed/au/transform.py``) to the aligned raw matrix
+and standardises the result, because ``example_nowcast.m`` computes
+``Y_location`` and ``Y_scale`` from transformed data. Note that a differenced
+row loses its first observation -- ``pch``/``chg`` the first month of the panel
+window, ``pca`` the first quarter -- which is arithmetic, not data loss.
+
 WHAT THIS MODULE DOES NOT DO
 ----------------------------
-It does not deflate, and it does not apply the spec's ``Transformation``
-column. ``household_spending`` must be passed in ALREADY REAL -- see
+It does not deflate. ``household_spending`` must be passed in ALREADY REAL -- see
 ``nyfed/au/deflator.py``; the registry's series is at current prices, and it
 normalises the Global factor, so a nominal one sets that factor's scale from
 inflation.
@@ -40,6 +46,7 @@ import numpy as np
 import pandas as pd
 
 from nyfed.au.sources import AU_SERIES, SPEC_PATH, SeriesSource
+from nyfed.au.transform import transform_panel
 from nyfed.spec import load_spec
 
 
@@ -162,8 +169,20 @@ def assemble(
             raise KeyError(f"{source.key} is registered but was not fetched")
         aligned[source.key] = _align(series[source.key], dates, source)
 
-    _check_imports_survived(aligned, dates)
     raw = np.vstack([aligned[source.key] for source in sources])
+
+    # BEFORE standardisation, not after. `example_nowcast.m` computes
+    # `Y_location` and `Y_scale` from transformed data; standardising first
+    # would centre and scale the LEVELS and then difference them, which is a
+    # different number. See `nyfed/au/transform.py`.
+    raw = transform_panel(raw, spec, dates)
+
+    # AFTER the transform, because the transform is what the guard is for. A
+    # log-difference `pch` empties the wholly negative imports row without
+    # raising, and this is the only place that can see it happen.
+    _check_imports_survived(
+        {source.key: raw[i] for i, source in enumerate(sources)}, dates
+    )
 
     Y, location, scale = standardise(raw)
     return Panel(

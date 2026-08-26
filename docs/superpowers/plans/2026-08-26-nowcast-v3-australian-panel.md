@@ -2051,16 +2051,20 @@ from nyfed.au.freshness import check_freshness
 from nyfed.au.panel import Panel, assemble
 from nyfed.au.sources import AU_SERIES
 
-# The A$ all-items column of RBA table I2. Recorded here rather than in the
-# registry because it is a property of the table's layout, not of the panel.
-RBA_COMMODITY_COLUMN = "Index of Commodity Prices; All items; A$"
-
-
 def _fetch_one(source) -> pd.Series:
+    """Dispatch one registry entry to its fetcher.
+
+    Every fetcher takes the registry's ``locator`` and nothing else. The RBA
+    column is encoded IN the locator (``"I2:GRCPAIAD"``), exactly as the ABS
+    catalogue and series id are (``"6202.0:A84423043C"``) -- do not reintroduce
+    a separate column argument or a module-level column constant. Task 3's
+    review found that a hand-typed column let ``GRCPAISAD``, a one-character
+    variant that is a genuinely different series, pass every test in the suite.
+    """
     if source.fetcher == "abs":
         return fetch_abs_series(source.locator)
     if source.fetcher == "rba":
-        return fetch_rba_series(source.locator, column=RBA_COMMODITY_COLUMN)
+        return fetch_rba_series(source.locator)
     if source.fetcher == "v2":
         return read_v2_series(source.locator)
     raise ValueError(f"{source.key} has unknown fetcher {source.fetcher!r}")

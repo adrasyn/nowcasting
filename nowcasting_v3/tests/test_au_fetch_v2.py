@@ -39,3 +39,19 @@ def test_every_v2_series_is_present_and_parses(source):
 def test_a_missing_v2_csv_raises_rather_than_returning_empty(tmp_path):
     with pytest.raises(FileNotFoundError):
         read_v2_series("does_not_exist", root=tmp_path)
+
+
+def test_a_csv_with_no_date_like_column_raises_a_descriptive_error(tmp_path):
+    """A bare ``next()`` over an empty generator raises a message-less
+    StopIteration -- unhelpful for the three hand-scraped series, the ones
+    most likely to hand this reader an unexpected shape. Confirm the failure
+    names the file and what was actually found instead."""
+    (tmp_path / "odd.csv").write_text("month,reading\n2026-01,1.0\n2026-02,2.0\n")
+    with pytest.raises(KeyError, match="no date-like column"):
+        read_v2_series("odd", root=tmp_path)
+
+
+def test_a_csv_with_only_a_date_column_raises_a_descriptive_error(tmp_path):
+    (tmp_path / "dateonly.csv").write_text("date\n2026-01-01\n2026-02-01\n")
+    with pytest.raises(KeyError, match="but nothing else"):
+        read_v2_series("dateonly", root=tmp_path)

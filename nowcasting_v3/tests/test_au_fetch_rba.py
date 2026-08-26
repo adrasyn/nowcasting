@@ -4,19 +4,63 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from nyfed.au.fetch_rba import parse_rba_frame
+from nyfed.au.sources import AU_SERIES
 
 FIXTURES = Path(__file__).parent / "fixtures" / "au"
+RBA_SERIES = [s for s in AU_SERIES if s.fetcher == "rba"]
 
 
-def test_the_commodity_price_fixture_is_recorded():
-    assert (FIXTURES / "rba_I2.csv").is_file()
+def _fixture_path(source):
+    table = source.locator.split(":")[0]
+    return FIXTURES / f"rba_{table}.csv"
 
 
-def test_the_commodity_index_parses_to_a_monthly_float_series():
-    frame = pd.read_csv(FIXTURES / "rba_I2.csv", index_col=0, parse_dates=True)
-    parsed = parse_rba_frame(frame, column=frame.columns[0])
+def _fixture_frame(source):
+    return pd.read_csv(_fixture_path(source), index_col=0, parse_dates=True)
+
+
+def _parse(source):
+    column = source.locator.split(":")[1]
+    return parse_rba_frame(_fixture_frame(source), column)
+
+
+def test_every_rba_series_has_a_recorded_fixture():
+    """Same guard as the ABS fixtures: a missing payload must fail, not skip."""
+    missing = [s.key for s in RBA_SERIES if not _fixture_path(s).is_file()]
+    assert not missing, f"no recorded fixture for {missing}"
+
+
+@pytest.mark.parametrize("source", RBA_SERIES, ids=lambda s: s.key)
+def test_the_fixture_header_carries_the_registry_column(source):
+    """Table I2 carries 21 columns -- three currencies each for the all-items
+    index and five sub-indices (rural, non-rural, base metals, bulk, and a
+    bulk-spot variant). Every one of them parses to a plausible-looking float
+    series, so shape and dtype alone cannot catch a fixture recorded against,
+    or a fetch dispatcher pointed at, the wrong column -- and GRCPAISAD, the
+    bulk-commodities-spot variant, is one character away from the correct
+    GRCPAIAD and would pass every other test in this file.
+
+    Derive the expected column from the registry, the same discipline Task 2
+    applied to a mislabelled ABS payload: this checks that ``sources.py`` and
+    the recorded fixture agree, not merely that some column parses. A
+    hardcoded expectation in this test file would not catch the registry
+    itself drifting to the wrong column -- only the registry-derived
+    assertion does.
+    """
+    expected = source.locator.split(":")[1]
+    assert expected in _fixture_frame(source).columns, (
+        f"{_fixture_path(source).name} has no column {expected!r} (registry "
+        f"locator {source.locator!r} for {source.key!r}); re-record the "
+        "fixture or fix sources.py"
+    )
+
+
+@pytest.mark.parametrize("source", RBA_SERIES, ids=lambda s: s.key)
+def test_the_commodity_index_parses_to_a_monthly_float_series(source):
+    parsed = _parse(source)
     assert isinstance(parsed.index, pd.DatetimeIndex)
     assert parsed.index.is_monotonic_increasing
     assert (parsed.index.day == 1).all()
@@ -25,19 +69,26 @@ def test_the_commodity_index_parses_to_a_monthly_float_series():
     assert 28 <= gaps.median() <= 31
 
 
-def test_the_fixture_first_column_is_the_a_dollar_all_items_index():
-    """Table I2 carries 21 columns -- three currencies each for the all-items
-    index and five sub-indices (rural, non-rural, base metals, bulk, and a
-    bulk-spot variant). Every one of them parses to a plausible-looking float
-    series, so shape alone cannot catch a fixture recorded against the wrong
-    column. Pin the RBA series id directly, the same discipline Task 2 applied
-    to a mislabelled ABS payload: this asserts the fixture's own header, not
-    just that *some* column parses.
+def test_commodity_prices_reproduces_the_published_release():
+    """RBA Index of Commodity Prices, July 2026 -- release date 4 August 2026,
+    https://www.rba.gov.au/statistics/frequency/commodity-prices/2026/icp-0726.html:
+    "In Australian dollar terms, the index increased by 1.2 per cent in
+    July... The index has increased by 7.5 per cent in Australian dollar
+    terms" (over the year to July 2026).
+
+    Shape, dtype and column-name checks all pass on a fixture that was
+    corrupted or silently rescaled under the correct header -- the same
+    defect class as Task 2's Important 1 for the ABS fixtures. A published
+    movement cannot reproduce from the wrong numbers, so reproduce both the
+    monthly and annual change from the fixture's GRCPAIAD column directly.
+    Tolerance is 0.05, the precision the RBA release rounds to.
     """
-    frame = pd.read_csv(FIXTURES / "rba_I2.csv", index_col=0, parse_dates=True)
-    assert frame.columns[0] == "GRCPAIAD", (
-        "rba_I2.csv's first column is not GRCPAIAD (Commodity prices -- A$, "
-        "all items); re-record the fixture or fix the column choice in "
-        "fetch_rba.py -- every other column in this table is a different "
-        "index or a different currency"
-    )
+    source = next(s for s in AU_SERIES if s.key == "commodity_prices")
+    parsed = _parse(source)
+    now = parsed.loc[pd.Timestamp("2026-07-01")]
+    prev = parsed.loc[pd.Timestamp("2026-06-01")]
+    year_ago = parsed.loc[pd.Timestamp("2025-07-01")]
+    mom = (now / prev - 1) * 100
+    yoy = (now / year_ago - 1) * 100
+    assert mom == pytest.approx(1.2, abs=0.05), "month-on-month change"
+    assert yoy == pytest.approx(7.5, abs=0.05), "year-on-year change"

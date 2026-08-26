@@ -12,6 +12,17 @@ is plausible-looking either way. Do not swap in a sub-index (rural,
 non-rural, base metals, bulk) or the "with bulk commodities spot prices"
 variant (GRCPAISAD) without a documented reason -- both parse cleanly and
 both are a different series.
+
+The column choice is not a parameter a caller supplies -- it lives in
+``nyfed.au.sources.AU_SERIES`` as part of the locator, ``"I2:GRCPAIAD"``,
+the same self-contained shape ABS locators use (``"<catalogue>:<series
+id>"``). ``fetch_rba_series`` takes that one string and splits it, rather
+than taking ``table`` and ``column`` as two separate arguments: a
+two-argument signature invites a future caller to type the column by hand,
+and ``GRCPAISAD`` -- one character away from the correct column -- would
+type-check, fetch, and parse without complaint. Keeping the column in the
+registry makes ``sources.py`` the single place a fixture or a caller can be
+checked against, for both source families.
 """
 
 from __future__ import annotations
@@ -31,9 +42,16 @@ def parse_rba_frame(frame: pd.DataFrame, column: str) -> pd.Series:
     return series[~series.index.duplicated(keep="last")].sort_index()
 
 
-def fetch_rba_series(table: str, *, column: str) -> pd.Series:
-    """Retrieve one column of an RBA statistical table."""
+def fetch_rba_series(locator: str) -> pd.Series:
+    """Retrieve one column of an RBA statistical table.
+
+    ``locator`` is ``"<table>:<column>"``, e.g. ``"I2:GRCPAIAD"`` -- the same
+    self-contained shape as ``fetch_abs.fetch_abs_series``'s ABS locator, and
+    for the same reason: the column is part of what a registry entry names,
+    not something a caller chooses at the call site.
+    """
     import readabs as ra  # imported lazily: tests never need it
 
+    table, column = locator.split(":", 1)
     frame, _meta = ra.read_rba_table(table)
     return parse_rba_frame(frame, column)

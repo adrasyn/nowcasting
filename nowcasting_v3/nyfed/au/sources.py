@@ -6,7 +6,13 @@ is not the identity (``nyfed/spec.py:112``), because the data panel is built in
 raw CSV order and is never permuted with it. So this order is load-bearing.
 
 ``fetcher`` names the module that retrieves the series and ``locator`` is that
-fetcher's argument: an ABS series id, an RBA table code, or a v2 CSV stem.
+fetcher's argument: ``"<catalogue>:<series id>"`` for ABS, ``"<table>:<column>"``
+for RBA, or a bare v2 CSV stem. Both the ABS and RBA locators are self-contained
+on purpose -- ``sources.py`` is the single place that names which column of a
+multi-column source the panel means, so a fixture or a fetch dispatcher can be
+checked against the registry directly rather than trusting a caller to type
+the right column by hand. See the ``commodity_prices`` entry below for why
+this matters concretely.
 
 ``max_age_days`` is the staleness budget enforced in ``freshness.py``. It is
 set from the publication cycle plus a tolerance, not from convenience: four
@@ -38,6 +44,20 @@ against 6484.0's ~8 years. That is a real short-history constraint on the
 Nominal block's normaliser and on the price factor generally; it is not a
 substitution of something close, it is what currently exists. Re-check ABS
 for a longer back series before this becomes a problem for estimation.
+
+``commodity_prices`` locates ``"I2:GRCPAIAD"``: RBA statistical table I2
+carries 21 columns -- an all-items index and five sub-indices (rural,
+non-rural, base metals, bulk commodities, and a "with bulk commodities spot
+prices" variant), each in three currency terms (A$, US$, SDR). ``GRCPAIAD``
+is the all-items index in A$ terms. Australia's GDP is A$-denominated, and
+the Q1 2026 miss this series was added to address was an A$ terms-of-trade
+shock, so the US$/SDR variants would not serve that purpose even though
+they parse to equally plausible numbers -- and ``GRCPAISAD``, the
+bulk-commodities-spot variant, is one character away and a genuinely
+different series. The column lives here, not as a bare table code plus a
+caller-supplied argument, precisely so a fetch dispatcher cannot silently
+choose the wrong one: ``fetch_rba.fetch_rba_series`` takes this locator
+whole and splits it, the same as ABS.
 
 No ``vacancy_index`` entry: this panel was designed around a row v2 lists
 but does not have. v2's own ``seed/panel_info.csv`` marks the Jobs and
@@ -100,7 +120,7 @@ AU_SERIES: tuple[SeriesSource, ...] = (
                  "abs", "5368.0:A2718603V", "m", 60),
     SeriesSource("commodity_prices", "commodity_prices",
                  "RBA Index of Commodity Prices",
-                 "rba", "I2", "m", 45),
+                 "rba", "I2:GRCPAIAD", "m", 45),
     SeriesSource("cpi", "cpi", "Monthly CPI",
                  "abs", "6401.0:A130607789R", "m", 60),
     SeriesSource("cpi_trimmed", "cpi_trimmed", "Monthly CPI trimmed mean",

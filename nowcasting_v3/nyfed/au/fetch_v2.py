@@ -46,8 +46,20 @@ def read_v2_series(stem: str, *, root: Path | None = None) -> pd.Series:
             "but never writes it."
         )
     raw = pd.read_csv(path)
-    date_col = next(c for c in raw.columns if c.lower() in ("date", "ref_date", "time"))
-    value_col = next(c for c in raw.columns if c != date_col)
+    date_candidates = [c for c in raw.columns if c.lower() in ("date", "ref_date", "time")]
+    if not date_candidates:
+        raise KeyError(
+            f"{path} has no date-like column (looked for 'date'/'ref_date'/"
+            f"'time', case-insensitive); got {list(raw.columns)}"
+        )
+    date_col = date_candidates[0]
+    value_candidates = [c for c in raw.columns if c != date_col]
+    if not value_candidates:
+        raise KeyError(
+            f"{path} has a date column ({date_col!r}) but nothing else; got "
+            f"{list(raw.columns)}"
+        )
+    value_col = value_candidates[0]
     series = pd.Series(
         pd.to_numeric(raw[value_col], errors="coerce").to_numpy(dtype=float),
         index=pd.DatetimeIndex(raw[date_col]).to_period("M").to_timestamp(),

@@ -1,0 +1,526 @@
+"""Fetch, guard and assemble the Australian panel, and run the model on it.
+
+The one entry point Plans C, D and E call. Fetching happens here; every other
+module in ``nyfed/au`` is pure and testable offline.
+
+THE HOUSEHOLD SPENDING ROW IS DEFLATED HERE, AND ONLY HERE
+----------------------------------------------------------
+The registry fetches ``5682.0:A130200584T``, the Monthly Household Spending
+Indicator **at current prices**. The panel row it feeds is "Household Spending
+(real)" and mirrors the NY Fed's ``PCEC96``. Three separate reasons the nominal
+series must not reach ``assemble``:
+
+* its transformation is ``pch``, so a nominal series carries inflation straight
+  into the factor;
+* it **normalises the Global factor** (``Block0_Global = 100`` in
+  ``model_spec_AU.csv``), so its scale sets the broadest factor's scale;
+* v2 measured the size of the error: 2024 mean 3-month nominal growth 0.82%
+  against real 0.19%, with real GDP around 0.4%.
+
+So ``build_panel`` replaces the fetched series with
+``deflator.real_household_spending(...)`` **before** the freshness check and
+before ``assemble``. ``nyfed/au/panel.py`` deliberately does not deflate --
+``assemble`` takes whatever it is handed -- so this line is the only thing
+standing between the registry's nominal series and the Global factor.
+
+AS OF MEANS AS OF
+-----------------
+Every series and every deflator tier is truncated to ``asof`` before anything
+else happens. Two consequences, both wanted:
+
+* the panel is a real vintage -- a build at 2026-07-01 cannot see the August
+  releases, whether it is fetching live or replaying a recording made later;
+* ``check_freshness`` measures age from the last observation **at that
+  vintage**, so a build dated to a Tuesday in July is judged on what was
+  published by that Tuesday, not on what exists now.
+
+Freshness is checked on the series that actually enter the panel, which means
+``household_spending`` is checked *after* deflation: if the deflator ran out
+before the nominal series did, the real row's trailing months are NaN and that
+is a genuine staleness of the row the model sees.
+
+There is no flag to skip the freshness check, and there must not be. A build
+today refuses -- ``aig_pmi``'s last observation is 2026-05-01, roughly 117 days
+against a 75-day budget, because Ai Group folded its PMI into a broader index
+in May 2026. That refusal is the guard working. The way to nowcast anyway is to
+fix or replace the dead series, not to widen the budget or add a bypass.
+
+It is not the only series named, and the rest of that message is a separate,
+open finding rather than more dead data: building approvals, household
+spending, exports and imports were all 86 days old on 2026-08-26 and entirely
+current, because they are dated to the start of their reference month and
+published about two months later. The 75-day monthly budget is too tight for
+that publication profile and those four series need their own budgets, derived
+per series from the release calendar. Reported with Task 10; recorded in
+``test_a_build_today_is_refused_because_the_pmi_is_dead`` so it is met rather
+than rediscovered.
+
+VINTAGES: WHY THE GATE DOES NOT FETCH
+-------------------------------------
+``build_panel(asof=...)`` with no ``vintage`` fetches live, which is what a
+production run does. A *recorded vintage* is the same data written to CSV, and
+``build_panel(asof=..., vintage=path)`` replays it. The end-to-end gate replays
+a recording for three reasons: a live build takes about two and a half minutes
+and touches four hosts; ``readabs`` emits warnings that the suite's
+``filterwarnings = ["error"]`` would turn into unrelated failures; and ABS
+revises, so a networked gate would quietly measure a different panel every
+week. The recording is real fetched data, checked against the trimmed payloads
+that were verified against the ABS and RBA releases (see
+``tests/test_au_end_to_end.py``), and ``load_vintage`` refuses a recording whose
+locators no longer match the registry.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from nyfed.au.deflator import (
+    DEFLATOR_SOURCES,
+    fetch_deflator_sources,
+    real_household_spending,
+)
+from nyfed.au.fetch_abs import fetch_abs_series
+from nyfed.au.fetch_rba import fetch_rba_series
+from nyfed.au.fetch_v2 import read_v2_series
+from nyfed.au.freshness import check_freshness
+from nyfed.au.initval import seed_lambda
+from nyfed.au.panel import Panel, assemble
+from nyfed.au.restrict import build_restrict
+from nyfed.au.sources import AU_SERIES, SPEC_PATH, SeriesSource
+from nyfed.gibbs import GibbsResult, gibbs_sampler
+from nyfed.model import InitVal, Latent, Restrict, construct_prior, construct_ssm
+from nyfed.nowcast import point_nowcast
+from nyfed.parameters import Params, map_parameter, vec_parameter
+from nyfed.settings import GibbsSettings
+from nyfed.spec import ModelSpec, load_spec
+from nyfed.ssm import StateSpace
+
+__all__ = [
+    "DEFAULT_START",
+    "Vintage",
+    "build_panel",
+    "estimate_short",
+    "fetch_vintage",
+    "free_parameter_mask",
+    "load_vintage",
+    "quick_nowcast",
+    "save_vintage",
+    "state_space",
+    "target_periods",
+]
+
+DEFAULT_START = "1990-01-01"
+
+# Factor-VAR and measurement-error lag orders. ``example_estimate.m:44-45``.
+P_F, P_E = 4, 1
+
+
+# --------------------------------------------------------------------------- #
+# Fetching
+# --------------------------------------------------------------------------- #
+
+
+def _fetch_one(source: SeriesSource) -> pd.Series:
+    """Dispatch one registry entry to its fetcher.
+
+    Every fetcher takes the registry's ``locator`` and nothing else. The RBA
+    column is encoded IN the locator (``"I2:GRCPAIAD"``), exactly as the ABS
+    catalogue and series id are (``"6202.0:A84423043C"``) -- do not reintroduce
+    a separate column argument or a module-level column constant. Task 3's
+    review found that a hand-typed column let ``GRCPAISAD``, a one-character
+    variant that is a genuinely different series, pass every test in the suite.
+    """
+    if source.fetcher == "abs":
+        return fetch_abs_series(source.locator)
+    if source.fetcher == "rba":
+        return fetch_rba_series(source.locator)
+    if source.fetcher == "v2":
+        return read_v2_series(source.locator)
+    raise ValueError(f"{source.key} has unknown fetcher {source.fetcher!r}")
+
+
+@dataclass(frozen=True)
+class Vintage:
+    """Everything one build needs from outside, before any truncation.
+
+    ``series`` is keyed by registry key and holds household spending **at
+    current prices**, exactly as fetched: a Vintage is a recording of the
+    sources, not of the panel. ``deflator_sources`` is keyed by
+    ``DeflatorSource.key`` and is what turns that row real.
+    """
+
+    series: dict[str, pd.Series]
+    deflator_sources: dict[str, pd.Series]
+    recorded_at: str | None = None
+
+
+def fetch_vintage(sources: tuple[SeriesSource, ...] = AU_SERIES) -> Vintage:
+    """Retrieve every registered series and every deflator tier. Networked."""
+    return Vintage(
+        series={s.key: _fetch_one(s) for s in sources},
+        deflator_sources=fetch_deflator_sources(),
+        recorded_at=datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Recording a vintage
+# --------------------------------------------------------------------------- #
+
+_SERIES_CSV = "series.csv"
+_DEFLATOR_CSV = "deflator_sources.csv"
+_MANIFEST = "manifest.json"
+
+
+def _tidy(series: dict[str, pd.Series]) -> pd.DataFrame:
+    frames = [
+        pd.DataFrame({"key": key, "date": s.index, "value": s.to_numpy(dtype=float)})
+        for key, s in series.items()
+    ]
+    return pd.concat(frames, ignore_index=True)
+
+
+def _untidy(frame: pd.DataFrame) -> dict[str, pd.Series]:
+    out: dict[str, pd.Series] = {}
+    for key, part in frame.groupby("key", sort=False):
+        out[str(key)] = pd.Series(
+            part["value"].to_numpy(dtype=float),
+            index=pd.DatetimeIndex(part["date"]),
+            name=str(key),
+        ).sort_index()
+    return out
+
+
+def save_vintage(vintage: Vintage, directory: str | Path) -> Path:
+    """Write a fetched vintage to ``directory`` as three small files.
+
+    The manifest carries the registry locator each series was fetched from, so
+    a later locator change in ``sources.py`` makes the recording refuse to load
+    rather than silently keep the superseded series alive. That is the same
+    failure ``fetch_abs.parse_abs_frame`` guards for a single payload -- a
+    fixture recorded under a series id the registry has since moved off.
+    """
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    _tidy(vintage.series).to_csv(directory / _SERIES_CSV, index=False)
+    _tidy(vintage.deflator_sources).to_csv(directory / _DEFLATOR_CSV, index=False)
+    (directory / _MANIFEST).write_text(
+        json.dumps(
+            {
+                "recorded_at": vintage.recorded_at,
+                "locators": {s.key: s.locator for s in AU_SERIES},
+                "deflator_locators": {d.key: d.locator for d in DEFLATOR_SOURCES},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    return directory
+
+
+def load_vintage(directory: str | Path) -> Vintage:
+    """Read a recorded vintage, refusing one the registry has moved off."""
+    directory = Path(directory)
+    manifest_path = directory / _MANIFEST
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"{manifest_path} is absent; record one with "
+            "tools/record_au_vintage.py (needs network)."
+        )
+    manifest = json.loads(manifest_path.read_text())
+
+    recorded = manifest.get("locators", {})
+    current = {s.key: s.locator for s in AU_SERIES}
+    if recorded != current:
+        drifted = sorted(
+            set(recorded) ^ set(current)
+            | {k for k in set(recorded) & set(current) if recorded[k] != current[k]}
+        )
+        raise ValueError(
+            f"the recorded vintage in {directory} was fetched from different "
+            f"locators than the registry now names: {drifted}. Re-record it "
+            "(tools/record_au_vintage.py) rather than trusting the recording: "
+            "a superseded series parses and standardises perfectly well."
+        )
+    recorded_defl = manifest.get("deflator_locators", {})
+    current_defl = {d.key: d.locator for d in DEFLATOR_SOURCES}
+    if recorded_defl != current_defl:
+        raise ValueError(
+            f"the recorded vintage in {directory} was fetched from different "
+            "deflator locators than nyfed.au.deflator now names. Re-record it."
+        )
+
+    return Vintage(
+        series=_untidy(pd.read_csv(directory / _SERIES_CSV, parse_dates=["date"])),
+        deflator_sources=_untidy(
+            pd.read_csv(directory / _DEFLATOR_CSV, parse_dates=["date"])
+        ),
+        recorded_at=manifest.get("recorded_at"),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# The build
+# --------------------------------------------------------------------------- #
+
+
+def _truncate(series: dict[str, pd.Series], asof: pd.Timestamp) -> dict[str, pd.Series]:
+    """Drop every observation dated after ``asof``. See AS OF MEANS AS OF."""
+    return {key: s[s.index <= asof] for key, s in series.items()}
+
+
+def build_panel(
+    *,
+    asof: str,
+    start: str = DEFAULT_START,
+    vintage: str | Path | Vintage | None = None,
+) -> Panel:
+    """Fetch every registered series, refuse if any is stale, and assemble.
+
+    ``vintage`` is ``None`` for a live fetch, or a recorded vintage (a
+    directory, or an already-loaded :class:`Vintage`) to replay.
+    """
+    asof_ts = pd.Timestamp(asof)
+    if vintage is None:
+        v = fetch_vintage()
+    elif isinstance(vintage, Vintage):
+        v = vintage
+    else:
+        v = load_vintage(vintage)
+
+    series = _truncate(v.series, asof_ts)
+    deflator_sources = _truncate(v.deflator_sources, asof_ts)
+
+    # THE DEFLATED SERIES IS WHAT ENTERS THE PANEL, NOT THE NOMINAL ONE.
+    # `assemble` will take the nominal series without complaint and the model
+    # will run on it; see this module's docstring for the three reasons that is
+    # wrong, and `nyfed/au/deflator.py` for how the deflator is built.
+    series["household_spending"] = real_household_spending(
+        series["household_spending"], deflator_sources
+    )
+
+    check_freshness(series, asof_ts)
+    return assemble(series, start=start, end=asof)
+
+
+# --------------------------------------------------------------------------- #
+# The model path
+# --------------------------------------------------------------------------- #
+
+
+def _initial_point(
+    panel: Panel, spec: ModelSpec, restrict: Restrict
+) -> tuple[np.ndarray, InitVal]:
+    """A neutral starting point for the sampler, and the prior mean it implies.
+
+    ``InitVal`` needs a full parameter draw and a full latent draw
+    (``nyfed/model.py:112-121``). The NY Fed ships one in ``initval.mat``,
+    fitted; Australia has none, so this builds the blandest point the model can
+    represent. The sampler moves off it on the first sweep -- it only has to be
+    representable, and it must satisfy the restrictions.
+
+    THREE THINGS READ OUT OF ``initval.mat`` RATHER THAN GUESSED. The plan's
+    sketch had all three the other way, and each is silent:
+
+    1. **Restricted loadings must carry their restriction value, not the PCA
+       seed.** ``gibbs_update`` draws only the entries where ``restrict.Lambda``
+       is NaN and keeps ``param.Lambda`` verbatim everywhere else
+       (``nyfed/gibbs.py:553-571``). So a normalising loading -- the ``100``
+       entries in ``model_spec_AU.csv``, which ``load_spec`` turns into ``1.0``
+       -- stays at whatever the initial value put there, for the whole chain.
+       Seeding it from PCA would fix the Global factor's normaliser at an
+       arbitrary number and quietly rescale the factor. ``initval.mat``'s
+       Lambda is exactly ``1.0`` at all four of the US spec's normalisers and
+       exactly ``0.0`` at its structural zeros; this reproduces that.
+    2. **``pi_f`` and ``pi_e`` are the probability of NO outlier.**
+       ``gibbs._s_support`` puts mass ``pi`` on scale 1 and spreads ``1 - pi``
+       over scales 2..5, and ``construct_prior`` centres them at
+       ``1 - 1/(2*12) = 0.958``. ``initval.mat`` carries 0.95..0.98. A starting
+       value of 0.05 would declare 95% of every series' months outliers, which
+       runs, and quietly discards the data.
+    3. **The ``gamma`` parameters are standard deviations and start at the
+       prior scale, not zero.** ``update_vol`` propagates
+       ``ln sigma_t^2 = ln sigma_{t-1}^2 + gamma * ups_t``, so ``gamma = 0``
+       is a degenerate random walk. ``initval.mat`` has ``gamma_g = 0.0107``
+       against ``sqrt(s2_g) = 0.01``.
+    """
+    n, n_f = spec.blocks.shape
+    T = panel.Y.shape[1]
+
+    # Free loadings take the PCA seed; restricted ones take the restriction.
+    Lambda0 = np.where(
+        np.isnan(restrict.Lambda), np.nan_to_num(seed_lambda(panel)), restrict.Lambda
+    )
+
+    # `example_estimate.m:88`: the prior mean for Lambda IS the initial value.
+    prior = construct_prior((n, n_f, P_F, P_E), Lambda0)
+    prior.P_Phi = prior.P_Phi / 5      # example_estimate.m:89
+
+    # Mild persistence rather than zero, so the factor VAR is not degenerate on
+    # sweep one; then the restrictions (the COVID factor's row and column) are
+    # imposed on top, as they are for Lambda.
+    Phi0 = np.zeros((n_f, n_f, P_F))
+    Phi0[:, :, 0] = 0.5 * np.eye(n_f)
+    Phi0 = np.where(np.isnan(restrict.Phi), Phi0, restrict.Phi)
+
+    pi_f0 = prior.a_f / (prior.a_f + prior.b_f)
+    pi_e0 = prior.a_e / (prior.a_e + prior.b_e)
+    param0 = Params(
+        mu=np.zeros(n),
+        gamma_g=float(np.sqrt(prior.s2_g)),
+        Lambda=Lambda0,
+        Phi=Phi0,
+        gamma_f=np.full(n_f, np.sqrt(prior.s2_f)),
+        pi_f=np.full(n_f, pi_f0),
+        phi=np.zeros((n, P_E)),
+        gamma_e=np.full(n, np.sqrt(prior.s2_e)),
+        pi_e=np.full(n, pi_e0),
+    )
+    latent0 = Latent(sigma=np.ones((n_f + n, T)), s=np.ones((n_f + n, T)))
+    return prior, InitVal(param=param0, latent=latent0)
+
+
+def estimate_short(
+    panel: Panel,
+    *,
+    n_gs: int = 200,
+    n_burn: int = 100,
+    n_thin: int = 1,
+    seed: int = 321,
+    spec_path=SPEC_PATH,
+) -> GibbsResult:
+    """A short sampler run on one assembled panel.
+
+    Proves the sampler completes on this panel and does not collapse; it is not
+    an accuracy check, because there is nothing to check against. Nobody
+    publishes an Australian nowcast from this model.
+
+    Latents are always stored: :func:`state_space` needs them, and at these
+    lengths they cost a few hundred kilobytes.
+    """
+    spec = load_spec(spec_path)
+    restrict = build_restrict(panel, spec, p_f=P_F)
+    prior, initval = _initial_point(panel, spec, restrict)
+    settings = GibbsSettings(n_gs=n_gs, n_burn=n_burn, n_thin=n_thin)
+    return gibbs_sampler(
+        panel.Y,
+        prior,
+        restrict,
+        initval,
+        settings,
+        np.random.default_rng(seed),
+        need_latents=True,
+    )
+
+
+def state_space(
+    panel: Panel, result: GibbsResult, *, spec_path=SPEC_PATH
+) -> StateSpace:
+    """One state space from a sampler run: median parameters, mean latents.
+
+    The same summary ``tests/test_end_to_end.py`` uses against the published US
+    figures -- ``median(param_Gibbs)`` with the latents averaged over stored
+    draws.
+    """
+    if result.sigmas is None or result.ss is None:
+        raise ValueError("the sampler run stored no latents; need_latents was off")
+    spec = load_spec(spec_path)
+    n, n_f = spec.blocks.shape
+    param = map_parameter(np.median(result.params, axis=1), (n, n_f, P_F, P_E))
+    latent = Latent(sigma=result.sigmas.mean(axis=2), s=result.ss.mean(axis=2))
+    return construct_ssm(param, latent, build_restrict(panel, spec, p_f=P_F))
+
+
+def free_parameter_mask(restrict: Restrict, dims: tuple[int, int, int, int]) -> np.ndarray:
+    """Which entries of the stored parameter vector the sampler may draw.
+
+    ``GibbsResult.params`` stores the WHOLE parameter vector, restricted entries
+    included, and those never move -- a structural zero in ``model_spec_AU.csv``
+    and a normalising ``1.0`` are held fixed for the entire chain by design
+    (``nyfed/gibbs.py:553-571``). So "every parameter moved" is a false
+    expectation of a correct run: of the Australian panel's 246 stored
+    parameters, 74 are restricted -- 42 loadings (the spec's structural zeros
+    and its four normalising ones) and 32 factor-VAR coefficients (the COVID
+    factor's row and column, across four lags). Asking whether every FREE
+    parameter moved is the question
+    that has a right answer, and this builds the mask the engine's own layout
+    implies rather than re-deriving the offsets by hand.
+    """
+    n, n_f, p_f, p_e = dims
+    marker = Params(
+        mu=np.full(n, np.nan),
+        gamma_g=np.nan,
+        Lambda=np.asarray(restrict.Lambda, dtype=float),
+        Phi=np.asarray(restrict.Phi, dtype=float),
+        gamma_f=np.full(n_f, np.nan),
+        pi_f=np.full(n_f, np.nan),
+        phi=np.full((n, p_e), np.nan),
+        gamma_e=np.full(n, np.nan),
+        pi_e=np.full(n, np.nan),
+    )
+    return np.isnan(vec_parameter(marker))
+
+
+def target_periods(panel: Panel) -> np.ndarray:
+    """Panel columns to nowcast: the quarters after the last observed GDP.
+
+    ``example_nowcast.m`` steps three months at a time from the quarter after
+    the target series' last observation. With GDP observed through 2026-03 and
+    a panel ending 2026-07, that is a single horizon, June 2026 -- the last
+    month of Q2, which is where ``panel._align`` puts a quarterly observation.
+    """
+    observed = np.flatnonzero(np.isfinite(panel.Y[panel.i_now]))
+    if observed.size == 0:
+        raise ValueError("the nowcast target row carries no observation")
+    t_now = np.arange(int(observed[-1]) + 3, panel.Y.shape[1], 3)
+    if t_now.size == 0:
+        raise ValueError(
+            f"the panel ends {panel.dates[-1].date()}, which is inside the last "
+            f"observed quarter of {panel.series_id[panel.i_now]}; there is no "
+            "quarter left to nowcast."
+        )
+    return t_now
+
+
+def quick_nowcast(
+    panel: Panel,
+    *,
+    ssm: StateSpace | None = None,
+    t_now: np.ndarray | None = None,
+    n_gs: int = 200,
+    n_burn: int = 100,
+    seed: int = 321,
+) -> float:
+    """The nowcast for the first target quarter, in GDP's own units.
+
+    GDP's spec transformation is ``pca``, so the returned number is an
+    **annualised** quarterly growth rate in percent; ``nyfed.au.emit`` converts
+    it to the quarter-on-quarter figure Australia publishes.
+
+    Its only job is to give the leakage check a number to compare. It is not a
+    published figure and there is nothing to check it against.
+
+    ``ssm`` and ``t_now`` are injectable so that two panels can be compared
+    through the SAME state space. That is what makes the leakage check a
+    measurement of the DATA channel: re-estimating on each panel would mix the
+    effect of removing observations with the sampler's own noise, and the
+    difference would then be uninterpretable in either direction.
+    """
+    if ssm is None:
+        ssm = state_space(
+            panel, estimate_short(panel, n_gs=n_gs, n_burn=n_burn, seed=seed)
+        )
+    if t_now is None:
+        t_now = target_periods(panel)
+
+    point = point_nowcast(panel.Y, panel.Y, ssm, ssm, panel.i_now, t_now)
+    location = float(panel.y_location[panel.i_now, 0])
+    scale = float(panel.y_scale[panel.i_now, 0])
+    return location + scale * float(point.nowcast[3, 0])

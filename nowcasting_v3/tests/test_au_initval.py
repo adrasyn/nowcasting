@@ -130,3 +130,62 @@ def test_all_nan_row_is_seeded_at_zero_not_dropped_from_the_shape():
     Lambda = seed_lambda(panel)
     assert Lambda.shape == spec.blocks.shape
     assert (Lambda[5, :] == 0.0).all()
+
+
+def _normalisers(spec) -> list[tuple[int, int]]:
+    """``(row, column)`` of every block's normalising loading.
+
+    ``load_spec`` turns the spec's ``100`` entries into ``1.0`` and its ``1``
+    entries into ``NaN``, so a finite non-zero entry is exactly a normaliser.
+    The Soft block has none -- no series carries ``100`` in ``Block1_Soft`` --
+    and a block without one has no sign to be consistent with.
+    """
+    rows, cols = np.nonzero(np.nan_to_num(spec.blocks) == 1.0)
+    return list(zip(rows.tolist(), cols.tolist(), strict=True))
+
+
+def test_the_seed_agrees_in_sign_with_each_block_s_normalising_series():
+    """A principal component's sign is arbitrary; the spec's normalisation is not.
+
+    ``model_spec_AU.csv`` fixes household spending's Global loading, employment's
+    Labor and COVID loadings and CPI's Nominal loading at ``+1``, which DEFINES
+    each of those factors to move with that series. ``np.linalg.svd`` returns
+    either sign of a component with equal right, so a seed that does not orient
+    itself contradicts that definition roughly half the time -- and the
+    contradiction is not cosmetic. The seed is the prior MEAN for every free
+    loading in the column (``construct_prior`` centres ``m_Lambda`` there with
+    precision 10, i.e. a prior standard deviation near 0.32), so a flipped
+    column pulls every other series in the block toward the wrong sign while the
+    normaliser stays pinned at +1.
+
+    Measured on the real panel before this was fixed: the Global column's seed
+    was negative for 12 of 15 series INCLUDING its normaliser, and GDP's Global
+    loading was still -0.76 after 3,000 sweeps -- i.e. real GDP growth loading
+    the broadest factor with the opposite sign to real consumption growth, on a
+    panel where the two correlate +0.12.
+
+    Twenty independent panels, because one panel only samples the coin once.
+    """
+    spec = load_spec(SPEC_PATH)
+    pairs = _normalisers(spec)
+    assert pairs, "no block carries a normalising loading; the test is vacuous"
+
+    wrong = []
+    for seed in range(20):
+        rng = np.random.default_rng(1000 + seed)
+        n, T = len(AU_SERIES), 240
+        factor = rng.standard_normal((1, T))
+        Y = 0.8 * factor + 0.3 * rng.standard_normal((n, T))
+        dates = pd.date_range("2001-01-01", periods=T, freq="MS")
+        panel = Panel(Y=Y, y_location=np.zeros((n, 1)), y_scale=np.ones((n, 1)),
+                      dates=dates, series_id=list(spec.series_id),
+                      i_now=spec.series_id.index("gdp"))
+        Lambda = seed_lambda(panel)
+        for row, col in pairs:
+            if Lambda[row, col] < 0.0:
+                wrong.append((seed, spec.series_id[row], spec.block_names[col],
+                              float(Lambda[row, col])))
+    assert not wrong, (
+        f"{len(wrong)} of {20 * len(pairs)} normalising loadings were seeded "
+        f"against their own normalisation, e.g. {wrong[:3]}"
+    )

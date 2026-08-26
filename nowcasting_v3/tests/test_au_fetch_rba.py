@@ -92,3 +92,28 @@ def test_commodity_prices_reproduces_the_published_release():
     yoy = (now / year_ago - 1) * 100
     assert mom == pytest.approx(1.2, abs=0.05), "month-on-month change"
     assert yoy == pytest.approx(7.5, abs=0.05), "year-on-year change"
+
+
+def test_the_parser_accepts_the_period_index_readabs_actually_returns():
+    """``read_rba_table`` hands back a ``PeriodIndex``, not a ``DatetimeIndex``.
+
+    The recorded fixture is a CSV, so ``pd.read_csv(parse_dates=True)`` rebuilds
+    it as a ``DatetimeIndex`` and every other test in this file exercises a
+    shape the live fetcher never sees. Measured against RBA table I2 on
+    2026-08-26, ``read_rba_table("I2").index`` is
+    ``PeriodIndex(dtype='period[M]')``, and ``pd.DatetimeIndex`` of a
+    ``PeriodIndex`` raises ``TypeError: Passing PeriodDtype data is invalid``
+    under pandas 2.x -- so ``commodity_prices`` was the one registry entry that
+    could not be fetched at all, with the whole offline suite green.
+
+    This is the ABS half's ``_first_of_month_index`` rule applied to the RBA
+    half: it is the same normalisation, and Task 2 wrote it for exactly this
+    shape.
+    """
+    frame = _fixture_frame(RBA_SERIES[0])
+    live_shape = frame.copy()
+    live_shape.index = pd.DatetimeIndex(frame.index).to_period("M")
+    assert isinstance(live_shape.index, pd.PeriodIndex)
+
+    parsed = parse_rba_frame(live_shape, RBA_SERIES[0].locator.split(":")[1])
+    pd.testing.assert_series_equal(parsed, _parse(RBA_SERIES[0]))

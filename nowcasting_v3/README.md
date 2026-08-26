@@ -10,11 +10,13 @@ same surprising thing, and says so in a comment. Deviating would break the one
 thing that makes the port checkable: that every function can be compared against
 the original, running, on the same inputs.
 
-**Status: Plan A complete.** Both published US headline nowcasts reproduce end
+**Status: Plans A and B complete.** Both published US headline nowcasts reproduce end
 to end, and every per-series release impact of the week the drop is configured
 for. The other week's per-series table cannot be reproduced from this drop, for
 a reason that is measured rather than assumed. See
-[The end-to-end gate](#the-end-to-end-gate).
+[The end-to-end gate](#the-end-to-end-gate). The engine now also estimates on
+an Australian panel — see [The Australian panel](#the-australian-panel), which
+has no oracle and says so.
 
 ## Layout
 
@@ -22,6 +24,8 @@ a reason that is measured rather than assumed. See
 | --- | --- |
 | `nyfed/` | The Python port (the deliverable). |
 | `nyfed/run_us_reference.py` | `example_nowcast.m` end to end; the gate's runner. |
+| `nyfed/au/` | The Australian panel: fetch, deflate, guard, assemble. Nothing in `nyfed/` outside it knows about Australia. |
+| `model_spec_AU.csv` | The Australian model specification, 15 series over 5 blocks. |
 | `nyfed_matlab/` | **Vendored MATLAB reference implementation. Read-only.** |
 | `tools/` | Octave fixture generation, `.mat` → `.npz` conversion, timing. |
 | `tests/` | Pytest suite. `tests/fixtures/*.npz` are committed. |
@@ -462,6 +466,162 @@ That is a live gap for Plan D, whose headline deliverable is a decomposition
 panel built on exactly these terms. It is asserted rather than commented, in
 `test_the_0929_revisions_term_has_no_published_counterpart`, so that if the
 missing file ever turns up the test fails and says to add the check.
+
+## The Australian panel
+
+**Status: Plan B complete.** `nyfed/au/` builds an Australian panel and the
+engine estimates on it. `nyfed/` itself is untouched — the engine reads a spec
+CSV and a standardised `(n, T)` matrix and does not know which country it is
+looking at.
+
+```python
+from nyfed.au.build import build_panel, estimate_short, quick_nowcast
+panel = build_panel(asof="2026-07-01")          # fetches, guards, assembles
+```
+
+### The 15 series
+
+`model_spec_AU.csv` and `nyfed/au/sources.py` carry the same 15 rows in the same
+order, and `assemble` refuses if they ever disagree — the panel is stacked from
+the registry and labelled from the spec, so a mismatch would attach every label,
+and `i_now`, to the wrong row.
+
+| Series | Source | Locator | Block | Transform |
+| --- | --- | --- | --- | --- |
+| Employment | ABS 6202.0 | `A84423043C` | Labor* | `chg` |
+| Unemployment rate | ABS 6202.0 | `A84423050A` | Labor | `chg` |
+| ANZ-Indeed Job Ads | **v2 CSV** | `anz_ads` | Labor | `chg` |
+| AiG Manufacturing PMI | **v2 CSV** | `aig_pmi` | Soft | `lin` |
+| NAB Business Conditions | **v2 CSV** | `nab_cond` | Soft | `lin` |
+| Building Approvals | ABS 8731.0 | `A422070J` | Global | `chg` |
+| Household Spending (real) | ABS 5682.0, **deflated** | `A130200584T` | Global* | `pch` |
+| Exports | ABS 5368.0 | `A2718577A` | Nominal | `pch` |
+| Imports | ABS 5368.0 | `A2718603V` | Nominal | `pch` |
+| RBA Commodity Prices (A$) | RBA table I2 | `GRCPAIAD` | Nominal | `pch` |
+| Monthly CPI | ABS 6401.0 | `A130607789R` | Nominal* | `pch` |
+| Monthly CPI trimmed mean | ABS 6401.0 | `A130400381L` | Nominal | `pch` |
+| Unit labour cost | ABS 5206.0 | `A2433074L` | Labor | `pca` |
+| Real gross domestic income | ABS 5206.0 | `A2304410X` | Global | `pca` |
+| **Real GDP** (the target) | ABS 5206.0 | `A2304402X` | Global | `pca` |
+
+`*` marks the series that normalises a block. Every series also loads the Global
+factor, and all but the four price/commodity rows load the COVID factor, which
+`nyfed/au/restrict.py` confines to March 2020 – December 2021.
+
+Two series a reader may expect are absent, both deliberately and both documented
+in `sources.py`: **retail sales** (ABS ceased Retail Trade after the June 2025
+release; household spending covers the ground better) and the **Internet Vacancy
+Index** (v2 has never once fetched it — the JSA host is firewalled from v2's
+runner — and it duplicates job ads anyway).
+
+### Household spending is deflated, and that is load-bearing
+
+ABS publishes no monthly, real, seasonally adjusted household spending series.
+The registry fetches the **nominal** Monthly Household Spending Indicator and
+`build_panel` deflates it before anything else sees it, because the panel row
+mirrors the NY Fed's real `PCEC96`, its transform is `pch`, and it **normalises
+the Global factor** — so a nominal series would set the broadest factor's scale
+from inflation. v2 measured the size of the error: 2024 mean 3-month nominal
+growth 0.82% against real 0.19%, with real GDP around 0.4%.
+
+The deflator (`nyfed/au/deflator.py`) is a three-tier ratio splice, because
+Australia's monthly CPI history is split across a live publication (6401.0,
+2024-04 onward), a ceased one (6484.0, 2017-09 to 2025-09) and a quarterly index
+interpolated to monthly for the 2012–2017 tail. Each join is rebased by the
+geometric mean of the overlap so that `pch` does not see a step change.
+
+### Three series come from v2, and that is a real dependency
+
+Job ads, the AiG PMI and NAB business conditions originate in media releases and
+PDFs. v3 does not run v2's R code; it reads the CSVs v2's **weekly laptop
+routine** commits to `nowcasting_v2/data_raw/`. If that routine stops, those
+files go stale, and `nyfed/au/freshness.py` is what turns silent staleness into a
+refusal. It has already happened: `aig_pmi` stopped updating in May 2026 when Ai
+Group folded its PMI into a broader index, and **a live build today correctly
+refuses**. The fix is to replace the series, not to widen the budget.
+
+### Freshness budgets, and how they are set
+
+Budgets are per series, in `sources.py`, and they are set from the **publication
+cycle**, not from the reference period. This has been got wrong twice, both
+times in the same direction, because Australian series are dated to the START of
+the period they cover while publication lags by weeks:
+
+* monthly: **75 days**. Measured 2026-08-26 — job ads and NAB conditions healthy
+  at 56 days, `aig_pmi` dead at 117.
+* quarterly: **200 days**. A quarterly observation sits at the last month of its
+  quarter and the national accounts appear about two months after the quarter
+  ends, so a completely current `gdp` reaches ~186 days just before the next
+  release; measured at 178 on 2026-08-26. The earlier 120-day budget refused
+  three healthy series, the nowcast target among them, on every build between
+  late June and early September.
+
+**Known and not yet fixed:** the 75-day monthly budget is still too tight for the
+ABS monthly series that publish about two months in arrears — building approvals,
+household spending, exports and imports were all 86 days old and perfectly
+healthy on 2026-08-26. They need their own budgets, derived per series from the
+release calendar. `test_a_build_today_is_refused_because_the_pmi_is_dead`
+records the measurement so it is not rediscovered.
+
+### The normalisation Australia had to choose for itself
+
+`construct_prior` needs a prior mean for the loading matrix. The NY Fed ships a
+fitted one in `initval.mat`; Australia has none, so `nyfed/au/initval.py` seeds
+it by principal components on the assembled panel, and `nyfed/au/build.py` builds
+the rest of the starting point — neutral volatilities, no outliers, mild factor
+persistence — from the prior's own scales.
+
+Two things about that seed are easy to get silently wrong, and both were:
+
+1. **A principal component's sign is arbitrary; the spec's normalisation is
+   not.** `model_spec_AU.csv` fixes household spending's Global loading at +1,
+   which defines the factor to move with it. An unoriented seed contradicts that
+   about half the time, and because the seed is the prior *mean* for every free
+   loading in the column, the contradiction propagates: before this was fixed,
+   real GDP loaded the Global factor at **−0.76 after 3,000 sweeps** while real
+   consumption was pinned at +1, on a panel where the two correlate +0.12.
+   `seed_lambda` now orients each column to its block's normalising series, and
+   GDP's Global loading comes out at +1.15.
+2. **Restricted loadings must start at their restriction value.** The sampler
+   draws only the entries the restriction marks free and keeps the rest verbatim
+   for the whole chain, so a normalising loading seeded from PCA would stay at an
+   arbitrary number forever and quietly rescale its factor.
+
+### Plan B has no oracle
+
+Plan A could check itself against a published New York Fed figure. **Nobody
+publishes an Australian nowcast from this model**, so nothing in
+`tests/test_au_end_to_end.py` reproduces a reference number and nothing is tuned
+toward one. What that gate does establish:
+
+* the panel has the right shape, the right row order and honest ragged edges;
+* the row that reaches the model is the **deflated** household spending series,
+  checked by reconstruction to floating point;
+* the engine accepts the panel and the sampler moves every free parameter and no
+  restricted one;
+* the target quarter's own months drive the nowcast, and months after it move it
+  ~250 times less.
+
+That last pair is a *consistency* check, not a leak detector, and the test says
+so: at this vintage only one post-target month exists, published by seven of
+fifteen series, which is measurably too little signal to catch a one-month
+misalignment. The structural no-leak guarantee comes from the Octave-pinned
+quarterly aggregation in `construct_ssm` plus the panel's deterministic
+alignment tests. A vintage-pair leakage test belongs to Plan C.
+
+### The gate replays a recorded vintage
+
+`build_panel(asof=...)` fetches live. The gate does not: it replays
+`tests/fixtures/au/vintage/`, a full-history recording of every series and every
+deflator tier, because a live build takes ~2.5 minutes across four hosts, ABS
+revises weekly, and `readabs` emits warnings that `filterwarnings = ["error"]`
+would turn into unrelated failures. The recording is checked against the trimmed
+payloads that were verified against published ABS and RBA releases, and
+`load_vintage` refuses a recording whose locators no longer match the registry.
+
+```bash
+caffeinate -i .venv/bin/python tools/record_au_vintage.py    # needs network
+```
 
 ## Measured timings
 

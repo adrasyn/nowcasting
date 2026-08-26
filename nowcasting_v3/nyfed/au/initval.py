@@ -84,6 +84,27 @@ def seed_lambda(panel: Panel, spec_path=SPEC_PATH) -> np.ndarray:
         components = U[:, :n_f] * S[:n_f]
         Lambda[observed, : components.shape[1]] = components[:, :n_f]
 
+    # Orient each column to its block's NORMALISING series before anything
+    # else looks at the signs. `np.linalg.svd` returns either sign of a
+    # principal component with equal right, but `model_spec_AU.csv` fixes one
+    # loading per block at +1 (the `100` entries, which `load_spec` rescales to
+    # 1.0), and that fixes the factor's sign: the factor is DEFINED to move with
+    # that series. An unoriented seed contradicts that about half the time, and
+    # the contradiction is not cosmetic -- this matrix is the prior MEAN for
+    # every free loading in the column (`construct_prior`, precision 10, so a
+    # prior standard deviation near 0.32), so a flipped column pulls the whole
+    # block toward the wrong sign while the normaliser stays pinned at +1.
+    # Measured on the real panel before this line existed: the Global column
+    # was seeded negative for 12 of 15 series, its own normaliser included, and
+    # GDP's Global loading was still -0.76 after 3,000 sweeps -- real GDP growth
+    # loading the broadest factor against real consumption growth. A block with
+    # no normaliser (Soft) has no sign to be consistent with and is left alone.
+    normalising = np.nan_to_num(spec.blocks) == 1.0
+    for i_f in range(n_f):
+        rows = np.flatnonzero(normalising[:, i_f])
+        if rows.size and Lambda[rows[0], i_f] < 0.0:
+            Lambda[:, i_f] = -Lambda[:, i_f]
+
     # Respect the spec's structural zeros BEFORE normalising, not after: a
     # block's structural-zero count is a fact about the panel's design (how
     # many series were specified to load on it), not evidence about the

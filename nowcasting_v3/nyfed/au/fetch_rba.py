@@ -29,14 +29,27 @@ from __future__ import annotations
 
 import pandas as pd
 
+from nyfed.au.fetch_abs import _first_of_month_index
+
 
 def parse_rba_frame(frame: pd.DataFrame, column: str) -> pd.Series:
-    """Tidy one RBA table column into a first-of-month float series."""
+    """Tidy one RBA table column into a first-of-month float series.
+
+    The index is normalised by ``fetch_abs._first_of_month_index``, the same
+    rule the ABS half uses, because ``readabs`` returns the same shape from both
+    families: ``read_rba_table("I2")`` hands back a ``PeriodIndex``
+    (``period[M]``), not a ``DatetimeIndex``. This module previously wrote
+    ``pd.DatetimeIndex(frame.index)`` by hand, which raises ``TypeError:
+    Passing PeriodDtype data is invalid`` on that shape under pandas 2.x -- so
+    the live fetch of ``commodity_prices`` failed outright while every offline
+    test passed, because the recorded fixture is a CSV and ``read_csv`` rebuilds
+    it as a ``DatetimeIndex``. Found by the first end-to-end build (Task 10).
+    """
     if column not in frame.columns:
         raise KeyError(f"{column} is not a column of table; got {list(frame.columns)[:5]}")
     series = pd.Series(
         pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=float),
-        index=pd.DatetimeIndex(frame.index).to_period("M").to_timestamp(),
+        index=_first_of_month_index(frame.index),
         name=column,
     )
     return series[~series.index.duplicated(keep="last")].sort_index()

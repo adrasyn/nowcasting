@@ -81,3 +81,38 @@ def test_quarterly_budgets_exceed_monthly_ones():
     monthly = max(s.max_age_days for s in AU_SERIES if s.frequency == "m")
     quarterly = min(s.max_age_days for s in AU_SERIES if s.frequency == "q")
     assert quarterly > monthly
+
+
+def test_the_quarterly_budget_passes_a_healthy_series_and_still_catches_a_dead_one():
+    """The budget the first end-to-end build had to correct, pinned so it stays.
+
+    A quarterly ABS observation is dated to the LAST MONTH of its quarter, and
+    the national accounts are published about two months after the quarter ends
+    -- so an entirely current ``gdp`` reaches roughly 186 days old just before
+    the next release, and a run that day is a run on the freshest data that
+    exists. The budget was 120, which refused three healthy series -- including
+    the nowcast target -- on every build between late June and early September.
+    Measured on 2026-08-26 with the March quarter the latest published: 178
+    days.
+
+    The two ages below are the two cases the budget has to separate: the oldest
+    a current series gets, and a series that has missed a release entirely.
+    """
+    quarterly = [s for s in AU_SERIES if s.frequency == "q"]
+    assert quarterly, "no quarterly series to test against"
+
+    asof = pd.Timestamp("2026-08-26")
+    healthy = {s.key: _series("2026-03-01", freq="QS-DEC") for s in quarterly}
+    assert series_age_days(healthy[quarterly[0].key], asof) == 178
+    check_freshness(healthy, asof, sources=tuple(quarterly))
+
+    # Just before the next release: the oldest a healthy series ever gets.
+    oldest_healthy = {s.key: _series("2026-03-01", freq="QS-DEC") for s in quarterly}
+    check_freshness(oldest_healthy, pd.Timestamp("2026-09-02"),
+                    sources=tuple(quarterly))
+
+    # One release missed outright: 2025-12 still the latest in September 2026.
+    missed = {s.key: _series("2025-12-01", freq="QS-DEC") for s in quarterly}
+    with pytest.raises(StaleSeriesError) as excinfo:
+        check_freshness(missed, pd.Timestamp("2026-09-02"), sources=tuple(quarterly))
+    assert {k for k, _, _ in excinfo.value.stale} == {s.key for s in quarterly}

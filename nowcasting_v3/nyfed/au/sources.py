@@ -36,6 +36,23 @@ checking whether the series you are tightening against is dated to
 reference-period start; that mistake is exactly what widened it in the
 first place.
 
+Quarterly budgets are 200 days, not the 120 the same earlier pass assigned,
+and for exactly the same reason: 120 was measured against the reference
+period rather than the publication cycle, and it halts a healthy series for
+two months out of every three. A quarterly observation is dated to the LAST
+MONTH of its quarter (``fetch_abs._first_of_month_index``), so Q1 2026 sits
+at 2026-03-01; ABS publishes the national accounts about two months after
+the quarter ends, and then nothing moves for a further quarter. Measured on
+2026-08-26 by the first end-to-end build: ``gdp``, ``gdi`` and
+``unit_labour_cost`` were 178 days old and entirely current -- the March
+quarter was the latest published, and the June quarter was still a week
+away. Under a 120-day budget every build between late June and early
+September refuses on three healthy series, including the nowcast target.
+The healthy maximum is about 186 days (roughly 95 days of publication lag
+plus one 91-day release interval); a genuinely missed release reaches about
+277. 200 passes the first and catches the second. Do not tighten this back
+toward 120 without measuring a real ``gdp`` age first.
+
 No ``retail_sales`` entry: ABS ceased "Retail Trade, Australia" (cat. 8501.0)
 after the June 2025 release, published 31 July 2025 as its final edition --
 the fourth Australian monthly indicator this project has lost, after Weekly
@@ -143,9 +160,9 @@ AU_SERIES: tuple[SeriesSource, ...] = (
                  "abs", "6401.0:A130400381L", "m", 75),
     # --- quarterly ---------------------------------------------------------
     SeriesSource("unit_labour_cost", "unit_labour_cost", "Unit labour cost",
-                 "abs", "5206.0:A2433074L", "q", 120),
+                 "abs", "5206.0:A2433074L", "q", 200),
     SeriesSource("gdi", "gdi", "Real gross domestic income",
-                 "abs", "5206.0:A2304410X", "q", 120),
+                 "abs", "5206.0:A2304410X", "q", 200),
     SeriesSource("gdp", "gdp", "Real gross domestic product",
-                 "abs", "5206.0:A2304402X", "q", 120),
+                 "abs", "5206.0:A2304402X", "q", 200),
 )

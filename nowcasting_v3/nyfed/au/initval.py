@@ -84,11 +84,16 @@ def seed_lambda(panel: Panel, spec_path=SPEC_PATH) -> np.ndarray:
         components = U[:, :n_f] * S[:n_f]
         Lambda[observed, : components.shape[1]] = components[:, :n_f]
 
-    # Normalise each factor's loadings to unit scale so the seed does not
-    # depend on the panel's length.
+    # Respect the spec's structural zeros BEFORE normalising, not after: a
+    # block's structural-zero count is a fact about the panel's design (how
+    # many series were specified to load on it), not evidence about the
+    # strength of that factor, and normalising first would make each column's
+    # seed magnitude a mechanical function of that count instead of signal.
+    Lambda[spec.blocks == 0] = 0.0
+
+    # Normalise each factor's loadings to unit scale so every block gets a
+    # unit-norm prior mean regardless of how many series load on it, and so
+    # the seed does not depend on the panel's length.
     norms = np.linalg.norm(Lambda, axis=0, keepdims=True)
     Lambda = np.divide(Lambda, norms, out=np.zeros_like(Lambda), where=norms > 0)
-
-    # Respect the spec's structural zeros.
-    Lambda[spec.blocks == 0] = 0.0
     return Lambda

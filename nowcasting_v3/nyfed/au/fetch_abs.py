@@ -9,6 +9,33 @@ from __future__ import annotations
 
 import pandas as pd
 
+# Catalogues ABS has CEASED, mapped to the frozen landing page that still serves
+# their final release.
+#
+# readabs resolves a catalogue through the ABS Time Series Directory. A ceased
+# catalogue is removed from that directory, so `read_abs_series(cat="6484.0",
+# ...)` raises outright -- "Catalogue number '6484.0' not found in the ABS Time
+# Series Directory" -- even though the release page and its spreadsheets are
+# still up. `read_abs_series` takes a `url=` override for exactly this case:
+# given the landing page it downloads the zip directly and skips the directory.
+#
+# 6484.0 is the Monthly CPI Indicator, final release September 2025. Nothing in
+# `AU_SERIES` points at it -- `cpi` and `cpi_trimmed` moved to the live 6401.0
+# when ABS folded monthly CPI into the main collection. It is here for the
+# household spending deflator only, which splices 6484.0's ~8 years of monthly
+# history under the live series' 28 months. See `nyfed/au/deflator.py`.
+#
+# This is a dict rather than a `url=` parameter on `fetch_abs_series` on
+# purpose: `sources.py` keeps locators self-contained so that no caller has to
+# supply a second argument to get the right series, and the same rule should
+# hold for a dead catalogue. `fetch_abs_series("6484.0:A128481587A")` works.
+CEASED_CATALOGUE_URLS: dict[str, str] = {
+    "6484.0": (
+        "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation"
+        "/monthly-consumer-price-index-indicator/sep-2025"
+    ),
+}
+
 
 def _first_of_month_index(index: pd.Index) -> pd.DatetimeIndex:
     """Map an ABS index onto the first day of the month an observation *covers*.
@@ -84,5 +111,7 @@ def fetch_abs_series(locator: str) -> pd.Series:
     import readabs as ra  # imported lazily: tests never need it
 
     cat, series_id = locator.split(":", 1)
-    frame, _meta = ra.read_abs_series(cat=cat, series_id=series_id)
+    frame, _meta = ra.read_abs_series(
+        cat=cat, series_id=series_id, url=CEASED_CATALOGUE_URLS.get(cat, "")
+    )
     return parse_abs_frame(frame, series_id)

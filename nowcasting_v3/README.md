@@ -477,7 +477,13 @@ looking at.
 ```python
 from nyfed.au.build import build_panel, estimate_short, quick_nowcast
 panel = build_panel(asof="2026-06-01")          # fetches, guards, assembles
+figure = quick_nowcast(panel)                   # estimates, guards, nowcasts
 ```
+
+Both calls can **refuse**. `build_panel` raises `StaleSeriesError` if any input
+has gone stale; `quick_nowcast` raises `CollapsedFactorError` if the fitted
+chain left GDP disconnected from the panel. Neither has a bypass flag, and
+neither refusal is a bug — see below.
 
 ### The 15 series
 
@@ -630,6 +636,8 @@ toward one. What that gate does establish:
   checked by reconstruction to floating point;
 * the engine accepts the panel and the sampler moves every free parameter and no
   restricted one;
+* a chain that collapsed into the basin where GDP is disconnected from the panel
+  is refused rather than turned into a number;
 * the target quarter's own months drive the nowcast, and months after it move it
   ~160 times less;
 * the vintage contains nothing that had not been released at `asof`.
@@ -644,29 +652,53 @@ Octave-pinned quarterly aggregation in `construct_ssm` plus the panel's
 deterministic alignment and release-date tests. A vintage-pair leakage test
 belongs to Plan C.
 
-### GDP's posterior is bimodal, and the gate says which mode it is in
+### GDP's posterior is bimodal, and the model refuses when it collapses
 
-The clearest finding from running the model end to end. GDP loads only the
-Global factor and the COVID factor, and the COVID factor is active for the 22
-months (March 2020 – December 2021) containing by far the largest moves in the
-target series. It can fit those quarters almost perfectly — and when it does,
-the Global factor is left explaining a much quieter series and GDP's loading on
-it collapses toward zero, leaving a "nowcast" driven by GDP's own idiosyncratic
-dynamics that barely reads the monthly panel.
+The clearest finding from running the model end to end, and the one that
+produced the second guard.
 
-These are separate basins, not tails of one distribution. A chain picks one in
-its first sweeps and stays; lengthening it to 2,000 sweeps does not resolve it.
-Measured over 400 stored draws, GDP's Global loading has a 5–95% range of
-−0.45…0.31 at seed 321 and 1.22…1.55 at seed 1, with each chain's first and last
-fifty draws in the same place. Three of six seeds land in each basin.
+**The premise, measured.** GDP loads only the Global factor and the COVID
+factor. The COVID factor is active for 22 months (March 2020 – December 2021),
+and those months hold **8 of GDP's 143 observations but 64.5% of its
+standardised sum of squares**, including all five of its largest absolute
+values. A factor confined to that window can fit the biggest moves in the target
+series almost perfectly.
 
-The NY Fed does not face this: `initval.mat` ships a *fitted* starting point that
-puts the chain in the right basin. Australia starts from a bland one, so the
-gate declares its seed, runs in the identified basin, and pins the bimodality
-itself in `test_the_gdp_loading_is_bimodal_across_seeds` so it is a measured
-property rather than a footnote. **Plan C cannot leave this to the seed:** it
-needs a starting point doing `initval.mat`'s job, or a spec that does not make a
-22-month factor compete with the Global factor for the target series.
+**The mechanism is a two-sided handover.** When GDP's Global loading collapses
+(1.334 → 0.011 between two seeds) its COVID loading rises only 1.036 → 1.318 —
+nowhere near enough, since the COVID factor is zero outside its 22 months and
+the other 135 observations still need explaining. What takes them is GDP's own
+idiosyncratic stochastic volatility, and it rises **outside** the window too:
+0.875 → 1.107 between those seeds, 0.788 → 1.119 between the two basins' means
+over ten seeds. COVID takes the in-window variance; GDP's own error takes the
+out-of-window variance the Global loading used to carry. The result is a series
+explained by itself.
+
+A likely enabler: the Global factor is normalised by household spending, which
+starts in 2012, so only **164 of the panel's 438 months** pin that factor's
+scale.
+
+**These are separate basins, not tails of one distribution.** A chain picks one
+in its first sweeps and stays. Over 400 stored draws GDP's Global loading has a
+5–95% range of −0.45…0.31 at seed 321 and 1.22…1.55 at seed 1, with each chain's
+first and last fifty draws in the same place. Lengthening to 2,000 sweeps does
+not resolve it. Five of ten seeds land in each basin.
+
+**So the model refuses.** `state_space` — the one funnel from a sampler run to a
+state space — raises `CollapsedFactorError` when the target's Global loading is
+at or below **0.75**, a floor measured between the two basins: the five
+collapsed chains gave 0.011…0.554 and the five identified ones 1.192…1.348.
+Without it, a caller taking the library defaults got a plausible 2.83% number
+from a model whose response to its *entire* monthly panel was 0.015pp. The
+default seed was changed too, but a lucky default is not a guard — half the
+seeds collapse, and the next caller passes their own.
+
+Re-running with another seed gets a usable chain about half the time. That is a
+workaround. The NY Fed does not face the coin flip at all because `initval.mat`
+ships a *fitted* starting point that puts the chain in the right basin, and
+Australia starts from a bland one. **Plan C needs a starting point with that
+job, or a spec that does not make a 22-month factor compete with the Global
+factor for the target series.**
 
 ### The gate replays a recorded vintage
 

@@ -65,6 +65,15 @@ v2's scraper that stopped -- so the fix is a working fetcher, and in the
 meantime the refusal is the guard doing its job. The way to nowcast anyway is
 not to widen the budget or add a bypass.
 
+TWO GUARDS, NOT ONE
+-------------------
+``check_freshness`` refuses a panel whose inputs have gone stale. The second
+guard is further down and refuses a *model*: :func:`state_space` raises
+:class:`CollapsedFactorError` when the fitted chain has left the nowcast target
+disconnected from the factor its monthly series feed. Half the sampler seeds
+land there, the result runs and produces a plausible number, and that number is
+not a nowcast. Neither guard has a bypass flag.
+
 VINTAGES: WHY THE GATE DOES NOT FETCH
 -------------------------------------
 ``build_panel(asof=...)`` with no ``vintage`` fetches live, which is what a
@@ -114,6 +123,8 @@ from nyfed.spec import ModelSpec, load_spec
 from nyfed.ssm import StateSpace
 
 __all__ = [
+    "COLLAPSED_GLOBAL_LOADING",
+    "CollapsedFactorError",
     "DEFAULT_START",
     "Vintage",
     "build_panel",
@@ -128,6 +139,42 @@ __all__ = [
 ]
 
 DEFAULT_START = "1990-01-01"
+
+# The floor the nowcast target's Global loading has to clear before a state
+# space built from a sampler run may be used. See `CollapsedFactorError`.
+#
+# Measured over ten seeds at n_gs=200, n_burn=100 on the 2026-06-01 vintage.
+# The two basins are far apart and this sits between them: the five collapsed
+# chains gave 0.011, 0.222, 0.293, 0.300 and 0.554, and the five identified ones
+# 1.192, 1.230, 1.334, 1.347 and 1.348. So 0.75 clears the largest collapsed
+# value by 0.20 and undercuts the smallest identified one by 0.44.
+COLLAPSED_GLOBAL_LOADING = 0.75
+
+
+class CollapsedFactorError(Exception):
+    """The fitted model does not connect the target series to the panel.
+
+    GDP loads only the Global factor and the COVID factor, and the COVID factor
+    is active for the 22 months holding 64.5% of GDP's standardised variation
+    (8 of 143 observations, including the five largest). When a chain lets the
+    COVID factor take the in-window variation and GDP's own idiosyncratic
+    stochastic volatility take the rest, GDP's Global loading collapses toward
+    zero -- and the Global factor is what every monthly series feeds. The result
+    still runs, still produces a plausible number, and is not a nowcast: at the
+    worst seed measured, a one-sigma shock to the ENTIRE monthly panel across
+    the target quarter moved it by 0.015pp.
+
+    Half the seeds land there. So this is raised rather than warned about: the
+    whole point of this project's guards is to turn a plausible wrong number
+    into a loud failure, and a number from a collapsed chain must not reach a
+    reader.
+
+    Re-running with a different seed gets a usable chain about half the time.
+    That is a workaround, not a fix. The fix is a starting point that does what
+    the NY Fed's fitted ``initval.mat`` does -- put the chain in the identified
+    basin -- or a specification that does not make a 22-month factor compete
+    with the Global factor for the target series. Plan C.
+    """
 
 # Factor-VAR and measurement-error lag orders. ``example_estimate.m:44-45``.
 P_F, P_E = 4, 1
@@ -446,7 +493,7 @@ def estimate_short(
     n_gs: int = 200,
     n_burn: int = 100,
     n_thin: int = 1,
-    seed: int = 321,
+    seed: int = 1,
     spec_path=SPEC_PATH,
 ) -> GibbsResult:
     """A short sampler run on one assembled panel.
@@ -487,6 +534,34 @@ def state_space(
     spec = load_spec(spec_path)
     n, n_f = spec.blocks.shape
     param = map_parameter(np.median(result.params, axis=1), (n, n_f, P_F, P_E))
+
+    # THE COLLAPSE GUARD. This is the one funnel from a sampler run to a state
+    # space, so it is the one place that can refuse before a collapsed chain
+    # becomes a number. `map_parameter` and `construct_ssm` are still available
+    # to anyone deliberately inspecting a collapsed run -- as
+    # `test_the_gdp_loading_is_bimodal_across_seeds` does.
+    if "Global" not in spec.block_names:
+        raise ValueError(
+            f"the spec has no Global block (blocks: {spec.block_names}), so the "
+            "collapse guard cannot be applied. It checks the nowcast target's "
+            "loading on the factor every monthly series feeds; a spec without "
+            "one needs a different guard, not no guard."
+        )
+    i_global = spec.block_names.index("Global")
+    loading = float(param.Lambda[panel.i_now, i_global])
+    if loading <= COLLAPSED_GLOBAL_LOADING:
+        raise CollapsedFactorError(
+            f"{panel.series_id[panel.i_now]}'s loading on the Global factor is "
+            f"{loading:.3f}, at or below the {COLLAPSED_GLOBAL_LOADING} floor: "
+            "this chain settled in the basin where the target series is not "
+            "connected to the panel, and any nowcast from it would be driven by "
+            "the target's own dynamics rather than by the monthly data. "
+            "Measured over ten seeds, five land here (0.011..0.554) and five do "
+            "not (1.192..1.348), and lengthening the chain to 2,000 sweeps does "
+            "not resolve it. See CollapsedFactorError for why a different seed "
+            "is a workaround and not a fix."
+        )
+
     latent = Latent(sigma=result.sigmas.mean(axis=2), s=result.ss.mean(axis=2))
     return construct_ssm(param, latent, build_restrict(panel, spec, p_f=P_F))
 
@@ -549,7 +624,7 @@ def quick_nowcast(
     t_now: np.ndarray | None = None,
     n_gs: int = 200,
     n_burn: int = 100,
-    seed: int = 321,
+    seed: int = 1,
 ) -> float:
     """The nowcast for the first target quarter, in GDP's own units.
 
@@ -559,6 +634,15 @@ def quick_nowcast(
 
     Its only job is to give the leakage check a number to compare. It is not a
     published figure and there is nothing to check it against.
+
+    IT CAN REFUSE. When it estimates for itself it goes through
+    :func:`state_space`, which raises :class:`CollapsedFactorError` if the chain
+    settled in the basin where the target series is not connected to the panel.
+    An injected ``ssm`` has been through the same guard, because
+    :func:`state_space` is the only thing in this module that builds one from a
+    sampler run. The default seed is one that lands in the identified basin, but
+    a default is not a guard -- half the seeds collapse, so the guard is what
+    makes this function safe to call with your own.
 
     ``ssm`` and ``t_now`` are injectable so that two panels can be compared
     through the SAME state space. That is what makes the leakage check a

@@ -14,7 +14,7 @@ WHAT THE LEAKAGE CHECK MEASURES, AND WHAT IT DOES NOT
 Two problems, and the second one is fatal:
 
 1. At this vintage the nowcast target IS the current quarter -- GDP is observed
-   through 2026-03, so Q2 2026 is what the model is nowcasting, and Q2's
+   through 2025-12, so Q1 2026 is what the model is nowcasting, and Q1's
    monthly observations are exactly what it is supposed to read. A nowcast that
    ignored them would be a broken nowcast, not a leak-free one. The leak worth
    testing for is the one that cleared v2: data from AFTER the target quarter
@@ -22,10 +22,11 @@ Two problems, and the second one is fatal:
 
 2. A blanking test passes whenever the nowcast does not move, INCLUDING when
    the pipeline is dead. Blanking is also a weak instrument in its own right:
-   measured here, removing all three of Q2's months moves the nowcast by
-   0.008pp -- not because the model ignores them but because they came in close
-   to what it expected. Removal measures how surprising the data was, not
-   whether the data is read.
+   measured at this gate's own seed, removing all three of Q1's months moves the
+   nowcast by 0.051pp, against 2.169pp for a one-sigma shock to the same cells
+   -- not because the model ignores them but because they came in close to what
+   it expected. Removal measures how surprising the data was, not whether the
+   data is read.
 
 So the instrument is a one-sigma SHOCK, applied to the same rows, through the
 same state space, in two places:
@@ -47,14 +48,16 @@ tests' date pinning do deterministically.
 
 THE NUMERICAL CHECK IS A CONSISTENCY CHECK, NOT A LEAK DETECTOR, and saying
 otherwise would be a false claim about a real guard. Measured: a genuine
-one-month misalignment -- July's observation written into June's column, which
-is what an off-by-one in ``panel._align`` would produce -- takes the ratio from
-252 to 25 at seed 321 and from 30 to 7 at seed 1, but leaves it at 47 and 29 at
-seeds 3 and 7. At this vintage only ONE post-target month exists and only seven
-of the fifteen series have published it, so there is too little post-target data
-for the ratio to separate the two cases reliably. A vintage-pair leakage test
-(build at two dates, compare) is the instrument that would, and it belongs to
-Plan C, where more than one post-target month is available.
+one-month misalignment -- April's observation written into March's column,
+which is what an off-by-one in ``panel._align`` would produce -- is caught at
+NONE of the six seeds tried. The healthy ratios are 17.6, 162.5, 52.6, 365.2,
+395.4 and 17.5; under the leak they become 49.5, 37.8, 16.9, 22.9, 109.8 and
+320.4, every one still above the asserted floor of 10, and two of them higher
+than the healthy value. At this vintage only ONE post-target month exists and
+only eight of the fifteen series have published it, so there is too little
+post-target data for the ratio to separate the two cases at all. A vintage-pair
+leakage test (build at two dates, compare) is the instrument that would, and it
+belongs to Plan C, where more than one post-target month is available.
 
 The state space is estimated ONCE, on the unmodified panel, and reused for
 every arm. Re-estimating per arm would mix the effect of changing observations
@@ -80,6 +83,8 @@ import pandas as pd
 import pytest
 
 from nyfed.au.build import (
+    COLLAPSED_GLOBAL_LOADING,
+    CollapsedFactorError,
     P_E,
     P_F,
     build_panel,
@@ -96,7 +101,7 @@ from nyfed.au.fetch_abs import parse_abs_frame
 from nyfed.au.fetch_rba import parse_rba_frame
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.panel import Panel
-from nyfed.au.restrict import build_restrict
+from nyfed.au.restrict import COVID_END, COVID_START, build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
 from nyfed.model import construct_ssm
 from nyfed.parameters import map_parameter
@@ -147,6 +152,9 @@ TARGET_QUARTER = (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-03-01"))
 # names the reason.
 N_GS, N_BURN, SEED = 200, 100, 1
 
+# A seed that lands in the OTHER basin, used to exercise the collapse guard.
+COLLAPSED_SEED = 321
+
 # The Global block, column 0 of `spec.blocks`.
 I_GLOBAL = 0
 
@@ -166,6 +174,16 @@ def fitted(panel):
     """One short sampler run, and the state space and horizons it implies."""
     result = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=SEED)
     return result, state_space(panel, result), target_periods(panel)
+
+
+@pytest.fixture(scope="module")
+def collapsed_result(panel):
+    """One chain at seed 321, which lands in the collapsed basin.
+
+    Shared by the bimodality measurement and the collapse-guard test so that the
+    two cost a single sampler run between them.
+    """
+    return estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=COLLAPSED_SEED)
 
 
 def _with_data(panel: Panel, Y: np.ndarray) -> Panel:
@@ -306,7 +324,7 @@ def test_the_household_spending_row_is_the_deflated_series_not_the_nominal_one(p
 # --------------------------------------------------------------------------- #
 
 
-def test_a_build_today_is_refused_because_the_pmi_is_dead():
+def test_a_build_at_the_vintages_own_date_is_refused_because_the_pmi_is_dead():
     """Not a bug: the guard doing its job, pinned so it cannot be quietly lost.
 
     ``nowcasting_v2/data_raw/aig_pmi.csv`` was last committed on 2026-06-11 with
@@ -317,16 +335,28 @@ def test_a_build_today_is_refused_because_the_pmi_is_dead():
     fix is a working fetcher rather than a replacement series. Either way the
     build must refuse, and the way to nowcast again is not to widen the budget.
 
-    IT REFUSES ON THAT SERIES AND NOTHING ELSE, which is the round-1 finding
-    closed. Under the old hand-typed 75-day monthly budget this build also named
-    building approvals, household spending, exports and imports -- all four
-    entirely current, all four dated to the start of their reference month and
-    published about two months later. Deriving the budget from a sourced
-    publication lag passes them and still catches the dead row, so the negative
-    assertion below is the load-bearing half of this test.
+    IT REFUSES ON THAT SERIES AND NOTHING ELSE. Under the old hand-typed 75-day
+    monthly budget this build also named building approvals, household spending,
+    exports and imports -- all four entirely current, all four dated to the
+    start of their reference month and published about two months later.
+    Deriving the budget from a sourced publication lag passes them and still
+    catches the dead row, so the negative assertion is the load-bearing half.
+
+    DATED TO THE VINTAGE, NOT TO ``today()``. The recording is frozen, so a
+    ``today()``-based version of this test had a shelf life rather than a
+    meaning: scanned day by day, the stale set stays ``{aig_pmi}`` through
+    2026-09-23, becomes five series on 2026-09-24 and all fifteen by 2026-10-20
+    -- at which point the gate would fail looking like a freshness regression
+    instead of "the vintage needs re-recording". Measuring at the vintage's own
+    ``recorded_at`` asks the question the frozen data can actually answer: on
+    the day this was fetched, what did the guard say?
     """
+    vintage = load_vintage(VINTAGE)
+    assert vintage.recorded_at is not None, "the recording has no date to test at"
+    recorded_on = pd.Timestamp(vintage.recorded_at).tz_convert(None).normalize()
+
     with pytest.raises(StaleSeriesError) as excinfo:
-        build_panel(asof=str(pd.Timestamp.today().date()), vintage=VINTAGE)
+        build_panel(asof=str(recorded_on.date()), vintage=vintage)
 
     stale = {key: age for key, age, _ in excinfo.value.stale}
     assert set(stale) == {"aig_pmi"}, f"expected only aig_pmi, got {sorted(stale)}"
@@ -567,12 +597,12 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
 ):
     """The leakage-shaped check, with its limits stated rather than implied.
 
-    The target quarter is Q2 2026; July 2026 is in the panel because seven of
+    The target quarter is Q1 2026; April 2026 is in the panel because eight of
     the fifteen series had published it by this vintage. A one-sigma shock to
-    those July observations moves the Q2 nowcast by 0.004pp against 1.087pp for
-    the same shock inside Q2. Not zero, and it should not be: the smoother is
+    those April observations moves the Q1 nowcast by 0.013pp against 2.169pp for
+    the same shock inside Q1. Not zero, and it should not be: the smoother is
     two-sided, so a later month legitimately carries a little information about
-    the factor path in June.
+    the factor path in March.
 
     WHAT THIS DOES NOT ESTABLISH. It does not detect a one-month misalignment.
     Measured across six sampler seeds, the probe is caught at NONE of them: the
@@ -658,51 +688,135 @@ def test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor(panel, spe
 
 
 @pytest.mark.slow
-def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec):
+def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_result):
     """A finding, pinned as a measurement so it cannot be mistaken for noise.
 
-    GDP loads only the Global factor and the COVID factor. The COVID factor is
-    active for 22 months (March 2020 to December 2021) that contain by far the
-    largest moves in the target series, so it can fit those quarters almost
-    perfectly -- and when it does, the Global factor is left explaining a much
-    quieter series and GDP's loading on it collapses toward zero. The two
-    outcomes are separate basins, not tails of one distribution, and a chain
-    picks one in its first sweeps and stays: measured at seed 321 over 400 stored
-    draws, GDP's Global loading has a 5-95% range of -0.45..0.31 with the first
-    and last fifty draws averaging -0.16 and -0.01, while at seed 1 the same
-    range is 1.22..1.55. Lengthening the chain to 2,000 sweeps does not resolve
-    it.
+    THE PREMISE, measured on the panel rather than asserted: GDP loads only the
+    Global factor and the COVID factor; the COVID factor is active for 22 months
+    (March 2020 to December 2021); and those 22 months hold **8 of GDP's 143
+    observations but 64.5% of its standardised sum of squares**, including all
+    five of its largest absolute values. A factor confined to that window can fit
+    the biggest moves in the target series almost perfectly.
 
-    THIS IS WHY THE GATE DECLARES ITS SEED. The NY Fed does not face the coin
-    flip because ``initval.mat`` ships a fitted starting point that puts the
-    chain in the right basin; Australia starts from a bland one. Plan C's
-    backtest cannot leave this to the seed -- it needs a starting point with the
-    same job as ``initval.mat``, or a spec that does not make one factor's
-    22-month window compete with the other for the target series.
+    THE MECHANISM IS A TWO-SIDED HANDOVER, not just the COVID factor taking
+    over. When GDP's Global loading collapses (1.334 -> 0.011 between the two
+    seeds here) its COVID loading rises only 1.036 -> 1.318, which cannot absorb
+    the difference -- the COVID factor is zero outside its 22 months and the
+    other 135 observations still need explaining. What takes them is GDP's own
+    idiosyncratic stochastic volatility, and it rises OUTSIDE the window too:
+    0.875 -> 1.107 between these two seeds, and 0.788 -> 1.119 between the two
+    basins' means over ten seeds. So COVID takes the in-window variance and
+    GDP's own error takes the out-of-window variance the Global loading used to
+    carry, which is why the result is a series explained by itself.
 
-    Two seeds, one from each basin, so the test costs two short chains.
+    A LIKELY ENABLER, worth Plan C's attention: the Global factor is normalised
+    by household spending, which starts in 2012, so only 164 of the panel's 438
+    months pin that factor's scale at all.
+
+    These are separate basins, not tails of one distribution. A chain picks one
+    in its first sweeps and stays: measured at seed 321 over 400 stored draws,
+    GDP's Global loading has a 5-95% range of -0.45..0.31 with the first and
+    last fifty draws averaging -0.16 and -0.01, while at seed 1 the same range
+    is 1.22..1.55. Lengthening the chain to 2,000 sweeps does not resolve it,
+    and five of ten seeds land in each basin.
+
+    THIS IS WHY THE GATE DECLARES ITS SEED and why ``state_space`` refuses a
+    collapsed chain outright. The NY Fed does not face the coin flip because
+    ``initval.mat`` ships a fitted starting point that puts the chain in the
+    right basin; Australia starts from a bland one. Plan C needs a starting
+    point with that job, or a spec that does not make a 22-month factor compete
+    with the Global factor for the target series.
     """
     n, n_f = spec.blocks.shape
     i_gdp, i_covid = panel.series_id.index("gdp"), spec.block_names.index("COVID")
+    window = (panel.dates >= COVID_START) & (panel.dates <= COVID_END)
 
-    loadings = {}
-    for seed in (SEED, 321):
-        result = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=seed)
+    # The premise.
+    row = panel.Y[i_gdp]
+    observed = np.isfinite(row)
+    assert observed.sum() == 143
+    assert (observed & window).sum() == 8
+    share = np.nansum(row[observed & window] ** 2) / np.nansum(row[observed] ** 2)
+    assert share > 0.6, f"the COVID window carries {share:.1%} of GDP's variation"
+    largest = np.argsort(-np.abs(np.where(observed, row, 0.0)))[:5]
+    assert window[largest].all()
+
+    identified_result, _, _ = fitted
+    summaries = {}
+    for name, result in (("identified", identified_result),
+                         ("collapsed", collapsed_result)):
         param = map_parameter(np.median(result.params, axis=1), (n, n_f, P_F, P_E))
-        loadings[seed] = (float(param.Lambda[i_gdp, I_GLOBAL]),
-                          float(param.Lambda[i_gdp, i_covid]))
+        sigma_e = result.sigmas[n_f + i_gdp].mean(axis=1)
+        summaries[name] = (float(param.Lambda[i_gdp, I_GLOBAL]),
+                           float(param.Lambda[i_gdp, i_covid]),
+                           float(sigma_e[~window].mean()))
 
-    identified, collapsed = loadings[SEED], loadings[321]
-    assert identified[0] > 0.5, f"seed {SEED} is no longer in the identified basin"
-    assert collapsed[0] < 0.5, (
-        "seed 321 no longer lands in the collapsed basin -- if that is a real "
-        "improvement, re-measure the spread before relaxing anything that "
-        "depends on it"
+    identified, collapsed = summaries["identified"], summaries["collapsed"]
+    assert identified[0] > COLLAPSED_GLOBAL_LOADING, (
+        f"seed {SEED} is no longer in the identified basin"
     )
-    # The trade-off is the mechanism, so check it rather than only the symptom:
-    # the basin that loses the Global loading gains the COVID one.
+    assert collapsed[0] <= COLLAPSED_GLOBAL_LOADING, (
+        f"seed {COLLAPSED_SEED} no longer lands in the collapsed basin -- if "
+        "that is a real improvement, re-measure the spread before relaxing "
+        "anything that depends on it"
+    )
+    # Both halves of the handover, because naming only the COVID factor would be
+    # an incomplete account: it cannot explain the 135 out-of-window quarters.
     assert collapsed[1] > identified[1], (
         f"GDP's COVID loading is {collapsed[1]:.3f} in the collapsed basin "
-        f"against {identified[1]:.3f} in the identified one; the two factors "
-        "were expected to be competing for the same variance"
+        f"against {identified[1]:.3f} in the identified one"
     )
+    assert collapsed[2] > 1.15 * identified[2], (
+        f"GDP's idiosyncratic volatility OUTSIDE the COVID window is "
+        f"{collapsed[2]:.3f} collapsed against {identified[2]:.3f} identified; "
+        "the out-of-window variance has to go somewhere and the COVID factor "
+        "cannot take it"
+    )
+
+    i_hh = panel.series_id.index("household_spending")
+    assert np.isfinite(panel.Y[i_hh]).sum() == 164
+
+
+@pytest.mark.slow
+def test_a_collapsed_chain_is_refused_rather_than_turned_into_a_number(
+    panel, collapsed_result
+):
+    """The guard the re-review asked for, and the reason it is not just a default.
+
+    ``estimate_short`` and ``quick_nowcast`` used to default to seed 321 -- the
+    seed this module's own bimodality test asserts lands in the collapsed basin.
+    A caller taking the defaults got a plausible 2.83% number from a model whose
+    response to its entire monthly panel was 0.015pp. Switching the default is
+    not the fix, because five of ten seeds collapse and the next caller passes
+    their own; the fix is that the model detects its own collapse from a
+    quantity it already computes and refuses.
+
+    Both arms are exercised: the funnel (``state_space``) and the entry point
+    (``quick_nowcast``), because it is the entry point the README advertises.
+    """
+    with pytest.raises(CollapsedFactorError, match=r"gdp's loading"):
+        state_space(panel, collapsed_result)
+
+    with pytest.raises(CollapsedFactorError):
+        quick_nowcast(panel, n_gs=N_GS, n_burn=N_BURN, seed=COLLAPSED_SEED)
+
+    # ...and the identified basin is not refused, or the guard would just be a
+    # blanket refusal that happens to look right.
+    assert np.isfinite(quick_nowcast(panel, n_gs=N_GS, n_burn=N_BURN, seed=SEED))
+
+
+def test_the_library_defaults_do_not_land_in_the_collapsed_basin():
+    """The defaults are checked, not trusted -- cheaply, without a sampler run.
+
+    A default that is only correct because someone remembered to change it is
+    the failure this round was reported for. This reads the signature.
+    """
+    import inspect
+
+    for function in (estimate_short, quick_nowcast):
+        default = inspect.signature(function).parameters["seed"].default
+        assert default == SEED, (
+            f"{function.__name__} defaults to seed {default}; the gate measures "
+            f"seed {SEED} into the identified basin and seed {COLLAPSED_SEED} "
+            "into the collapsed one"
+        )

@@ -1012,6 +1012,42 @@ git commit -m "feat(v3): freshness guards that halt on a stale or discontinued s
 
 Quarterly series occupy the **last month of their quarter** and are NaN in the other two, which is how `construct_ssm` expects mixed frequency (`nyfed/model.py`, the `isquart` branch).
 
+### Household spending must be deflated to real — added 2026-08-26
+
+The registry fetches `5682.0:A130200584T`, which is the Monthly Household Spending Indicator
+**at current prices** — nominal, seasonally adjusted. The spec row calls it "Household
+Spending (real)" and mirrors the NY Fed's `PCEC96`, which is *real* personal consumption
+expenditures. Its transformation is `pch`, so a nominal series carries inflation straight
+into the factor, and this series **normalises the Global factor**, so its scale sets that
+factor's scale.
+
+This is not hypothetical. v2 found it empirically and recorded it in its panel notes: nominal
+MHSI over-read real GDP through the 2024 inflation — 2024 mean 3-month nominal 0.82% against
+real 0.19%, with real GDP around 0.4%.
+
+Queried against the ABS catalogue, the available variants are:
+
+| variant | series | note |
+|---|---|---|
+| monthly, nominal, seasonally adjusted | `A130200584T` | what the registry fetches |
+| monthly, real (chain volume), **Original** | `A130265220L` | not seasonally adjusted |
+| quarterly, real, seasonally adjusted | `A130271111R` | 48 obs, 2014Q3–2026Q2 |
+
+**There is no monthly real seasonally-adjusted series**, so a monthly panel row mirroring
+`PCEC96` must be derived by deflation.
+
+**Deflate by the quarterly CPI All-groups index (`6401.0:A2325846C`) interpolated to
+monthly** — `real = nominal / cpi * 100` — mirroring v2's method. Not by the monthly CPI
+indicator already in the panel: catalogue `6484.0` is absent from the ABS Time Series
+Directory and resolves only through a URL override, and its history is short enough to
+truncate a series that starts in 2012-07 and sets the Global factor's scale. `6401.0` carries
+312 observations back to 1948Q3 and resolves normally.
+
+Add a test that the deflated series is **below** the nominal one for every month after the
+deflator's base period, and that its history still starts at the nominal series' start —
+a deflation that silently truncates history would quietly shrink the panel's longest
+consumption record.
+
 - [ ] **Step 1: Write the failing test**
 
 `nowcasting_v3/tests/test_au_panel.py`:

@@ -1302,6 +1302,197 @@ git commit -m "feat(v3): assemble the Australian panel with ragged edges preserv
 
 ---
 
+## Task 5A: Apply the spec's transformations
+
+**Added 2026-08-26, after Task 5's implementer found that no task in this plan applied the
+`Transformation` column.** This is a plan defect, not an oversight by any implementer.
+
+**Files:**
+- Create: `nowcasting_v3/nyfed/au/transform.py`
+- Modify: `nowcasting_v3/nyfed/au/panel.py` (call the transform between alignment and standardisation)
+- Test: `nowcasting_v3/tests/test_au_transform.py`
+
+**Interfaces:**
+- Consumes: `nyfed.spec.ModelSpec`, the aligned raw matrix built inside `nyfed.au.panel.assemble`
+- Produces: `transform_panel(raw: np.ndarray, spec: ModelSpec, dates: pd.DatetimeIndex) -> np.ndarray` — same shape, transformed per series
+
+### Why this is needed, established by execution not assumption
+
+The NY Fed never had to solve this: their drop ships **pre-transformed** `Data_*.mat` files, and
+`example_nowcast.m` only standardises them. We are building the pipeline they did not ship.
+
+Verified by loading `nyfed_matlab/data/Data_2023_09_29.mat` directly:
+
+| column | spec transformation | observed range | last value | reading |
+|---|---|---|---|---|
+| `PAYEMS` | `chg` | -20514 .. 4565 | 187 | **change** in thousands, not the ~150,000 level |
+| `CPIAUCSL` | `pch` | -1.77 .. 1.38 | 0.63 | **percent change**, not the ~300 index |
+| `GDPC1` | `pca` | -28.0 .. 34.8 | 2.06 | **annualised percent change** — 2.06 is the quarter's growth |
+
+Without this task the Australian panel reaches the engine as standardised **levels** where the
+spec declares growth rates. The model would run and every number it produced would be wrong.
+
+### The four codes, and the one subtlety
+
+- **`lin`** — no transformation. The survey series (`aig_pmi`, `nab_conditions`) are diffusion
+  indices already expressed as a rate; the NY Fed treats Empire State and the Philadelphia Fed
+  the same way.
+- **`chg`** — first difference against the previous observation.
+- **`pch`** — percent change against the previous observation: `100 * (x_t / x_{t-k} - 1)`.
+- **`pca`** — percent change annualised: `100 * ((x_t / x_{t-k}) ** periods_per_year - 1)`.
+
+**The subtlety is `k`, the step to the previous observation.** Monthly series step back one
+month. **Quarterly series are observed only in months 3, 6, 9 and 12, so they step back three
+months on the monthly grid, not one** — and their `pca` annualises with an exponent of 4, not
+12. Get this wrong and GDP reports a quarterly growth rate annualised as though it were
+monthly, which is wrong by a large factor with no obvious signature: the number stays plausible.
+
+### Two hazards this plan has already met
+
+**`imports` is negative** (ABS debit convention). Implement `pch` as a **ratio**, never as a log
+difference — a log of a negative number is NaN and the series would silently empty. Task 5
+already asserts `imports` carries at least as many observations as `exports`; that assertion
+now becomes load-bearing, because this is the task that could break it.
+
+**Order matters.** The transform runs **before** standardisation. `example_nowcast.m` computes
+`Y_location` and `Y_scale` on transformed data, so standardising first would centre and scale
+the levels and then difference them, which is not the same thing.
+
+- [ ] **Step 1: Write the failing test**
+
+`nowcasting_v3/tests/test_au_transform.py`:
+
+```python
+"""The spec's Transformation column, applied.
+
+The NY Fed ships pre-transformed data; we build the pipeline they did not. Without
+this the panel reaches the engine as levels where the spec declares growth rates,
+and the model runs anyway.
+"""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from nyfed.au.sources import SPEC_PATH
+from nyfed.au.transform import transform_panel
+from nyfed.spec import load_spec
+
+DATES = pd.date_range("2020-01-01", periods=24, freq="MS")
+
+
+def _spec():
+    return load_spec(SPEC_PATH)
+
+
+def test_lin_is_left_untouched():
+    spec = _spec()
+    i = spec.transformation.index("lin")
+    raw = np.full((len(spec.series_id), 24), np.nan)
+    raw[i] = np.arange(24, dtype=float)
+    out = transform_panel(raw, spec, DATES)
+    assert np.array_equal(out[i], raw[i], equal_nan=True)
+
+
+def test_pch_is_a_ratio_not_a_log_difference():
+    """imports enters the panel NEGATIVE by ABS's debit convention. A log
+    difference would make it all-NaN with no error raised."""
+    spec = _spec()
+    i = spec.series_id.index("imports")
+    assert spec.transformation[i] == "pch"
+    raw = np.full((len(spec.series_id), 24), np.nan)
+    raw[i] = -np.linspace(100.0, 200.0, 24)
+    out = transform_panel(raw, spec, DATES)
+    assert np.isfinite(out[i, 1:]).all(), "negative series became NaN -- log transform?"
+
+
+def test_monthly_pch_steps_back_one_month():
+    spec = _spec()
+    i = spec.series_id.index("cpi")
+    raw = np.full((len(spec.series_id), 24), np.nan)
+    raw[i] = 100.0 * (1.01 ** np.arange(24))
+    out = transform_panel(raw, spec, DATES)
+    assert out[i, 1:] == pytest.approx(1.0, abs=1e-9)
+    assert np.isnan(out[i, 0]), "the first observation has no predecessor"
+
+
+def test_quarterly_pca_steps_back_three_months_and_annualises_by_four():
+    """GDP is observed in months 3, 6, 9, 12 only. Stepping back one month
+    would compare it to an empty cell; annualising by 12 would report a
+    quarterly rate as a monthly one. Both produce plausible numbers."""
+    spec = _spec()
+    i = spec.series_id.index("gdp")
+    assert spec.transformation[i] == "pca"
+    raw = np.full((len(spec.series_id), 24), np.nan)
+    quarter_ends = [m for m, d in enumerate(DATES) if d.month in (3, 6, 9, 12)]
+    for step, m in enumerate(quarter_ends):
+        raw[i, m] = 1000.0 * (1.01 ** step)      # 1% per quarter
+    out = transform_panel(raw, spec, DATES)
+    expected = 100.0 * (1.01 ** 4 - 1)           # ~4.06% annualised
+    got = out[i, quarter_ends[1:]]
+    assert got == pytest.approx(expected, abs=1e-9)
+    assert np.isnan(out[i, quarter_ends[0]]), "the first quarter has no predecessor"
+
+
+def test_transformed_values_land_where_the_observations_are():
+    """A quarterly transform must not write into the two empty months."""
+    spec = _spec()
+    i = spec.series_id.index("gdp")
+    raw = np.full((len(spec.series_id), 24), np.nan)
+    quarter_ends = [m for m, d in enumerate(DATES) if d.month in (3, 6, 9, 12)]
+    for step, m in enumerate(quarter_ends):
+        raw[i, m] = 1000.0 + step
+    out = transform_panel(raw, spec, DATES)
+    non_quarter = [m for m in range(24) if m not in quarter_ends]
+    assert np.isnan(out[i, non_quarter]).all()
+
+
+def test_chg_is_a_first_difference():
+    spec = _spec()
+    i = spec.series_id.index("employment")
+    assert spec.transformation[i] == "chg"
+    raw = np.full((len(spec.series_id), 24), np.nan)
+    raw[i] = np.arange(24, dtype=float) * 5.0
+    out = transform_panel(raw, spec, DATES)
+    assert out[i, 1:] == pytest.approx(5.0, abs=1e-12)
+
+
+def test_every_spec_transformation_code_is_handled():
+    """An unrecognised code must raise, not pass the series through untouched.
+    Silently returning levels for a code nobody implemented is the failure this
+    whole task exists to fix."""
+    spec = _spec()
+    assert set(spec.transformation) <= {"lin", "chg", "pch", "pca"}
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `cd nowcasting_v3 && .venv/bin/pytest tests/test_au_transform.py -q`
+Expected: FAIL with `ModuleNotFoundError: No module named 'nyfed.au.transform'`
+
+- [ ] **Step 3: Write the transform**
+
+Implement `transform_panel`. Derive each series' step from `spec.frequency` — 1 month for `m`,
+3 for `q` — and its annualisation exponent from the same field: 12 for monthly, 4 for quarterly.
+**Raise on an unrecognised transformation code**; do not fall through to returning levels.
+
+- [ ] **Step 4: Wire it into `assemble`, before standardisation**
+
+In `nyfed/au/panel.py`, call `transform_panel` on the aligned raw matrix and standardise the
+result. Add a test that the panel's GDP row after assembly is a growth rate rather than a
+level — assert its magnitude is under 100, which a chain-volume level in millions never is.
+
+- [ ] **Step 5: Run the fast suite, then commit**
+
+```bash
+cd nowcasting_v3 && .venv/bin/pytest -m "not slow" -q
+git add nowcasting_v3/nyfed/au/transform.py nowcasting_v3/nyfed/au/panel.py \
+        nowcasting_v3/tests/test_au_transform.py
+git commit -m "feat(v3): apply the spec's transformations before standardising"
+```
+
+---
+
 ## Task 6: PCA seeding of the initial loadings
 
 **Files:**

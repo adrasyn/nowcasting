@@ -288,3 +288,41 @@ def test_the_assembled_gdp_row_is_annualised_by_four_not_twelve():
 
     assert recovered[-1] == pytest.approx(expected, abs=1e-9)
     assert expected != pytest.approx(100.0 * ((last / previous) ** 12 - 1.0))
+
+
+def test_the_imports_guard_runs_AFTER_the_transform_not_before(monkeypatch):
+    """Pins the guard's POSITION in `assemble`, which nothing else does.
+
+    The three tests above pass with the guard on either side of
+    `transform_panel`, because each hands `assemble` an imports row that is
+    already NaN before any transform runs. So they cannot see the guard move.
+    But above the transform the guard is dead by construction: the fault it
+    describes -- a log-difference `pch` emptying the wholly negative imports
+    row -- does not exist yet at that point in the function.
+
+    This test injects the real fault: a `pch` that log-differences. Below the
+    transform, `_check_imports_survived` catches it and says "imports". Above
+    it, the guard sees healthy levels and passes, and the failure surfaces
+    instead from `standardise`'s all-NaN refusal -- a ValueError naming a ROW
+    NUMBER and no series, several steps from the cause. Matching on "imports"
+    is what separates the two.
+    """
+    import nyfed.au.panel as panel_module
+
+    real = panel_module.transform_panel
+
+    def log_difference_pch(raw, spec, dates):
+        out = real(raw, spec, dates)
+        i = spec.series_id.index("imports")
+        with np.errstate(invalid="ignore"):
+            logs = np.log(raw[i])          # wholly negative -> every value NaN
+        out[i] = logs - np.roll(logs, 1)
+        return out
+
+    monkeypatch.setattr(panel_module, "transform_panel", log_difference_pch)
+
+    inputs = _panel_inputs()
+    inputs["imports"] = _recorded("imports", "A2718603V")
+    inputs["exports"] = _recorded("exports", "A2718577A")
+    with pytest.raises(ValueError, match="imports"):
+        assemble(inputs, start="2023-07-01", end="2026-06-01")

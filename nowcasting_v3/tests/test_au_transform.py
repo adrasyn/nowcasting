@@ -31,14 +31,24 @@ def test_lin_is_left_untouched():
 
 def test_pch_is_a_ratio_not_a_log_difference():
     """imports enters the panel NEGATIVE by ABS's debit convention. A log
-    difference would make it all-NaN with no error raised."""
+    difference would make it all-NaN with no error raised.
+
+    Finiteness alone is too weak to pin this: ``100 * (|x_t| / |x_{t-k}| - 1)``
+    is finite everywhere here and would report a rising debit as a rising
+    number, so the first two cells are checked by VALUE. Under the debit
+    convention a debit growing from -100 to -110 is imports up 10 per cent, and
+    -110 to -99 is imports down 10 per cent; the signs are the assertion.
+    """
     spec = _spec()
     i = spec.series_id.index("imports")
     assert spec.transformation[i] == "pch"
     raw = np.full((len(spec.series_id), 24), np.nan)
     raw[i] = -np.linspace(100.0, 200.0, 24)
+    raw[i, :3] = [-100.0, -110.0, -99.0]     # a debit that grows, then shrinks
     out = transform_panel(raw, spec, DATES)
     assert np.isfinite(out[i, 1:]).all(), "negative series became NaN -- log transform?"
+    assert out[i, 1] == pytest.approx(10.0, abs=1e-12)
+    assert out[i, 2] == pytest.approx(-10.0, abs=1e-12)
 
 
 def test_monthly_pch_steps_back_one_month():

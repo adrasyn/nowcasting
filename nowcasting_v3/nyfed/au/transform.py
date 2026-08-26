@@ -37,6 +37,26 @@ row in silence and the model would run on fourteen series.
 ``panel._check_imports_survived`` is the trip wire for exactly that, and it runs
 on the output of this module.
 
+...BUT A RATIO IS NOT SIGN-SAFE IN GENERAL, AND ``pca`` IS THE UNSAFE ONE
+------------------------------------------------------------------------
+The paragraph above settles the sign question for a series that is *wholly*
+negative: the ratio of two negatives is positive and the growth rate is right.
+It does NOT settle it for a level sequence that CROSSES zero. There the ratio
+goes negative, and ``pca`` raises it to an even power -- 4, or 12 -- which
+returns it positive. Measured on a sequence stepping through zero, ``pca``
+yields -93.75, -59.04, +406.25: finite, signed, plausible, and meaningless. No
+NaN, no warning, nothing for a guard downstream to catch. ``pch`` is milder but
+also wrong across a sign change, since "percent" of a quantity whose sign
+flipped is not a growth rate.
+
+**This is unreachable today and deliberately not guarded.** Only ``gdp``,
+``gdi`` and ``unit_labour_cost`` carry ``pca``, and all three are chain-volume
+or index levels that are strictly positive by construction. A speculative
+refusal here would halt a live run on a case that cannot occur, which is its own
+failure. But if a future panel entry takes ``pca`` or ``pch`` on a series that
+can cross zero -- a balance, a net flow, a spread, a differenced series -- this
+module will not tell you. Check the sign domain of the series before you add it.
+
 ORDER
 -----
 This runs BEFORE ``standardise``. ``example_nowcast.m`` computes ``Y_location``

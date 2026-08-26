@@ -1,4 +1,4 @@
-"""The 16-series Australian panel registry.
+"""The 15-series Australian panel registry.
 
 One entry per series, in spec CSV row order: monthly first, then quarterly.
 ``load_spec`` permutes its fields by frequency and raises if that permutation
@@ -38,6 +38,22 @@ against 6484.0's ~8 years. That is a real short-history constraint on the
 Nominal block's normaliser and on the price factor generally; it is not a
 substitution of something close, it is what currently exists. Re-check ABS
 for a longer back series before this becomes a problem for estimation.
+
+No ``vacancy_index`` entry: this panel was designed around a row v2 lists
+but does not have. v2's own ``seed/panel_info.csv`` marks the Jobs and
+Skills Australia Internet Vacancy Index (``ivi``) ``status=MISSING``,
+``has_csv=FALSE``, "host firewalled" -- the JSA host has been unreachable
+from v2's fetch runner since the series was added, and no ``ivi.csv`` has
+ever been written to ``nowcasting_v2/data_raw/``. There is no working
+route to this series, so it is dropped rather than kept as a permanently
+failing registry row (the same reasoning as the ``retail_sales`` drop
+above). It was also already flagged, independently of the outage, as the
+panel's weakest mapping: IVI is a vacancy count against ANZ-Indeed Job
+Ads' ad count, and the two are expected to be collinear -- job_ads (still
+in the panel) already covers this economic concept. JSA does publish the
+IVI publicly, so it is not lost for good: a fetcher against JSA directly
+(not through v2) is the route back in, if a future evidence gate (e.g.
+Plan C) wants it.
 """
 
 from __future__ import annotations
@@ -69,8 +85,6 @@ AU_SERIES: tuple[SeriesSource, ...] = (
                  "abs", "6202.0:A84423050A", "m", 45),
     SeriesSource("job_ads", "job_ads", "ANZ-Indeed Job Ads",
                  "v2", "anz_ads", "m", 45),
-    SeriesSource("vacancy_index", "vacancy_index", "Internet Vacancy Index",
-                 "v2", "ivi", "m", 60),
     SeriesSource("aig_pmi", "aig_pmi", "AiG Manufacturing PMI",
                  "v2", "aig_pmi", "m", 45),
     SeriesSource("nab_conditions", "nab_conditions", "NAB Business Conditions",

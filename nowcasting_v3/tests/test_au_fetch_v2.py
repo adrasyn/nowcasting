@@ -1,8 +1,12 @@
-"""Readers for the four series v2 already fetches and commits.
+"""Readers for the three series v2 already fetches and commits.
 
-These are the media-release and PDF sources -- job ads, the vacancy index, the
-AiG PMI and NAB conditions. v2 fetches them weekly into committed CSVs; v3
-reads those rather than rebuilding the scraping.
+These are the media-release and PDF sources -- job ads, the AiG PMI and NAB
+conditions. v2 fetches them weekly into committed CSVs; v3 reads those rather
+than rebuilding the scraping. A fourth source, the Internet Vacancy Index,
+was originally in scope here but was dropped from the registry: v2 has never
+successfully fetched it (see ``nyfed.au.sources`` and ``nyfed.au.fetch_v2``
+for the detail), so there is nothing left for this reader to be tested
+against for that series.
 """
 
 from pathlib import Path

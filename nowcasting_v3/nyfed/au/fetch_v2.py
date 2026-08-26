@@ -1,10 +1,9 @@
-"""Readers for the four panel series that v2 fetches and commits.
+"""Readers for the three panel series that v2 fetches and commits.
 
 v3 does not import from v2 and does not run its R code. It reads the CSVs v2's
-weekly routine commits to ``nowcasting_v2/data_raw/``. Those four series -- job
-ads, the vacancy index, the AiG PMI and NAB conditions -- originate in media
-releases and PDFs, and rebuilding that scraping in Python would duplicate a
-working thing.
+weekly routine commits to ``nowcasting_v2/data_raw/``. Those three series --
+job ads, the AiG PMI and NAB conditions -- originate in media releases and
+PDFs, and rebuilding that scraping in Python would duplicate a working thing.
 
 The dependency is real and one-directional: if v2's weekly routine stops, these
 files go stale. ``freshness.py`` is what turns that into a halt rather than a
@@ -13,15 +12,19 @@ silently old nowcast.
 All three CSVs inspected while writing this reader (``anz_ads.csv``,
 ``aig_pmi.csv``, ``nab_cond.csv``) share the same shape: two columns, header
 ``date,value``, ISO dates already on the first of the month, one row per
-month. The fourth, ``ivi.csv`` (the Jobs & Skills Australia Internet Vacancy
-Index, locator ``ivi`` for the ``vacancy_index`` registry entry), is **absent
-from ``nowcasting_v2/data_raw/`` entirely** -- not stale, never written. v2's
-own ``seed/panel_info.csv`` and ``seed/panel_info_tier2.csv`` record it as
-``status=MISSING`` / ``BLOCKED``, ``has_csv=FALSE``, "host firewalled": the
-JSA host has been unreachable from v2's fetch runner since that series was
-added, and no fixture has ever been obtained. ``read_v2_series("ivi")`` raises
-``FileNotFoundError`` accordingly -- this is not a bug in this reader, it is
-v2 reporting a source it has never had.
+month.
+
+A fourth series, the Internet Vacancy Index (``ivi``, the ``vacancy_index``
+registry entry) was originally in scope here and is not any more. v2's
+``ivi.csv`` was never written at all -- its own ``seed/panel_info.csv`` and
+``seed/panel_info_tier2.csv`` record ``status=MISSING`` / ``BLOCKED``,
+``has_csv=FALSE``, "host firewalled": the JSA host has been unreachable from
+v2's fetch runner since the series was added, and no fixture has ever been
+obtained. ``read_v2_series`` still raises ``FileNotFoundError`` for any
+absent stem -- that behaviour is generic and correct -- but ``vacancy_index``
+itself has been removed from ``nyfed.au.sources.AU_SERIES``, so nothing calls
+``read_v2_series("ivi")`` in this panel any more. See ``sources.py`` for the
+removal rationale and the route back in (a direct JSA fetcher, not v2).
 """
 
 from __future__ import annotations

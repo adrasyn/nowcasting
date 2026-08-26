@@ -1,6 +1,6 @@
 """The Australian panel's registry and spec CSV.
 
-These tests are the contract every later task builds on: sixteen series,
+These tests are the contract every later task builds on: fifteen series,
 frequency-sorted, mirroring the NY Fed spec values series by series, with
 exactly one normalising series per factor.
 """
@@ -30,7 +30,6 @@ NY_FED_COUNTERPART = {
     "employment": "PAYEMS",
     "unemployment_rate": "UNRATE",
     "job_ads": "JTSJOL",
-    "vacancy_index": "ADPMNUSNERSA",
     "aig_pmi": "GACDISA066MSFRBNY",
     "nab_conditions": "GACDFSA066MSFRBPHI",
     "building_approvals": "PERMIT",
@@ -70,8 +69,8 @@ KNOWN_DEVIATIONS = {
 }
 
 
-def test_the_registry_has_sixteen_series():
-    assert len(AU_SERIES) == 16
+def test_the_registry_has_fifteen_series():
+    assert len(AU_SERIES) == 15
     assert all(isinstance(s, SeriesSource) for s in AU_SERIES)
 
 
@@ -96,8 +95,8 @@ def test_the_spec_csv_row_order_matches_the_registry():
 
 def test_the_spec_csv_loads_without_tripping_the_panel_order_guard():
     spec = load_spec(SPEC_PATH)
-    assert len(spec.series_id) == 16
-    assert spec.blocks.shape == (16, 5)
+    assert len(spec.series_id) == 15
+    assert spec.blocks.shape == (15, 5)
 
 
 def test_gdp_is_the_last_row_and_is_quarterly():
@@ -148,7 +147,7 @@ def test_spec_values_mirror_the_us_counterpart(series_id, transformation, prior)
 
 
 def test_every_row_mirrors_its_ny_fed_counterpart_exactly():
-    """The mirroring rule, checked cell-by-cell for all sixteen rows.
+    """The mirroring rule, checked cell-by-cell for all fifteen rows.
 
     Every AU spec value is supposed to be copied from its NY Fed counterpart
     in ``model_spec_FRED.csv``: Frequency, Trend, all five block columns,

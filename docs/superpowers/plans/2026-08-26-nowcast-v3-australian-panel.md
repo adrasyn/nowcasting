@@ -1079,6 +1079,19 @@ overlap, so the level is continuous.
   (2012-07). A deflator that silently truncates history would quietly shorten the panel's
   longest consumption record, and the model would run.
 
+### `imports` is negative — carried from Task 2's review
+
+ABS reports imports as a **debit**, so the series enters the panel negative: 2026-06 is
+`-45768.0` against `exports` at `+47696.0`. That is correct and is documented in the series'
+pin.
+
+It is safe **only if `pch` is implemented as a ratio**. If it is implemented as a log
+difference — the common form, and the vendored MATLAB carries no transform code to copy from —
+`imports` becomes **all-NaN with no error raised**, and the panel would quietly lose a series.
+
+Assert it: after assembly, `imports` must have at least as many non-NaN observations as
+`exports` over the same span. That fails loudly the moment a log transform swallows it.
+
 - [ ] **Step 1: Write the failing test**
 
 `nowcasting_v3/tests/test_au_panel.py`:

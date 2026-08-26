@@ -20,6 +20,22 @@ Australian monthly indicators were discontinued between March 2025 and June
 2026, and a discontinued series does not raise an error, it just stops
 updating.
 
+Monthly budgets are 75 days, not the 45-60 an earlier pass here assigned.
+That was measured wrong. ``job_ads`` and ``nab_conditions`` are dated to the
+*start* of their reference month, but publication lags that date by several
+weeks -- so age measured from the observation date runs roughly a month
+behind age measured from publication, and a budget calibrated to
+publication lag alone halts on perfectly good data. Measured on
+2026-08-26: ``job_ads`` and ``nab_conditions`` were 56 days old and healthy
+(both committed data through 2026-08-16), while ``aig_pmi`` was 117 days old
+and genuinely dead -- Ai Group folded its PMI into a broader index in May
+2026 with no separate release since. 75 days (31 days of reference month
+plus ~45 days of publication lag) passes the two healthy series and still
+catches the dead one. Do not tighten this back toward 45-60 without first
+checking whether the series you are tightening against is dated to
+reference-period start; that mistake is exactly what widened it in the
+first place.
+
 No ``retail_sales`` entry: ABS ceased "Retail Trade, Australia" (cat. 8501.0)
 after the June 2025 release, published 31 July 2025 as its final edition --
 the fourth Australian monthly indicator this project has lost, after Weekly
@@ -100,31 +116,31 @@ class SeriesSource:
 AU_SERIES: tuple[SeriesSource, ...] = (
     # --- monthly -----------------------------------------------------------
     SeriesSource("employment", "employment", "Employment",
-                 "abs", "6202.0:A84423043C", "m", 45),
+                 "abs", "6202.0:A84423043C", "m", 75),
     SeriesSource("unemployment_rate", "unemployment_rate", "Unemployment rate",
-                 "abs", "6202.0:A84423050A", "m", 45),
+                 "abs", "6202.0:A84423050A", "m", 75),
     SeriesSource("job_ads", "job_ads", "ANZ-Indeed Job Ads",
-                 "v2", "anz_ads", "m", 45),
+                 "v2", "anz_ads", "m", 75),
     SeriesSource("aig_pmi", "aig_pmi", "AiG Manufacturing PMI",
-                 "v2", "aig_pmi", "m", 45),
+                 "v2", "aig_pmi", "m", 75),
     SeriesSource("nab_conditions", "nab_conditions", "NAB Business Conditions",
-                 "v2", "nab_cond", "m", 45),
+                 "v2", "nab_cond", "m", 75),
     SeriesSource("building_approvals", "building_approvals", "Building Approvals",
-                 "abs", "8731.0:A422070J", "m", 60),
+                 "abs", "8731.0:A422070J", "m", 75),
     SeriesSource("household_spending", "household_spending",
                  "Household Spending (real)",
-                 "abs", "5682.0:A130200584T", "m", 60),
+                 "abs", "5682.0:A130200584T", "m", 75),
     SeriesSource("exports", "exports", "Exports",
-                 "abs", "5368.0:A2718577A", "m", 60),
+                 "abs", "5368.0:A2718577A", "m", 75),
     SeriesSource("imports", "imports", "Imports",
-                 "abs", "5368.0:A2718603V", "m", 60),
+                 "abs", "5368.0:A2718603V", "m", 75),
     SeriesSource("commodity_prices", "commodity_prices",
                  "RBA Index of Commodity Prices",
-                 "rba", "I2:GRCPAIAD", "m", 45),
+                 "rba", "I2:GRCPAIAD", "m", 75),
     SeriesSource("cpi", "cpi", "Monthly CPI",
-                 "abs", "6401.0:A130607789R", "m", 60),
+                 "abs", "6401.0:A130607789R", "m", 75),
     SeriesSource("cpi_trimmed", "cpi_trimmed", "Monthly CPI trimmed mean",
-                 "abs", "6401.0:A130400381L", "m", 60),
+                 "abs", "6401.0:A130400381L", "m", 75),
     # --- quarterly ---------------------------------------------------------
     SeriesSource("unit_labour_cost", "unit_labour_cost", "Unit labour cost",
                  "abs", "5206.0:A2433074L", "q", 120),

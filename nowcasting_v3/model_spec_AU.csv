@@ -1,0 +1,18 @@
+SeriesID,SeriesName,Frequency,Trend,Block0_Global,Block1_Soft,Block2_Nominal,Block3_Labor,Block4_COVID,Prior,Units,Transformation,Category
+employment,Employment,m,0,1,0,0,100,100,1,Thousands,chg,Labor
+unemployment_rate,Unemployment rate,m,0,1,0,0,1,1,-1,Percent,chg,Labor
+job_ads,ANZ-Indeed Job Ads,m,0,1,0,0,1,1,1,Index,chg,Labor
+vacancy_index,Internet Vacancy Index,m,0,1,0,0,1,1,1,Index,chg,Labor
+aig_pmi,AiG Manufacturing PMI,m,0,1,1,0,0,1,1,Index,lin,Surveys
+nab_conditions,NAB Business Conditions,m,0,1,1,0,0,1,1,Index,lin,Surveys
+building_approvals,Building Approvals,m,0,1,0,0,0,1,1,Number,chg,Housing and Construction
+retail_sales,Retail Sales,m,0,1,0,1,0,1,1,Millions of Dollars,pch,Retail and Consumption
+household_spending,Household Spending (real),m,0,100,0,0,0,1,1,Millions of Dollars,pch,Retail and Consumption
+exports,Exports,m,0,1,0,1,0,1,1,Millions of Dollars,pch,International Trade
+imports,Imports,m,0,1,0,1,0,1,1,Millions of Dollars,pch,International Trade
+commodity_prices,RBA Index of Commodity Prices,m,0,1,0,1,0,0,0,Index,pch,International Trade
+cpi,Monthly CPI,m,0,1,0,100,0,0,0,Index,pch,Prices
+cpi_trimmed,Monthly CPI trimmed mean,m,0,1,0,1,0,0,0,Index,pch,Prices
+unit_labour_cost,Unit labour cost,q,0,1,0,0,1,0,0,Index,pca,Labor
+gdi,Real gross domestic income,q,1,1,0,0,0,1,1,Millions of Dollars,pca,Income
+gdp,Real gross domestic product,q,1,1,0,0,0,1,1,Millions of Dollars,pca,Income

@@ -48,7 +48,8 @@ monthly.** ABS discontinued most; the survivors are quarterly.
 
 Rejected: substituting mining and resources series (Australia's cyclical goods sector);
 including the quarterly equivalents at quarterly frequency; both together. The block is left
-empty rather than filled with something that plays a different role.
+empty rather than filled with something that plays a different role. The absence was
+independently verified on 2026-08-26 including private-sector sources — see §The gap hunt.
 
 Also considered and rejected: using NAB sub-series as substitutes. Three map well
 conceptually — Forward Orders for durable goods new orders, Stocks for inventories, Capacity
@@ -113,7 +114,8 @@ Ten are already members of v2's panel; seven are new to this project. Quarterly 
    approved on 2026-06-03 as the direct fix for the Q1 2026 miss, which was a commodity and
    export shock the v2 panel could not see.
 
-2. **Seven further series have no Australian counterpart and are simply absent:** the two PCE
+2. **Seven further series have no Australian counterpart and are simply absent** (verified,
+   see §The gap hunt)**:** the two PCE
    price indices (no monthly Australian analogue), the import price index, housing starts,
    new houses sold, construction work done, and real disposable income (all quarterly in
    Australia). Combined with the seven manufacturing series, fourteen of the NY Fed's 31 have
@@ -122,6 +124,57 @@ Ten are already members of v2's panel; seven are new to this project. Quarterly 
 3. **Seven of v2's eight NAB sub-series are excluded.** The NY Fed survey block has exactly two
    members. NAB Business Conditions is the closest match to their Philadelphia Fed series;
    AiG Manufacturing PMI matches Empire State.
+
+## The gap hunt — verified 2026-08-26
+
+The claim that fourteen NY Fed series have no Australian counterpart was originally asserted
+from background knowledge. It was challenged and then checked, including private-sector
+sources. The conclusion holds, with one qualification and one finding that matters more than
+the series themselves.
+
+### What exists and was rejected
+
+- **HIA New Home Sales** — monthly, still publishing through 2026, a sample of Australia's
+  largest ~100 builders reporting actual sales volumes. A genuine match in kind for the NY
+  Fed's new-houses-sold series, and closer to hard data than a diffusion index because it
+  counts transactions rather than sentiment. **Excluded: the series is paywalled**, which
+  rules it out for a public site.
+- **Judo Bank / S&P Global Australia Manufacturing PMI sub-indices** — monthly and free.
+  Publishes New Orders (30% of the headline), Output, and Stocks of Purchases as separate
+  series, mapping onto durable goods orders, industrial production and manufacturers'
+  inventories. **Excluded under D2**: these are diffusion indices and belong in the Soft
+  block; placing them in the manufacturing slot is exactly the error D2 exists to prevent.
+  Retained as a Plan C candidate — adding them to the *Soft* block is a legitimate,
+  testable variant.
+- **CommBank Household Spending Insights** and **Xero Small Business Insights** — both
+  monthly and public. Xero is transaction data rather than survey (small-business sales,
+  jobs, wages). Neither addresses a gap: CBA overlaps the household spending series already
+  in the panel, and Xero has no NY Fed counterpart to mirror.
+
+### Confirmed genuinely unavailable
+
+Business and wholesale inventories, construction work done, housing starts, the import price
+index and real disposable income are quarterly-only from ABS. The two PCE deflators have no
+monthly Australian analogue; the monthly CPI already in the panel is the closest equivalent.
+ABS ceased publication 8301.0 (the last monthly manufacturing production series) in May 2014.
+
+### The finding that matters more than any series
+
+**Two near-perfect matches existed and were discontinued within the last year.**
+
+- The **ABS Monthly Business Turnover Indicator** was precisely what the manufacturing block
+  needed: monthly manufacturing turnover derived from ATO Business Activity Statement data,
+  history to January 2010, hard data rather than survey. **Final release November 2025.**
+- The **Monthly Employee Earnings Indicator**, built on Single Touch Payroll data, covered
+  both the payroll-employment and the income gap. **Ceased June 2026.**
+- **Weekly Payroll Jobs** was discontinued in March 2025.
+
+Three monthly indicators retired in eighteen months. The ABS has been withdrawing its
+experimental monthly suite, and any Australian monthly panel is exposed to that.
+
+This independently strengthens the freshness requirement below: **a discontinued series does
+not raise an error, it simply stops updating.** Without a staleness guard, the model would
+carry on nowcasting from a series that no longer exists, and nothing would say so.
 
 ## Factor structure
 
@@ -228,8 +281,10 @@ Each becomes an executable test, not a comment.
 - **v2 is not touched.** v3 reads four of its committed CSVs and changes nothing in it. v3
   supersedes v1; it does not replace v2.
 - **No panel expansion beyond the mirror.** Candidates deferred to Plan C's evidence gate:
-  the Brent oil price (approved 2026-06-03 *only if the backtest likes it*), and adding NAB
-  Forward Orders and Stocks to the Soft block as additional soft series.
+  the Brent oil price (approved 2026-06-03 *only if the backtest likes it*); adding NAB
+  Forward Orders and Stocks to the Soft block as additional soft series; and adding the Judo
+  Bank PMI New Orders and Stocks of Purchases sub-indices to the Soft block (see §The gap
+  hunt). HIA New Home Sales is **not** a candidate — it is paywalled.
 
 ## Open questions
 

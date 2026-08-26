@@ -43,3 +43,21 @@ def test_it_handles_arrays_elementwise():
     got = annualised_to_qoq(np.array([0.0, 4.0]))
     assert isinstance(got, np.ndarray)
     assert got == pytest.approx([0.0, 0.98534], abs=1e-5)
+
+
+def test_annualised_below_minus_100_raises():
+    """Below -100% annualised the fourth root has no real value, and -100%
+    annualised means output going to zero over a year -- not an economically
+    reachable quarterly outcome. This must raise on its own, not merely under
+    pytest's filterwarnings=error: a silent NaN reaching the published figure
+    is exactly the failure class this project hunts."""
+    with pytest.raises(ValueError, match=r"annualised.*-100"):
+        annualised_to_qoq(-150.0)
+
+
+def test_qoq_below_minus_100_raises():
+    """Symmetric bound on the other direction: a quarter-on-quarter rate at or
+    below -100% means the quantity goes to zero (or below) within a single
+    quarter, which is not an economically reachable outcome either."""
+    with pytest.raises(ValueError, match=r"qoq.*-100"):
+        qoq_to_annualised(-150.0)

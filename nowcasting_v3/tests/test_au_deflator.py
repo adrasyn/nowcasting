@@ -17,6 +17,8 @@ import pytest
 from nyfed.au.deflator import (
     DEFLATOR_SOURCES,
     build_deflator,
+    MIN_SPLICE_OVERLAP,
+    long_monthly_cpi,
     deflate,
     quarterly_to_monthly,
     real_household_spending,
@@ -574,3 +576,99 @@ def test_a_short_tier_whose_months_are_not_contiguous_is_refused():
     sources["cpi_monthly_live"] = full.iloc[:5].drop(full.index[1])
     with pytest.raises(ValueError, match="not the history we recorded"):
         build_deflator(sources, recorded=_sources())
+
+
+# --- the panel's own CPI row: monthly history, spliced ----------------------
+
+
+def test_long_monthly_cpi_reaches_back_to_the_ceased_indicator():
+    """The panel's `cpi` row should not be 28 observations long.
+
+    Australia's monthly CPI history is split across two catalogues: the ceased
+    6484.0 Monthly CPI Indicator (2017-09..2025-09) and the live 6401.0 monthly
+    series, whose every All-groups index restarts at 2024-04. Reading only the
+    live one gives the Nominal block's NORMALISER 28 observations, and leaves it
+    absent for the first two years of a 2022+ backtest window.
+    """
+    cpi = long_monthly_cpi(_sources())
+    assert cpi.index[0] == pd.Timestamp("2017-09-01")
+    assert cpi.index[-1] == pd.Timestamp("2026-07-01")
+    assert len(cpi) == 107
+    assert not cpi.isna().any()
+    assert (cpi > 0).all()
+
+
+def test_long_monthly_cpi_never_touches_the_quarterly_tier():
+    """Monthly only. Interpolated quarterly prices must not enter the panel.
+
+    The deflator legitimately interpolates the quarterly index back to 1948 --
+    it is a level ratio there. This row's transformation is ``pch``, so an
+    interpolated level becomes a smooth monthly CHANGE that never happened, and
+    the DFM would read manufactured movement as information. A NaN is honest
+    where an interpolation is not.
+    """
+    quarterly = _series("cpi_quarterly")
+    assert quarterly.index[0] < pd.Timestamp("1950-01-01")   # it really is long
+    assert long_monthly_cpi(_sources()).index[0] == pd.Timestamp("2017-09-01")
+
+
+def test_long_monthly_cpi_returns_the_live_months_untouched():
+    """The live series is preferred; the ceased one is rebased onto it."""
+    live = _series("cpi_monthly_live").dropna()
+    spliced = long_monthly_cpi(_sources())
+    pd.testing.assert_series_equal(
+        spliced.reindex(live.index), live, check_names=False
+    )
+
+
+def test_long_monthly_cpi_falls_back_to_one_tier_when_the_other_is_absent():
+    """Both single-tier cases are ordinary at some vintage, and neither raises.
+
+    Before 2024-04 the live tier does not exist, which is most of a backtest
+    window; after 6484.0 stops being fetched the ceased one would not. Because
+    the row's transformation is ``pch``, which is invariant to scale, a vintage
+    served by one tier alone is not inconsistent with one served by the splice
+    -- what matters is that no vintage carries a level STEP inside itself.
+    """
+    only_ceased = _sources() | {"cpi_monthly_live": _series("cpi_monthly_live")[:0]}
+    got = long_monthly_cpi(only_ceased)
+    assert got.index[0] == pd.Timestamp("2017-09-01")
+    assert got.index[-1] == pd.Timestamp("2025-09-01")
+
+    only_live = _sources() | {"cpi_monthly_ceased": _series("cpi_monthly_ceased")[:0]}
+    got = long_monthly_cpi(only_live)
+    assert got.index[0] == pd.Timestamp("2024-04-01")
+    assert len(got) == 28
+
+
+def test_long_monthly_cpi_is_empty_when_neither_monthly_tier_has_arrived():
+    """A vintage before 2017-09. Empty, not an exception -- the freshness guard
+    is what decides whether an empty panel row is acceptable, not this."""
+    none = _sources() | {
+        "cpi_monthly_live": _series("cpi_monthly_live")[:0],
+        "cpi_monthly_ceased": _series("cpi_monthly_ceased")[:0],
+    }
+    assert long_monthly_cpi(none).empty
+
+
+def test_long_monthly_cpi_takes_the_longer_tier_when_the_overlap_is_too_short():
+    """An as-of just after the live tier starts is ordinary, not an error.
+
+    At 2024-08 the live 6401.0 series is three months old and overlaps the
+    ceased indicator by less than `splice` will fit a ratio over -- rightly, a
+    ratio from three months has no evidence behind it. Falling back to the
+    longer tier keeps such a vintage buildable, and it costs nothing the model
+    can see: splicing rescales the older tier by a CONSTANT, and `pch` is
+    invariant to a constant scaling, so these months carry the same growth rates
+    a later, spliceable vintage will give them.
+    """
+    live = _series("cpi_monthly_live")
+    short = live[live.index <= pd.Timestamp("2024-06-01")]
+    sources = _sources() | {"cpi_monthly_live": short}
+    assert len(short.dropna()) < MIN_SPLICE_OVERLAP
+
+    got = long_monthly_cpi(sources)
+    assert got.index[0] == pd.Timestamp("2017-09-01")          # the ceased tier
+    pd.testing.assert_series_equal(
+        got, _series("cpi_monthly_ceased").dropna().sort_index(), check_names=False
+    )

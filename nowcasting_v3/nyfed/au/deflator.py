@@ -89,6 +89,11 @@ class DeflatorSource:
 
 # In PRECEDENCE order, most preferred first. `build_deflator` walks this
 # sequence and each entry supplies only the months no earlier entry covers.
+# The two tiers that are genuinely MONTHLY. `long_monthly_cpi` uses these and
+# not the quarterly one; see its docstring for why that distinction matters.
+LIVE_MONTHLY_CPI = "cpi_monthly_live"
+CEASED_MONTHLY_CPI = "cpi_monthly_ceased"
+
 DEFLATOR_SOURCES: tuple[DeflatorSource, ...] = (
     DeflatorSource(
         "cpi_monthly_live",
@@ -582,6 +587,66 @@ def deflate(
 
     rebased = deflator.reindex(nominal.index) / base_value
     return (nominal / rebased).rename(nominal.name)
+
+
+def long_monthly_cpi(sources: dict[str, pd.Series]) -> pd.Series:
+    """The panel's ``cpi`` row: every GENUINELY MONTHLY CPI observation, spliced.
+
+    NOT THE DEFLATOR. It shares this module's tiers and its splice, and nothing
+    else. :func:`build_deflator` builds a price LEVEL back to 1948 and is happy
+    to interpolate the quarterly index to get there. This builds a panel row
+    whose spec transformation is ``pch``, where interpolation would be a lie:
+    a quarterly index smeared across months turns one real price change into
+    three fabricated monthly ones, and the DFM cannot tell manufactured
+    movement from information. So the quarterly tier is not used here at all,
+    and months before 2017-09 are simply absent -- the Kalman filter treats an
+    unobserved month as unobserved, which is the honest answer.
+
+    WHY A SPLICE IS NEEDED AT ALL. Australia's monthly CPI history is split
+    across two catalogues: the ceased 6484.0 Monthly CPI Indicator
+    (2017-09..2025-09) and the live 6401.0 monthly series, whose every
+    All-groups index number restarts at **2024-04**. Reading only the live one
+    gives the Nominal block's NORMALISER 28 observations and leaves it missing
+    for the first two years of a 2022+ backtest window. Reading both and
+    concatenating would be worse: they are index numbers on different bases, so
+    the join would be a level step, and ``pch`` turns a level step into one
+    enormous false month.
+
+    A SINGLE TIER IS AN ORDINARY VINTAGE, NOT AN ERROR. Before 2024-04 the live
+    tier does not exist; that is most of any backtest window. Whichever tier is
+    present is returned on its own. Because ``pch`` is invariant to scale, a
+    vintage served by one tier is not inconsistent with a later one served by
+    the splice -- what matters is only that no single vintage carries a level
+    step inside itself, which is exactly what splicing prevents.
+    """
+    live = sources[LIVE_MONTHLY_CPI].dropna().sort_index()
+    ceased = sources[CEASED_MONTHLY_CPI].dropna().sort_index()
+
+    if live.empty and ceased.empty:
+        return live
+    if live.empty:
+        return ceased
+    if ceased.empty:
+        return live
+
+    # TOO LITTLE OVERLAP TO REBASE IS AN ORDINARY VINTAGE TOO. At an as-of just
+    # after 2024-04 the live tier is a few months old and overlaps the ceased
+    # one by less than `splice` will fit a ratio over -- correctly, since a
+    # ratio from three months has no evidence behind it. Take the tier with
+    # more history rather than raising.
+    #
+    # Safe precisely because this row's transformation is `pch`: splicing only
+    # rescales the older tier by a CONSTANT, and a constant scaling leaves every
+    # percent change untouched. So the months this returns carry the same growth
+    # rates they will carry at a later vintage that can splice. The level
+    # differs; nothing the model sees does.
+    if len(live.index.intersection(ceased.index)) < MIN_SPLICE_OVERLAP:
+        return ceased if len(ceased) >= len(live) else live
+
+    spliced, _ = splice(
+        live, ceased, name=LIVE_MONTHLY_CPI, older_name=CEASED_MONTHLY_CPI
+    )
+    return spliced.sort_index()
 
 
 def real_household_spending(

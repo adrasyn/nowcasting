@@ -159,10 +159,10 @@ TARGET_QUARTER = (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-03-01"))
 # testing the pipeline rather than the coin flip. If the seed changes,
 # `test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor` fails and
 # names the reason.
-N_GS, N_BURN, SEED = 200, 100, 1
+N_GS, N_BURN, SEED = 200, 100, 3      # 1.562 on the shipping panel
 
 # A seed that lands in the OTHER basin, used to exercise the collapse guard.
-COLLAPSED_SEED = 321
+COLLAPSED_SEED = 6                    # 0.111 -- unambiguously collapsed
 
 # The Global block, column 0 of `spec.blocks`.
 I_GLOBAL = 0
@@ -228,7 +228,9 @@ def test_gdp_and_the_core_labour_series_reach_back_to_1990(panel):
 
 def test_late_starting_series_are_nan_not_zero_before_they_start(panel):
     for key, not_before in (("household_spending", "2010-01-01"),
-                            ("cpi", "2020-01-01"),
+                            # 2017-09: `cpi` is spliced onto the ceased
+                            # 6484.0 indicator, so it starts there, not 2024.
+                            ("cpi", "2015-01-01"),
                             ("job_ads", "2015-01-01")):
         row = panel.series_id.index(key)
         first = panel.dates[np.isfinite(panel.Y[row])][0]
@@ -529,21 +531,25 @@ def test_the_deflator_builds_at_every_monthly_vintage_and_never_hits_the_splice_
 def test_a_2018_vintage_now_refuses_for_the_reason_it_actually_has():
     """The build still cannot go back to 2018, and that is a different fact.
 
-    Two panel rows -- ``cpi`` and ``cpi_trimmed`` -- are fetched from 6401.0's
-    monthly analytical series, which begins in 2024-04 (see ``sources.py``).
-    Before then those rows have no observations at all, and the freshness guard
-    says so by name. What it no longer does is die inside the deflator naming a
-    tier whose emptiness was correct.
+    ``cpi_trimmed`` is fetched from 6401.0's monthly analytical series, which
+    begins in 2024-04, so before then it has no observations at all and the
+    freshness guard says so by name. What the build no longer does is die inside
+    the deflator naming a tier whose emptiness was correct.
 
-    So the honest boundary on Plan C's backtest is the registry's monthly CPI
-    history, not the deflator. If ABS publishes a longer back series the range
-    moves; nothing else has to change.
+    ``cpi`` USED TO BE IN THIS SET AND IS NOT ANY MORE. `build_panel` splices it
+    onto the ceased 6484.0 Monthly CPI Indicator, which starts 2017-09, so a
+    2018 vintage now carries real monthly CPI. `cpi_trimmed` has no such
+    counterpart: 6484.0 published EXCLUSION-based measures ("All groups CPI
+    excluding volatile items"), not a trimmed mean, and splicing an exclusion
+    measure onto a trimmed one would join two different constructions.
+
+    So the honest boundary on Plan C's backtest is now `cpi_trimmed` and
+    `job_ads`, not `cpi`. If ABS publishes a longer back series the range moves;
+    nothing else has to change.
     """
     with pytest.raises(StaleSeriesError) as excinfo:
         build_panel(asof="2018-06-01", vintage=VINTAGE)
-    assert {key for key, _, _ in excinfo.value.stale} == {
-        "job_ads", "cpi", "cpi_trimmed"
-    }
+    assert {key for key, _, _ in excinfo.value.stale} == {"job_ads", "cpi_trimmed"}
 
 
 def test_the_vintage_cut_is_by_release_date_not_by_reference_date(panel):
@@ -910,7 +916,7 @@ def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_
     GDP's Global loading has a 5-95% range of -0.45..0.31 with the first and
     last fifty draws averaging -0.16 and -0.01, while at seed 1 the same range
     is 1.22..1.55. Lengthening the chain to 2,000 sweeps does not resolve it,
-    and five of ten seeds land in each basin.
+    and 17 of 30 seeds land below the floor on this panel.
 
     THIS IS WHY THE GATE DECLARES ITS SEED and why ``state_space`` refuses a
     collapsed chain outright. The NY Fed does not face the coin flip because
@@ -979,7 +985,7 @@ def test_a_collapsed_chain_is_refused_rather_than_turned_into_a_number(
     seed this module's own bimodality test asserts lands in the collapsed basin.
     A caller taking the defaults got a plausible 2.83% number from a model whose
     response to its entire monthly panel was 0.015pp. Switching the default is
-    not the fix, because five of ten seeds collapse and the next caller passes
+    not the fix, because 17 of 30 seeds collapse and the next caller passes
     their own; the fix is that the model detects its own collapse from a
     quantity it already computes and refuses.
 
@@ -1046,3 +1052,70 @@ def test_build_panel_surfaces_a_skipped_deflator_tier(monkeypatch):
 
     monkeypatch.setattr(build_mod, "real_household_spending", fake)
     assert build_panel(asof=ASOF, vintage=VINTAGE).deflator_skipped == skipped
+
+
+def test_the_panel_cpi_row_carries_the_whole_monthly_history(panel):
+    """The Nominal block's normaliser must not be 24 observations long.
+
+    The registry fetches the LIVE 6401.0 monthly CPI, whose every All-groups
+    index number restarts at 2024-04 because the ABS ceased the 6484.0 Monthly
+    CPI Indicator. Used raw it left `cpi` -- which normalises the Nominal block
+    -- absent for the first two years of the 2022+ window Plan C evaluates on.
+    `build_panel` now splices the ceased tier on, monthly only.
+    """
+    i = panel.series_id.index("cpi")
+    observed = panel.dates[np.flatnonzero(np.isfinite(panel.Y[i]))]
+    assert len(observed) > 100
+    # 2017-10, not 2017-09: `pch` consumes the first level to make a change.
+    assert observed[0] == pd.Timestamp("2017-10-01")
+
+
+def test_the_panel_cpi_row_has_no_interpolated_quarterly_months(panel):
+    """Nothing before the ceased monthly indicator starts.
+
+    The deflator interpolates the quarterly index back to 1948 and is right to
+    -- there it is a level ratio. Here the transformation is `pch`, so an
+    interpolated level becomes three fabricated monthly changes per real
+    quarterly one, and the DFM cannot tell that from information.
+    """
+    i = panel.series_id.index("cpi")
+    observed = panel.dates[np.flatnonzero(np.isfinite(panel.Y[i]))]
+    assert observed.min() >= pd.Timestamp("2017-09-01")
+
+
+# --- the middle band the old 0.75 floor admitted ---------------------------
+
+MIDDLE_BAND_SEED = 5      # 0.843 on the shipping panel: above 0.75, below 1.0
+
+
+def test_a_chain_between_the_basins_is_refused(panel):
+    """The defect that raising the floor to 1.0 fixes, pinned so it stays fixed.
+
+    Thirty seeds on each of two panels showed THREE groups, not two. Three
+    chains in thirty sit between the basins on both panels -- 0.783/0.901/0.924
+    on a control with the short `cpi` row, 0.785/0.823/0.843 on the shipping
+    panel. The old 0.75 floor ADMITTED all of them: they cleared the guard while
+    sitting nowhere near the identified basin, and Plan C's warm start would
+    have carried one forward silently, never tripping the floor again.
+
+    The earlier ten-seed measurement did not sample the middle band at all,
+    which is how a floor got set inside it.
+    """
+    result = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=MIDDLE_BAND_SEED)
+    with pytest.raises(CollapsedFactorError, match=r"gdp's loading"):
+        state_space(panel, result)
+
+
+def test_the_floor_sits_in_the_gap_measured_on_both_panels():
+    """1.0 is not a round number picked for tidiness.
+
+    It is the only value that sits inside the widest gap on BOTH panels
+    measured: 0.924 -> 1.124 on the control, 0.843 -> 1.089 on the shipping
+    panel. 0.75 sat inside neither gap -- it sat below the middle band.
+    """
+    control_gap = (0.924, 1.124)
+    shipping_gap = (0.843, 1.089)
+    for lo, hi in (control_gap, shipping_gap):
+        assert lo < COLLAPSED_GLOBAL_LOADING < hi
+    assert not (control_gap[0] < 0.75 < control_gap[1])
+    assert not (shipping_gap[0] < 0.75 < shipping_gap[1])

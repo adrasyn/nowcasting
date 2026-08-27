@@ -123,6 +123,7 @@ import pandas as pd
 from nyfed.au.deflator import (
     DEFLATOR_SOURCES,
     fetch_deflator_sources,
+    long_monthly_cpi,
     real_household_spending,
 )
 from nyfed.au.fetch_abs import fetch_abs_series
@@ -164,12 +165,33 @@ DEFAULT_START = "1990-01-01"
 # The floor the nowcast target's Global loading has to clear before a state
 # space built from a sampler run may be used. See `CollapsedFactorError`.
 #
-# Measured over ten seeds at n_gs=200, n_burn=100 on the 2026-06-01 vintage.
-# The two basins are far apart and this sits between them: the five collapsed
-# chains gave 0.011, 0.222, 0.293, 0.300 and 0.554, and the five identified ones
-# 1.192, 1.230, 1.334, 1.347 and 1.348. So 0.75 clears the largest collapsed
-# value by 0.20 and undercuts the smallest identified one by 0.44.
-COLLAPSED_GLOBAL_LOADING = 0.75
+# Measured over THIRTY seeds at n_gs=200, n_burn=100 on the 2026-06-01 vintage,
+# and on TWO panels -- the shipping one and a control with the `cpi` row cut
+# back to the live tier alone. Sixty chains in total.
+#
+# THERE ARE THREE GROUPS, NOT TWO, AND THE EARLIER TEN-SEED MEASUREMENT MISSED
+# THE MIDDLE ONE. On both panels three chains sit between the basins:
+#
+#   control panel (28-obs cpi):  0.045..0.522 | 0.783 0.901 0.924 | 1.124..1.866
+#   shipping panel (103-obs cpi): 0.041..0.683 | 0.785 0.823 0.843 | 1.089..1.637
+#
+# The old floor of 0.75 ADMITTED that middle band on both panels: three chains
+# in thirty cleared the guard while sitting nowhere near the identified basin,
+# and a warm-started run begun from one would inherit it silently. 1.0 sits
+# inside the widest gap on BOTH panels (0.924->1.124 and 0.843->1.089), so it is
+# justified on two independent panels rather than on one ten-seed sample.
+#
+# It also has a reading, though the measurement is the justification: the
+# normalising series' loading is fixed at exactly 1.0, so the rule is that the
+# target must be at least as connected to the common factor as the series that
+# defines that factor's scale.
+#
+# Cost, disclosed: the `cpi` splice roughly doubles the COLD-START collapse
+# rate (9/30 -> 17/30 against this floor's predecessor). That is a property of
+# the starting lottery, not of the fitted model, and Plan C is warm-started for
+# exactly this reason -- it lands on the first vintage and the anchor fits,
+# where the guard already retries.
+COLLAPSED_GLOBAL_LOADING = 1.0
 
 
 class CollapsedFactorError(Exception):
@@ -430,6 +452,17 @@ def build_panel(
     # needs the recording to tell that apart from a fetcher that returned
     # nothing. Without it the earliest buildable vintage was 2024-11-01, which
     # is most of the range Plan C's backtest wants.
+    # THE `cpi` ROW IS SPLICED HERE, AND ONLY HERE. The registry fetches the
+    # LIVE 6401.0 monthly series, whose every All-groups index number restarts
+    # at 2024-04 because the ABS ceased the 6484.0 Monthly CPI Indicator. Used
+    # raw, that gives the Nominal block's NORMALISER 28 observations and leaves
+    # it absent for the first two years of a 2022+ backtest window. The ceased
+    # tier is already in hand -- the deflator fetches it -- so no extra request
+    # is made. `long_monthly_cpi` uses the two MONTHLY tiers only and never the
+    # quarterly one: this row's transformation is `pch`, and an interpolated
+    # quarterly level would become fabricated monthly changes.
+    series["cpi"] = long_monthly_cpi(deflator_sources)
+
     series["household_spending"], deflator = real_household_spending(
         series["household_spending"],
         deflator_sources,
@@ -529,7 +562,7 @@ def estimate_short(
     n_gs: int = 200,
     n_burn: int = 100,
     n_thin: int = 1,
-    seed: int = 1,
+    seed: int = 3,
     spec_path=SPEC_PATH,
 ) -> GibbsResult:
     """A short sampler run on one assembled panel.
@@ -592,10 +625,11 @@ def state_space(
             "this chain settled in the basin where the target series is not "
             "connected to the panel, and any nowcast from it would be driven by "
             "the target's own dynamics rather than by the monthly data. "
-            "Measured over ten seeds, five land here (0.011..0.554) and five do "
-            "not (1.192..1.348), and lengthening the chain to 2,000 sweeps does "
-            "not resolve it. See CollapsedFactorError for why a different seed "
-            "is a workaround and not a fix."
+            "Measured over sixty chains (thirty seeds on each of two panels), "
+            "17 of 30 land below this floor on the shipping panel and 9 of 30 "
+            "on a control, and lengthening the chain to 2,000 sweeps does not "
+            "resolve it. See CollapsedFactorError for why a different seed is a "
+            "workaround and not a fix."
         )
 
     latent = Latent(sigma=result.sigmas.mean(axis=2), s=result.ss.mean(axis=2))
@@ -667,7 +701,7 @@ def quick_nowcast(
     t_now: np.ndarray | None = None,
     n_gs: int = 200,
     n_burn: int = 100,
-    seed: int = 1,
+    seed: int = 3,
 ) -> float:
     """The nowcast for the first target quarter, in GDP's own units.
 

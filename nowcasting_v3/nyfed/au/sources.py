@@ -105,23 +105,47 @@ mode one layer down -- a number that looks measured and is not -- so a lag that
 cannot be sourced belongs in a comment saying so, not in the field.
 
 
-``aig_pmi`` IS STALE IN v2's CSV, NOT DEAD AT SOURCE. An earlier pass here
-recorded that "Ai Group folded its PMI into a broader index in May 2026 with
-no separate release since". The first half is right and the second is wrong,
-and sourcing the publication lag is what turned it up: Ai Group has released
-the Australian Industry Index for May, June and July 2026 (02/06, 30/06,
-04/08), and the July edition still reports a separate headline -- "The
-Australian PMI (manufacturing) declined 5.7 points to -19.6". What stopped is
-``nowcasting_v2/data_raw/aig_pmi.csv``, last committed 2026-06-11 with its
-last observation at 2026-05-01: v2's scraper stopped seeing releases when the
-publication changed shape. So the freshness guard is right to refuse and the
-fix is a working fetcher, not a replacement series. (It refuses from
-2026-08-27, not from 2026-07-27: the skipped-month override above widened this
-series' budget from 86 days to 117, which is the disclosed price of not
-refusing every February.) Note the trap before writing one: the index is now reported as a NET BALANCE centred on
-zero (-19.6), not the 50-centred diffusion index the ``aig_pmi.csv`` history
-carries. Repairing the scraper without handling that puts a level break into
-the panel's Soft block.
+``aig_pmi`` IS STALE IN v2's CSV, NOT DEAD AT SOURCE, AND THERE IS NO SCRAPER
+TO REPAIR. Ai Group still publishes it: the July 2026 edition of the Australian
+Industry Index reports "The Australian PMI (manufacturing) declined 5.7 points
+to -19.6", and recent editions went out 02/06, 30/06 and 04/08 for May, June
+and July. What stopped is ``nowcasting_v2/data_raw/aig_pmi.csv``, last
+committed 2026-06-11 with its last observation at 2026-05-01.
+
+The reason it stopped is not a broken fetcher. ``nowcasting_v2/seed/panel_info.csv``
+gives the series' source as "AiG/investing.com PDF (from_james)" -- a manual
+step -- and v2 never consumes the result: v2's live panel spec is ``B3_nab_wmi``,
+defined at ``nowcasting_v2/R/sweep_v2.R:116`` as the panel MINUS the AiG block,
+which ``R/emit_v2_json.R:45`` states outright. The three aig rows in v2's
+``panel_info.csv`` are selection candidates that the panel spec discards before
+``build_mai()``'s targeted-predictor test ever sees them. So the file went three
+months without an update because nobody had a reason to lift it, and **v3 is now
+its only consumer**. Do not "clean up" the aig entry from v2's registry or its
+weekly refresh routine on the grounds that v2 does not use it -- that is true and
+not the point.
+
+The fix is therefore a step in v2's weekly survey routine
+(``docs/cowork-weekly-refresh.md``, step D), not code here, and the CSV was
+backfilled to 2026-07 on 2026-08-27 (Jun -16.8, Jul -19.6).
+
+The trap for whoever maintains it is REVISIONS, not a scale break and not a
+name collision. Ai Group revises this series every month, and the CSV holds
+FIRST VINTAGES -- which is what a real-time nowcast needs. May 2026 was first
+published -22.4 (the CSV value) and later revised to -21.3; June was first
+published -16.8 and later revised to -13.9. So Ai Group's own prose ("declined
+5.7 points to -19.6") is computed against revised figures and will never
+reconcile against this history; that is expected, not an error. The source of
+record is the investing.com release table
+(au.investing.com/economic-calendar/aig-manufacturing-index-203), whose
+"Actual" column is the first vintage and which matches this CSV exactly across
+2026-02..2026-05. An earlier version of this comment claimed instead that the
+source had moved to a net balance while the history carried a 50-centred
+diffusion index; that is wrong -- the CSV has been zero-centred throughout
+(2014-08 = -5.4).
+
+(The guard refuses from 2026-08-27, not 2026-07-27: the skipped-month override
+above widened this series' budget from 86 days to 117, which is the disclosed
+price of not refusing every February.)
 
 No ``retail_sales`` entry: ABS ceased "Retail Trade, Australia" (cat. 8501.0)
 after the June 2025 release, published 31 July 2025 as its final edition --

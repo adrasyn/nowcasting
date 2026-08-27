@@ -430,14 +430,20 @@ def build_panel(
     # needs the recording to tell that apart from a fetcher that returned
     # nothing. Without it the earliest buildable vintage was 2024-11-01, which
     # is most of the range Plan C's backtest wants.
-    series["household_spending"] = real_household_spending(
+    series["household_spending"], deflator = real_household_spending(
         series["household_spending"],
         deflator_sources,
         recorded=v.deflator_sources,
     )
 
     check_freshness(series, asof_ts)
-    return assemble(series, start=start, end=asof)
+    panel = assemble(series, start=start, end=asof)
+    # Carry the skips out. A skipped tier is not fatal -- a lower tier covers
+    # the months -- but it means those months are priced by an interpolated
+    # quarterly index rather than a real monthly one, and nothing else in the
+    # production path says so.
+    panel.deflator_skipped = deflator.skipped
+    return panel
 
 
 # --------------------------------------------------------------------------- #

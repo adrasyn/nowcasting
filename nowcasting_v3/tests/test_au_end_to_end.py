@@ -377,7 +377,7 @@ def test_the_household_spending_row_is_the_deflated_series_not_the_nominal_one(p
     """
     vintage = load_vintage(VINTAGE).as_of(ASOF)
     nominal = vintage.series["household_spending"]
-    real = real_household_spending(nominal, vintage.deflator_sources)
+    real, _ = real_household_spending(nominal, vintage.deflator_sources)
     assert real.iloc[-1] < 0.8 * nominal.iloc[-1], (
         "the deflated series is not materially below the nominal one; the "
         "deflator did nothing"
@@ -479,11 +479,12 @@ def test_a_2018_vintage_deflates_household_spending_over_its_whole_span():
     assert list(deflator.skipped) == ["cpi_monthly_live"]
     assert set(deflator.coverage()) == {"cpi_monthly_ceased", "cpi_quarterly"}
 
-    real = real_household_spending(
+    real, _ = real_household_spending(
         cut.series["household_spending"],
         cut.deflator_sources,
         recorded=vintage.deflator_sources,
-    ).dropna()
+    )
+    real = real.dropna()
     assert (real.index[0], real.index[-1]) == (
         pd.Timestamp("2012-07-01"), pd.Timestamp("2018-03-01")
     )
@@ -1011,3 +1012,37 @@ def test_the_library_defaults_do_not_land_in_the_collapsed_basin():
             f"seed {SEED} into the identified basin and seed {COLLAPSED_SEED} "
             "into the collapsed one"
         )
+
+
+# --- residual 2: a skipped deflator tier must be visible from build_panel ---
+
+
+def test_build_panel_reports_no_deflator_skips_on_the_ordinary_path(panel):
+    """Three tiers in, three tiers used, nothing to report."""
+    assert panel.deflator_skipped == {}
+
+
+def test_build_panel_surfaces_a_skipped_deflator_tier(monkeypatch):
+    """A skip was a recorded fact for a direct caller and silent in production.
+
+    ``real_household_spending`` returned only the deflated series, discarding
+    the ``Deflator`` -- so the one thing that says the deflator fell back to
+    interpolated quarterly prices for the recent months never reached the
+    caller, and an operator had to call the deflator directly to find out.
+    Residual 1 makes the REFUSE branch reachable again; this makes the SKIP
+    branch legible, which is the other half of the same two lines.
+    """
+    from dataclasses import replace
+
+    from nyfed.au import build as build_mod
+
+    skipped = {"cpi_monthly_live": "supplies no observation at this vintage"}
+
+    real = build_mod.real_household_spending
+
+    def fake(nominal, sources, **kwargs):
+        deflated, actual = real(nominal, sources, **kwargs)
+        return deflated, replace(actual, skipped=skipped)
+
+    monkeypatch.setattr(build_mod, "real_household_spending", fake)
+    assert build_panel(asof=ASOF, vintage=VINTAGE).deflator_skipped == skipped

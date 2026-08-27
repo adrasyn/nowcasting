@@ -337,25 +337,59 @@ def _explain_or_refuse(
     what a direct call passes) there is no way to tell, so it raises -- the
     conservative half.
     """
-    n_cut = len(cut)
-    if recorded is not None:
-        n_recorded = len(recorded[key].dropna())
-        if n_recorded > n_cut:
-            return
+    if recorded is None:
         raise ValueError(
-            f"deflator source {key} {complaint}, and the vintage cut does not "
-            f"explain it: the recording holds {n_recorded} observation(s) and "
-            f"{n_cut} survived the cut, so nothing was removed. That is the "
-            "source, not the vintage -- a fetcher that returned nothing, or a "
-            "series id that has moved. Skipping the tier would drop the "
-            "deflator back to interpolated quarterly prices without a word."
+            f"deflator source {key} {complaint}. build_deflator was given no "
+            "recording to compare against (`recorded=`), so it cannot tell a tier "
+            "that had not started publishing at this vintage from a fetcher that "
+            "returned nothing, and refuses rather than guessing. `build.build_panel`"
+            " passes the uncut vintage and gets the distinction."
+        )
+
+    full = recorded[key].dropna().sort_index()
+    if len(full) > len(cut) and _is_prefix_of(cut, full):
+        return
+
+    if len(full) <= len(cut):
+        why = (
+            f"the recording holds {len(full)} observation(s) and {len(cut)} "
+            "survived the cut, so nothing was removed"
+        )
+    else:
+        why = (
+            f"what survived is not the history we recorded: {len(cut)} "
+            f"observation(s) that are not the first {len(cut)} of the "
+            f"recording's {len(full)}"
         )
     raise ValueError(
-        f"deflator source {key} {complaint}. build_deflator was given no "
-        "recording to compare against (`recorded=`), so it cannot tell a tier "
-        "that had not started publishing at this vintage from a fetcher that "
-        "returned nothing, and refuses rather than guessing. `build.build_panel`"
-        " passes the uncut vintage and gets the distinction."
+        f"deflator source {key} {complaint}, and the vintage cut does not "
+        f"explain it: {why}. That is the source, not the vintage -- a fetcher "
+        "that returned nothing, a partial fetch, or a series id that has "
+        "moved. Skipping the tier would drop the deflator back to interpolated "
+        "quarterly prices without a word."
+    )
+
+
+def _is_prefix_of(cut: pd.Series, full: pd.Series) -> bool:
+    """Is ``cut`` exactly what a release-date cut of ``full`` would leave?
+
+    A vintage cut removes the NEWEST observations and never touches the ones it
+    keeps, so what survives is always a contiguous prefix of the recording,
+    values included. Counting alone cannot check that, and counting alone was
+    the bug: the registry's conservative 58-day lag leaves the newest
+    observation unreleased even at the recording's own date, so "the cut removed
+    something" is unconditionally true for the live tier and the refuse branch
+    became unreachable.
+
+    An empty ``cut`` is vacuously a prefix -- a vintage earlier than the tier's
+    first release is the case this whole guard exists to let through.
+    """
+    if cut.empty:
+        return True
+    head = full.iloc[: len(cut)]
+    return head.index.equals(cut.index) and np.allclose(
+        head.to_numpy(dtype=float), cut.to_numpy(dtype=float),
+        rtol=0.0, atol=0.0, equal_nan=True,
     )
 
 
@@ -555,7 +589,7 @@ def real_household_spending(
     sources: dict[str, pd.Series],
     *,
     recorded: dict[str, pd.Series] | None = None,
-) -> pd.Series:
+) -> tuple[pd.Series, Deflator]:
     """The panel's ``household_spending`` row: nominal MHSI, deflated.
 
     This is the function the build step must call. ``build.build_panel`` fetches
@@ -564,5 +598,11 @@ def real_household_spending(
     normaliser carries inflation.
 
     ``recorded`` is passed straight to :func:`build_deflator`; see there.
+
+    RETURNS THE ``Deflator`` ALONGSIDE THE SERIES, and callers are expected to
+    carry its ``skipped`` onward. Returning the series alone made a skipped
+    tier -- the deflator quietly falling back to interpolated quarterly prices
+    for the recent months -- invisible to everything but a direct caller.
     """
-    return deflate(nominal, build_deflator(sources, recorded=recorded).index)
+    built = build_deflator(sources, recorded=recorded)
+    return deflate(nominal, built.index), built

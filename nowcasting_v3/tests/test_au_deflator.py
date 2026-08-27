@@ -312,7 +312,7 @@ def test_the_deflated_series_starts_at_the_same_month_as_the_nominal_one():
     longest consumption record -- and the one that normalises the Global
     factor -- with the model running on the shortened version."""
     nominal = _nominal_household_spending()
-    real = real_household_spending(nominal, _sources())
+    real, _ = real_household_spending(nominal, _sources())
     assert real.index[0] == nominal.index[0] == pd.Timestamp("2012-07-01")
     assert real.index[-1] == nominal.index[-1]
     assert len(real) == len(nominal)
@@ -324,7 +324,7 @@ def test_the_deflated_series_is_lower_than_the_nominal_one_after_the_base_month(
     below the current-price series everywhere after the base -- and equal it at
     the base. An inverted or flat deflator fails here."""
     nominal = _nominal_household_spending()
-    real = real_household_spending(nominal, _sources())
+    real, _ = real_household_spending(nominal, _sources())
     base = nominal.index[0]
 
     assert real.loc[base].item() == pytest.approx(nominal.loc[base].item())
@@ -342,7 +342,7 @@ def test_deflation_removes_the_inflation_v2_measured_in_the_nominal_series():
     different codebase that the deflation is doing the intended job.
     """
     nominal = _nominal_household_spending()
-    real = real_household_spending(nominal, _sources())
+    real, _ = real_household_spending(nominal, _sources())
     nominal_2024 = (nominal.pct_change(3) * 100).loc["2024"].mean()
     real_2024 = (real.pct_change(3) * 100).loc["2024"].mean()
     assert nominal_2024 == pytest.approx(0.82, abs=0.1)
@@ -359,7 +359,7 @@ def test_no_seam_shows_up_as_a_spike_in_the_deflated_series():
     large false month in `pch`, so assert the seam months are unremarkable
     against the series' own distribution.
     """
-    real = real_household_spending(_nominal_household_spending(), _sources())
+    real, _ = real_household_spending(_nominal_household_spending(), _sources())
     change = (real.pct_change() * 100).dropna().abs()
     ordinary = change.quantile(0.9)
     for seam_month in ("2017-09-01", "2024-04-01"):
@@ -515,3 +515,62 @@ def test_build_deflator_refuses_a_missing_tier():
     del sources["cpi_monthly_ceased"]
     with pytest.raises(KeyError, match="cpi_monthly_ceased"):
         build_deflator(sources)
+
+
+# --- residual 1: truncation is not the only way a tier gets short -----------
+
+
+def _moved(key: str, months: int) -> dict[str, pd.Series]:
+    """A tier whose id has MOVED: short, and not the history we recorded.
+
+    The values differ from the recording over the same months. A release-date
+    cut can only ever remove the newest observations, so it cannot produce
+    this; a fetcher pointed at a series that has been renumbered can.
+    """
+    sources = _sources()
+    short = sources[key].iloc[:months].copy()
+    sources[key] = short + 7.5
+    return sources
+
+
+@pytest.mark.parametrize("months", [1, 3, 5])
+def test_a_short_tier_that_is_not_our_recorded_history_is_refused(months):
+    """Residual 1: counting observations cannot tell truncation from a moved id.
+
+    ``n_recorded > n_cut`` is unconditionally true for the live tier at every
+    asof this recording supports -- the registry's conservative 58-day lag
+    leaves the newest observation unreleased even at the recording's own date,
+    so the cut ALWAYS removes something. That made the refuse branch
+    unreachable, and a live tier returning a short, non-overlapping history was
+    skipped where it used to raise. The deflator would then fall back to
+    interpolated quarterly prices with only ``Deflator.skipped`` saying so.
+
+    A vintage cut removes the NEWEST observations and never alters the ones it
+    keeps, so what survives is always a prefix of the recording. Anything else
+    is the source changing under us.
+    """
+    with pytest.raises(ValueError, match="not the history we recorded"):
+        build_deflator(_moved("cpi_monthly_live", months), recorded=_sources())
+
+
+@pytest.mark.parametrize("months", [1, 3, 5])
+def test_a_short_tier_that_IS_our_recorded_history_is_still_skipped(months):
+    """The other half: honest truncation still skips, so I1 stays fixed."""
+    deflator = build_deflator(_cut("cpi_monthly_live", months), recorded=_sources())
+    assert list(deflator.skipped) == ["cpi_monthly_live"]
+
+
+def test_a_short_tier_whose_months_are_not_contiguous_is_refused():
+    """A partial fetch is not a vintage either.
+
+    Values untouched, so only the INDEX arm of the prefix check can catch this.
+    The tier is cut short enough to fail admission on overlap, which is where
+    the guard runs -- a lone interior hole in an otherwise admissible tier is a
+    different problem, caught downstream by ``deflate``, and is harmlessly
+    covered here by the tier beneath.
+    """
+    sources = _sources()
+    full = sources["cpi_monthly_live"]
+    sources["cpi_monthly_live"] = full.iloc[:5].drop(full.index[1])
+    with pytest.raises(ValueError, match="not the history we recorded"):
+        build_deflator(sources, recorded=_sources())

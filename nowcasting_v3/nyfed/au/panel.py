@@ -40,7 +40,7 @@ inflation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -60,6 +60,11 @@ class Panel:
     dates: pd.DatetimeIndex  # length T
     series_id: list[str]
     i_now: int               # row index of the nowcast target
+    # Deflator tiers this vintage could not use, key -> why. Empty on the
+    # ordinary path. A skip means the deflator fell back to interpolated
+    # quarterly prices for the months that tier would have covered, so it
+    # has to be visible HERE and not only to a direct deflator caller.
+    deflator_skipped: dict[str, str] = field(default_factory=dict)
 
 
 def standardise(raw: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

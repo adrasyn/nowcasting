@@ -210,11 +210,30 @@ not the appendix.
 | Pseudo-real-time flatters v3 | stated in the headline; v2 is scored identically so the comparison stays fair |
 | Deflator tier silently skipped | `Panel.deflator_skipped` is now carried out; record it per vintage |
 
-## Open questions for James
+## The one open question for James
 
-1. **Wall-clock budget for Phase 1** — what is acceptable? This sets the window
-   more than any other choice, and it is the only input Phase 0 cannot measure
-   for itself.
-2. **Evaluation window start.** Matching v2's 49 quarters is the like-for-like;
-   starting at 2016 keeps every panel series alive for the whole window
-   (`aig_pmi` runs from 2001, but the Judo Bank alternative would not).
+**How long may Phase 1 run?** That is the whole decision. Everything else
+follows from it.
+
+Why it is the only one: how far back the backtest reaches is purely a cost
+choice, not a data choice. The panel's series start at wildly different dates
+(`gdp` 1959, `aig_pmi` 2001, `household_spending` 2012, `job_ads` 2021, both
+CPI series 2024) and the Kalman filter handles a late start natively -- an
+unobserved month is simply unobserved. So no window start "keeps every series
+alive", nothing has to be trimmed to make one, and reach is bought with
+wall-clock alone.
+
+Illustrative arithmetic, at four as-of dates per target quarter. **The warm
+speed-up is a guess until Phase 0 measures it** -- these are here to show the
+shape of the trade, not to promise a number:
+
+| Budget | Fits it buys (if warm is ~10x cold) | What that covers |
+|---|---|---|
+| One overnight run (~10 h) | ~65 | **17 quarters, 2022+** -- the honest post-COVID window |
+| A weekend (~48 h) | ~320 | **49 quarters** -- full like-for-like with v2's backtest |
+
+The recommendation is to start with the overnight budget. Post-COVID is the
+window that decides the Q1 2026 question, it is the window v2's own sweep
+treats as honest, and Phase 0 will have replaced the 10x guess with a measured
+figure before anything is committed. Extending to the full 49 quarters is then
+a second run, not a redesign.

@@ -20,10 +20,13 @@ import pandas as pd
 # given the landing page it downloads the zip directly and skips the directory.
 #
 # 6484.0 is the Monthly CPI Indicator, final release September 2025. Nothing in
-# `AU_SERIES` points at it -- `cpi` and `cpi_trimmed` moved to the live 6401.0
-# when ABS folded monthly CPI into the main collection. It is here for the
-# household spending deflator only, which splices 6484.0's ~8 years of monthly
-# history under the live series' 28 months. See `nyfed/au/deflator.py`.
+# `AU_SERIES` points at it -- `cpi` moved to the live 6401.0 when ABS folded
+# monthly CPI into the main collection, and `cpi_trimmed` was dropped from the
+# registry entirely (2026-08-28) because 6484.0 has no trimmed mean INDEX to
+# splice it onto. It is here for the deflator, which splices 6484.0's ~8 years
+# of monthly history under the live series' 28 months -- and `build_panel` now
+# reuses that same splice for the panel's own `cpi` row. See
+# `nyfed/au/deflator.py`.
 #
 # This is a dict rather than a `url=` parameter on `fetch_abs_series` on
 # purpose: `sources.py` keeps locators self-contained so that no caller has to

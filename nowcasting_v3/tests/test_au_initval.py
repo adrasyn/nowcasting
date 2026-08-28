@@ -28,10 +28,10 @@ def _panel(T: int = 300) -> Panel:
 def test_seed_has_the_right_shape_and_no_nan():
     spec = load_spec(SPEC_PATH)
     Lambda = seed_lambda(_panel())
-    # The panel is 15 series (`retail_sales` and `vacancy_index` were dropped
-    # from the registry), over 5 factors -- derive both from the spec rather
-    # than hard-coding numbers that would go stale the next time a series is
-    # added or dropped.
+    # The panel is 14 series (`retail_sales`, `vacancy_index` and `cpi_trimmed`
+    # were dropped from the registry), over 5 factors -- derive both from the
+    # spec rather than hard-coding numbers that would go stale the next time a
+    # series is added or dropped.
     assert Lambda.shape == spec.blocks.shape
     assert Lambda.shape == (len(AU_SERIES), 5)
     assert np.isfinite(Lambda).all()
@@ -158,8 +158,9 @@ def test_the_seed_agrees_in_sign_with_each_block_s_normalising_series():
     column pulls every other series in the block toward the wrong sign while the
     normaliser stays pinned at +1.
 
-    Measured on the real panel before this was fixed: the Global column's seed
-    was negative for 12 of 15 series INCLUDING its normaliser, and GDP's Global
+    Measured on the real panel before this was fixed (the 15-series panel of the
+    time, which still carried `cpi_trimmed`): the Global column's seed was
+    negative for 12 of 15 series INCLUDING its normaliser, and GDP's Global
     loading was still -0.76 after 3,000 sweeps -- i.e. real GDP growth loading
     the broadest factor with the opposite sign to real consumption growth, on a
     panel where the two correlate +0.12.

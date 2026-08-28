@@ -59,10 +59,37 @@ def test_standardise_refuses_an_all_nan_row_rather_than_warning():
         standardise(raw)
 
 
+def test_standardise_refuses_a_single_observation_row_rather_than_inventing_a_scale():
+    """One observation is not a small sample, it is an undefined one.
+
+    ``np.nanstd(..., ddof=1)`` on n=1 returns NaN with a RuntimeWarning, and
+    the ``~np.isfinite`` fallback that exists for a CONSTANT row then quietly
+    substitutes 1.0. The row goes into the filter standardised against a number
+    nobody computed, and nothing downstream can tell.
+
+    This is reachable, not hypothetical: at a 2021-04 vintage ``job_ads`` is
+    exactly this row. See ``nyfed/au/panel.py`` and
+    ``test_the_earliest_buildable_vintage_is_set_by_job_ads``.
+
+    A constant row is deliberately still allowed -- its sd is DEFINED and zero,
+    which is a different thing -- so both are asserted here together.
+    """
+    raw = np.array([[1.0, 2.0, 3.0], [np.nan, 5.0, np.nan]])
+    with pytest.raises(ValueError, match=r"row\(s\) \[1\] carry fewer than 2"):
+        standardise(raw)
+
+    two = np.array([[1.0, 2.0, 3.0], [np.nan, 5.0, 7.0]])
+    _, _, scale = standardise(two)
+    assert scale[1, 0] == pytest.approx(np.sqrt(2.0))
+
+    _, _, const_scale = standardise(np.array([[3.0, 3.0, 3.0]]))
+    assert const_scale[0, 0] == 1.0
+
+
 def test_panel_shape_and_row_order_follow_the_spec():
     panel = assemble(_panel_inputs(), start=START, end=END)
     assert isinstance(panel, Panel)
-    assert panel.Y.shape[0] == len(AU_SERIES) == 15
+    assert panel.Y.shape[0] == len(AU_SERIES) == 14
     assert panel.series_id == [s.series_id for s in AU_SERIES]
     assert panel.Y.shape[1] == len(panel.dates)
 
@@ -142,8 +169,8 @@ def test_assembly_refuses_to_label_rows_it_did_not_stack():
     spec. Nothing else ties them together, so a divergence would attach every
     label -- and the nowcast target -- to the wrong row, silently, with the
     model still running. Drop one registry entry and the guard must fire rather
-    than produce a 14-row panel carrying 15 labels."""
-    sources = tuple(s for s in AU_SERIES if s.key != "cpi_trimmed")
+    than produce a 13-row panel carrying 14 labels."""
+    sources = tuple(s for s in AU_SERIES if s.key != "commodity_prices")
     inputs = _panel_inputs()
     with pytest.raises(ValueError, match="wrong row"):
         assemble(inputs, start=START, end=END, sources=sources)

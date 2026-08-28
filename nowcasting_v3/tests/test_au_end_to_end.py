@@ -54,9 +54,12 @@ which is what an off-by-one in ``panel._align`` would produce -- is caught at
 NONE of the six seeds tried. The healthy ratios are 17.6, 162.5, 52.6, 365.2,
 395.4 and 17.5; under the leak they become 49.5, 37.8, 16.9, 22.9, 109.8 and
 320.4, every one still above the asserted floor of 10, and two of them higher
-than the healthy value. At this vintage only ONE post-target month exists and
-only eight of the fifteen series have published it, so there is too little
-post-target data for the ratio to separate the two cases at all. A vintage-pair
+than the healthy value. (Those six seeds were measured on the 15-series panel,
+before `cpi_trimmed` was dropped, and the conclusion -- the probe catches
+nothing -- did not warrant re-measuring for one fewer price series.) At this
+vintage only ONE post-target month exists and only seven of the fourteen series
+have published it, so there is too little post-target data for the ratio to
+separate the two cases at all. A vintage-pair
 leakage test (build at two dates, compare) is the instrument that would, and it
 belongs to Plan C, where more than one post-target month is available.
 
@@ -144,25 +147,35 @@ TARGET_QUARTER = (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-03-01"))
 # an accuracy check -- there is nothing to check against.
 #
 # THE SEED IS PART OF THE MEASUREMENT, NOT A TUNING KNOB, and it is disclosed
-# rather than quietly chosen. GDP's posterior on this panel is BIMODAL: the
-# Global factor and the COVID factor compete to explain the target series, a
-# chain settles into one basin within its first sweeps and stays there, and
-# lengthening the chain does not resolve it (measured to 2,000 sweeps). Three of
-# six seeds land in the basin where GDP loads Global at ~1.3, three in the one
-# where it loads ~0.1 and the COVID factor takes ~1.4 instead. In the second
-# basin the nowcast is driven by GDP's own idiosyncratic dynamics and barely
+# rather than quietly chosen. GDP's posterior on this panel is BIMODAL: a chain
+# settles into one basin within its first sweeps and stays there, and
+# lengthening the chain does not resolve it (measured to 2,000 sweeps). In the
+# low basin the nowcast is driven by GDP's own idiosyncratic dynamics and barely
 # reads the monthly panel at all.
 #
-# `test_the_gdp_loading_is_bimodal_across_seeds` pins that finding directly, so
+# ALL THREE SEEDS BELOW WERE RE-MEASURED ON 2026-08-28, when `cpi_trimmed` left
+# the registry. Dropping a series changes the panel and so changes which seed
+# lands where; the previous values (3, 6 and 5) were measurements of the
+# 15-series panel and two of the three had swapped basins. Thirty seeds, sorted:
+#
+#   0.065 0.074 0.075 0.118 0.149 0.330 0.369 0.369 0.436 0.439 0.493 0.535
+#   0.550 0.627 0.736 0.745 0.796 0.856 | 1.096 1.215 1.230 1.397 1.430 1.465
+#   1.497 1.524 1.558 1.596 1.601 1.712
+#
+# 18 of 30 below the floor, 12 above, and the widest gap in the distribution
+# (0.856 -> 1.096) still straddles `COLLAPSED_GLOBAL_LOADING`, so the floor set
+# at 1.0 on the old panel survives the change on its own evidence.
+#
+# `test_the_gdp_loading_is_bimodal_across_seeds` pins the finding directly, so
 # it is a measured property of this panel rather than a footnote, and the gate
 # runs at a seed in the identified basin so that the discriminator below is
 # testing the pipeline rather than the coin flip. If the seed changes,
 # `test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor` fails and
 # names the reason.
-N_GS, N_BURN, SEED = 200, 100, 3      # 1.562 on the shipping panel
+N_GS, N_BURN, SEED = 200, 100, 4      # 1.430 on the shipping panel
 
 # A seed that lands in the OTHER basin, used to exercise the collapse guard.
-COLLAPSED_SEED = 6                    # 0.111 -- unambiguously collapsed
+COLLAPSED_SEED = 14                   # 0.075 -- unambiguously collapsed
 
 # The Global block, column 0 of `spec.blocks`.
 I_GLOBAL = 0
@@ -207,10 +220,11 @@ def _with_data(panel: Panel, Y: np.ndarray) -> Panel:
 
 
 def test_the_panel_has_one_row_per_registered_series(panel):
-    """15, not the 17 an earlier draft of this plan assumed: ABS ceased Retail
-    Trade in July 2025, and the Internet Vacancy Index turned out never to have
-    been fetched by v2 at all. See ``nyfed/au/sources.py``."""
-    assert panel.Y.shape[0] == len(AU_SERIES) == 15
+    """14, not the 17 an earlier draft of this plan assumed: ABS ceased Retail
+    Trade in July 2025, the Internet Vacancy Index turned out never to have been
+    fetched by v2 at all, and ``cpi_trimmed`` was dropped on 2026-08-28. See
+    ``nyfed/au/sources.py``."""
+    assert panel.Y.shape[0] == len(AU_SERIES) == 14
     assert panel.series_id == [s.series_id for s in AU_SERIES]
     assert panel.series_id[panel.i_now] == "gdp"
 
@@ -428,11 +442,14 @@ def test_a_build_at_the_vintages_own_date_is_refused_because_the_pmi_is_dead():
 
     DATED TO THE VINTAGE, NOT TO ``today()``. The recording is frozen, so a
     ``today()``-based version of this test had a shelf life rather than a
-    meaning: scanned day by day, the stale set stays ``{aig_pmi}`` through
-    2026-09-23, becomes five series on 2026-09-24 and all fifteen by 2026-10-20
-    -- at which point the gate would fail looking like a freshness regression
-    instead of "the vintage needs re-recording". Measuring against the vintage's
-    own ``recorded_at`` asks the question the frozen data can actually answer.
+    meaning: re-scanned day by day on 2026-08-28, the stale set stays
+    ``{aig_pmi}`` through 2026-09-23, becomes five series on 2026-09-24, ten by
+    2026-09-29, thirteen by 2026-10-20 and all fourteen on 2026-11-05 -- at
+    which point the gate would fail looking like a freshness regression instead
+    of "the vintage needs re-recording". (An earlier draft of this docstring
+    said "all fifteen by 2026-10-20"; the scan says the last series to go is
+    ``nab_conditions``, sixteen days later.) Measuring against the vintage's own
+    ``recorded_at`` asks the question the frozen data can actually answer.
 
     A WEEK AFTER THE RECORDING, NOT ON ITS OWN DATE, AND THE WEEK IS THE POINT.
     ``aig_pmi``'s budget widened from 86 days to 117 when the registry took on
@@ -528,28 +545,79 @@ def test_the_deflator_builds_at_every_monthly_vintage_and_never_hits_the_splice_
     assert not thin, f"splice's floor was reached after admission: {thin}"
 
 
-def test_a_2018_vintage_now_refuses_for_the_reason_it_actually_has():
-    """The build still cannot go back to 2018, and that is a different fact.
+def test_a_2018_vintage_refuses_naming_the_one_series_that_is_short():
+    """The build still cannot go back to 2018, and only one series says why.
 
-    ``cpi_trimmed`` is fetched from 6401.0's monthly analytical series, which
-    begins in 2024-04, so before then it has no observations at all and the
-    freshness guard says so by name. What the build no longer does is die inside
-    the deflator naming a tier whose emptiness was correct.
+    ``job_ads`` (ANZ-Indeed) begins 2021-01, so before then it has no
+    observations at all and the freshness guard names it. TWO SERIES USED TO BE
+    IN THIS SET.
 
-    ``cpi`` USED TO BE IN THIS SET AND IS NOT ANY MORE. `build_panel` splices it
-    onto the ceased 6484.0 Monthly CPI Indicator, which starts 2017-09, so a
-    2018 vintage now carries real monthly CPI. `cpi_trimmed` has no such
-    counterpart: 6484.0 published EXCLUSION-based measures ("All groups CPI
-    excluding volatile items"), not a trimmed mean, and splicing an exclusion
-    measure onto a trimmed one would join two different constructions.
+    ``cpi`` left it when `build_panel` began splicing the live 6401.0 series
+    onto the ceased 6484.0 Monthly CPI Indicator, which starts 2017-09.
 
-    So the honest boundary on Plan C's backtest is now `cpi_trimmed` and
-    `job_ads`, not `cpi`. If ABS publishes a longer back series the range moves;
-    nothing else has to change.
+    ``cpi_trimmed`` left it by being dropped from the registry on 2026-08-28.
+    It could not be spliced the way `cpi` was -- 6484.0 published EXCLUSION-based
+    measures ("All groups CPI excluding volatile items") and a year-ended trimmed
+    RATE, never a trimmed mean INDEX, and joining either onto a trimmed mean
+    would join two different constructions. Pinned at 2024-04 it was, alone, the
+    binding constraint on how far back Plan C could backtest. See the
+    ``cpi_trimmed`` note in ``nyfed/au/sources.py`` for why a fifth series in a
+    five-series Nominal block did not earn that cost.
+
+    ``job_ads`` is now the whole boundary, and it is a much cheaper one --
+    ``test_the_earliest_buildable_vintage_is_set_by_job_ads`` measures where.
     """
     with pytest.raises(StaleSeriesError) as excinfo:
         build_panel(asof="2018-06-01", vintage=VINTAGE)
-    assert {key for key, _, _ in excinfo.value.stale} == {"job_ads", "cpi_trimmed"}
+    assert {key for key, _, _ in excinfo.value.stale} == {"job_ads"}
+
+
+def test_the_earliest_buildable_vintage_is_set_by_job_ads():
+    """Plan C's backtest window, measured rather than assumed.
+
+    This is the number dropping ``cpi_trimmed`` bought, and the reason to drop
+    it. Measured on this recorded vintage, against the registry at 2b49a15:
+
+        with    `cpi_trimmed`:  earliest asof 2024-07-01  (~7 target quarters)
+        without `cpi_trimmed`:  earliest asof 2021-05-01  (~20 target quarters)
+
+    THE THREE MONTHS BEFORE IT EACH FAIL FOR THEIR OWN REASON, and all three
+    are asserted because between them they are the whole boundary:
+
+      2021-02  `job_ads` has no observation released yet -- StaleSeriesError
+      2021-03  it has one, but `chg` consumes the first, leaving an all-NaN row
+      2021-04  it has one finite observation, whose ddof=1 sd is undefined
+      2021-05  two observations: the first vintage that honestly builds
+
+    2021-04 is the case worth pinning. It BUILT before `standardise` grew its
+    thin-row guard, silently, with `job_ads` standardised against an invented
+    scale of 1.0 -- the panel one would actually have backtested on. See
+    ``nyfed/au/panel.py``.
+
+    Two observations is the arithmetic floor, not an informativeness one.
+    `job_ads`' scale reads 0.50 at n=2 against ~6.3 from about n=7 (2021-10),
+    so Plan C should choose its own start inside this range with that in view;
+    what this test fixes is where the primitive stops lying.
+
+    Pinned so that a later change moving the boundary in either direction has
+    to say so here. If a longer `job_ads` back series appears, the earliest
+    date moves and this test is where that shows up.
+    """
+    with pytest.raises(StaleSeriesError) as excinfo:
+        build_panel(asof="2021-02-01", vintage=VINTAGE)
+    assert {key for key, _, _ in excinfo.value.stale} == {"job_ads"}
+
+    with pytest.raises(ValueError, match="no finite observation at all"):
+        build_panel(asof="2021-03-01", vintage=VINTAGE)
+
+    with pytest.raises(ValueError, match="fewer than 2 finite observations"):
+        build_panel(asof="2021-04-01", vintage=VINTAGE)
+
+    panel = build_panel(asof="2021-05-01", vintage=VINTAGE)
+    assert panel.Y.shape[0] == len(AU_SERIES) == 14
+    assert panel.dates[-1] == pd.Timestamp("2021-05-01")
+    i_ads = panel.series_id.index("job_ads")
+    assert np.isfinite(panel.Y[i_ads]).sum() == 2
 
 
 def test_the_vintage_cut_is_by_release_date_not_by_reference_date(panel):
@@ -791,12 +859,12 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
 ):
     """The leakage-shaped check, with its limits stated rather than implied.
 
-    The target quarter is Q1 2026; April 2026 is in the panel because eight of
-    the fifteen series had published it by this vintage. A one-sigma shock to
-    those April observations moves the Q1 nowcast by 0.013pp against 2.169pp for
-    the same shock inside Q1. Not zero, and it should not be: the smoother is
-    two-sided, so a later month legitimately carries a little information about
-    the factor path in March.
+    The target quarter is Q1 2026; April 2026 is in the panel because seven of
+    the fourteen series had published it by this vintage. A one-sigma shock to
+    those April observations moves the Q1 nowcast by a small fraction of what
+    the same shock inside Q1 does. Not zero, and it should not be: the smoother
+    is two-sided, so a later month legitimately carries a little information
+    about the factor path in March.
 
     WHAT THIS DOES NOT ESTABLISH. It does not detect a one-month misalignment.
     Measured across six sampler seeds, the probe is caught at NONE of them: the
@@ -805,9 +873,12 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
     16.9, 22.9, 109.8 and 320.4 -- every one still above the asserted 10, and
     two of them higher than the healthy value. (Round 1 of this task reported
     "2 of 4 seeds" on a different vintage; the correct count there was 1 of 4,
-    and on an honest vintage it is 0 of 6.) One post-target month, published by
-    eight of the fifteen series, is not enough signal for this statistic to
-    separate the cases. The structural
+    and on an honest vintage it is 0 of 6.) Those six seeds were measured on the
+    15-SERIES PANEL, before `cpi_trimmed` was dropped, and were not re-measured
+    for it: the finding is that the probe catches nothing, and one fewer price
+    series is not a reason to expect it to start. One post-target month,
+    published by seven of the fourteen series, is not enough signal for this
+    statistic to separate the cases. The structural
     guarantee is elsewhere (the Octave-pinned quarterly aggregation, plus the
     panel's deterministic alignment tests); this is a consistency check on top
     of it, and Plan C should add a vintage-pair test when more than one
@@ -816,7 +887,9 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
     Thresholds from the same six seeds: the post-target move was 0.0008, 0.0046,
     0.0060, 0.0064, 0.0106 and 0.0134pp, and the ratio never fell below 17.5 --
     in EITHER basin, which is why the ratio rather than the level is what this
-    test asserts.
+    test asserts. The asserted floor of 10 is a long way below the smallest of
+    those, which is why it survives a panel change unmeasured; if it ever fires,
+    re-measure the six-seed spread before moving it.
     """
     _, ssm, t_now = fitted
     monthly = np.array([f == "m" for f in spec.frequency])
@@ -824,9 +897,9 @@ def test_later_months_move_the_nowcast_far_less_than_the_target_quarters_own(
     after = panel.dates > TARGET_QUARTER[1]
     # Three columns after the target quarter, but only April carries data: the
     # fastest series in the panel has a 34-day lag, so May and June had not been
-    # published at this vintage. Eight of the twelve monthly series had April.
+    # published at this vintage. Seven of the eleven monthly series had April.
     assert after.sum() == 3
-    assert np.isfinite(panel.Y[np.ix_(monthly, after)]).sum() == 8, (
+    assert np.isfinite(panel.Y[np.ix_(monthly, after)]).sum() == 7, (
         "no post-target observations to shock; the comparison would be vacuous"
     )
 
@@ -856,7 +929,7 @@ def test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor(panel, spe
 
     It is also the gate's declaration of which posterior mode it is in. See
     ``test_the_gdp_loading_is_bimodal_across_seeds``: at ``SEED`` the chain
-    settles with GDP's Global loading near 1.3, and every sensitivity number in
+    settles with GDP's Global loading near 1.43, and every sensitivity number in
     this module is a number from that basin.
 
     The normalising loadings are checked in the same breath. They are restricted,
@@ -896,27 +969,46 @@ def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_
     five of its largest absolute values. A factor confined to that window can fit
     the biggest moves in the target series almost perfectly.
 
-    THE MECHANISM IS A TWO-SIDED HANDOVER, not just the COVID factor taking
-    over. When GDP's Global loading collapses (1.334 -> 0.011 between the two
-    seeds here) its COVID loading rises only 1.036 -> 1.318, which cannot absorb
-    the difference -- the COVID factor is zero outside its 22 months and the
-    other 135 observations still need explaining. What takes them is GDP's own
-    idiosyncratic stochastic volatility, and it rises OUTSIDE the window too:
-    0.875 -> 1.107 between these two seeds, and 0.788 -> 1.119 between the two
-    basins' means over ten seeds. So COVID takes the in-window variance and
-    GDP's own error takes the out-of-window variance the Global loading used to
-    carry, which is why the result is a series explained by itself.
+    THE MECHANISM IS A TWO-SIDED HANDOVER, and the two sides are not equally
+    reliable. Re-measured on 2026-08-28 over seven collapsed and six identified
+    seeds on this panel:
+
+                    Global    COVID   sigma_e outside the window
+      collapsed      0.169    0.798        1.239
+      identified     1.429    0.751        0.884
+
+    THE IDIOSYNCRATIC HALF IS THE ROBUST ONE. The COVID factor is zero outside
+    its 22 months, so it cannot absorb what the Global loading drops -- 135
+    observations still need explaining, and what takes them is GDP's own
+    stochastic volatility, up 40% between the basin means. That is why the
+    result is a series explained by itself, and it is the half this test
+    asserts, at a 1.15x margin rather than a bare inequality: the groups do not
+    separate cleanly seed by seed. Every collapsed seed measured sits above the
+    identified MEAN of 0.884, but the highest identified value (1.143) exceeds
+    the two lowest collapsed ones (1.017, 1.020), so this is a basin-mean
+    difference and not a classifier.
+
+    THE COVID HALF IS WEAKER THAN IT LOOKED. 0.798 against 0.751 is barely a
+    difference, and two of the seven collapsed seeds (7 and 9) load the COVID
+    factor NEGATIVELY, at -0.53 and -0.13. It holds at ``COLLAPSED_SEED``
+    (1.210 against 0.921) and at five of seven, so it is asserted -- but as a
+    tendency with named exceptions, not as the mechanism. Inside the identified
+    basin the COVID loading FALLS as the Global loading rises (1.229 at Global
+    1.096, down to 0.235 at Global 1.712), which is the competition the premise
+    above describes; across the collapse it mostly does not.
 
     A LIKELY ENABLER, worth Plan C's attention: the Global factor is normalised
     by household spending, which starts in 2012, so only 164 of the panel's 438
     months pin that factor's scale at all.
 
     These are separate basins, not tails of one distribution. A chain picks one
-    in its first sweeps and stays: measured at seed 321 over 400 stored draws,
-    GDP's Global loading has a 5-95% range of -0.45..0.31 with the first and
-    last fifty draws averaging -0.16 and -0.01, while at seed 1 the same range
-    is 1.22..1.55. Lengthening the chain to 2,000 sweeps does not resolve it,
-    and 17 of 30 seeds land below the floor on this panel.
+    in its first sweeps and stays. Over the 200 stored draws at each of the two
+    seeds this test runs, GDP's Global loading has a 5-95% range of
+    -0.150..0.293 at ``COLLAPSED_SEED``, with the first and last fifty draws
+    averaging 0.051 and 0.075, against 1.106..1.631 at ``SEED`` averaging 1.383
+    and 1.311. The ranges do not overlap and neither chain drifts toward the
+    other. Lengthening to 2,000 sweeps does not resolve it, and 18 of 30 seeds
+    land below the floor on this panel.
 
     THIS IS WHY THE GATE DECLARES ITS SEED and why ``state_space`` refuses a
     collapsed chain outright. The NY Fed does not face the coin flip because
@@ -960,6 +1052,10 @@ def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_
     )
     # Both halves of the handover, because naming only the COVID factor would be
     # an incomplete account: it cannot explain the 135 out-of-window quarters.
+    # A tendency, not the mechanism: seeds 7 and 9 collapse with a NEGATIVE
+    # COVID loading. Asserted at these two seeds because it holds at these two
+    # seeds; the docstring says how far it generalises and the assertion below
+    # carries the half that does.
     assert collapsed[1] > identified[1], (
         f"GDP's COVID loading is {collapsed[1]:.3f} in the collapsed basin "
         f"against {identified[1]:.3f} in the identified one"
@@ -1085,21 +1181,28 @@ def test_the_panel_cpi_row_has_no_interpolated_quarterly_months(panel):
 
 # --- the middle band the old 0.75 floor admitted ---------------------------
 
-MIDDLE_BAND_SEED = 5      # 0.843 on the shipping panel: above 0.75, below 1.0
+MIDDLE_BAND_SEED = 3      # 0.856 on the shipping panel: above 0.75, below 1.0
 
 
 def test_a_chain_between_the_basins_is_refused(panel):
     """The defect that raising the floor to 1.0 fixes, pinned so it stays fixed.
 
-    Thirty seeds on each of two panels showed THREE groups, not two. Three
-    chains in thirty sit between the basins on both panels -- 0.783/0.901/0.924
-    on a control with the short `cpi` row, 0.785/0.823/0.843 on the shipping
-    panel. The old 0.75 floor ADMITTED all of them: they cleared the guard while
-    sitting nowhere near the identified basin, and Plan C's warm start would
-    have carried one forward silently, never tripping the floor again.
+    Thirty seeds on each of two panels showed THREE groups, not two. Chains sit
+    between the basins on every panel measured -- 0.783/0.901/0.924 on a control
+    with the short `cpi` row, 0.785/0.823/0.843 on the 15-series panel, and
+    0.796/0.856 on this one. The old 0.75 floor ADMITTED all of them: they
+    cleared the guard while sitting nowhere near the identified basin, and Plan
+    C's warm start would have carried one forward silently, never tripping the
+    floor again.
 
     The earlier ten-seed measurement did not sample the middle band at all,
     which is how a floor got set inside it.
+
+    ``MIDDLE_BAND_SEED`` is 3, which was the GATE'S OWN DEFAULT SEED until
+    2026-08-28. On the 15-series panel it sat at 1.562, comfortably identified;
+    dropping `cpi_trimmed` moved it to 0.856, into the band. Nothing about the
+    seed changed -- the panel did, which is the whole reason these three
+    constants are re-measured rather than carried forward.
     """
     result = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=MIDDLE_BAND_SEED)
     with pytest.raises(CollapsedFactorError, match=r"gdp's loading"):

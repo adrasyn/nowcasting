@@ -183,14 +183,6 @@ def test_parse_abs_frame_handles_every_index_shape_a_source_can_hand_it():
             "the last month of 2026Q1",
         ),
         (
-            "cpi_trimmed", "2026-07-01", 107.8706, 0.0005,
-            "ABS 6401.0 CPI, Australia, July 2026: trimmed mean rose 0.5% in "
-            "the month and 3.6% over the year; both reproduce from this level "
-            "(see test_published_movements_reproduce_from_the_fixture). Its "
-            "previous id was a Percent rate against a spec row declaring "
-            "Index/pch, so this series has a wrong-variant history",
-        ),
-        (
             "gdi", "2026-03-01", 689681.0, 0.5,
             "ABS 5206.0 National Accounts, March quarter 2026: real gross "
             "domestic income, chain volume measures, $689,681m seasonally "
@@ -223,7 +215,7 @@ def test_a_verified_observation_pins_the_series_id(key, date, expected, tol, sou
 # Every pinned level above except gdp's is derivable from its own fixture, so
 # on its own the pin table cannot distinguish "read off the ABS release" from
 # "copied out of the recorded payload". These do: ABS publishes *movements* for
-# these four, and a level copied from the wrong series cannot reproduce a
+# these three, and a level copied from the wrong series cannot reproduce a
 # percentage ABS printed. Tolerance is 0.05, the precision ABS rounds to.
 @pytest.mark.parametrize(
     "key,date,previous,year_ago,per_period,annual,source",
@@ -232,11 +224,6 @@ def test_a_verified_observation_pins_the_series_id(key, date, expected, tol, sou
             "cpi", "2026-07-01", "2026-06-01", "2025-07-01", 0.6, 3.5,
             "ABS 6401.0 CPI, Australia, July 2026: All groups CPI seasonally "
             "adjusted, +0.6% monthly and +3.5% annually",
-        ),
-        (
-            "cpi_trimmed", "2026-07-01", "2026-06-01", "2025-07-01", 0.5, 3.6,
-            "ABS 6401.0 CPI, Australia, July 2026: trimmed mean, +0.5% "
-            "monthly and +3.6% annually",
         ),
         (
             "unit_labour_cost", "2026-03-01", "2025-12-01", "2025-03-01", 0.8, 3.2,
@@ -261,20 +248,23 @@ def test_published_movements_reproduce_from_the_fixture(
     assert got_annual == pytest.approx(annual, abs=0.05), f"{source} (year-on-year)"
 
 
-@pytest.mark.parametrize("key", ["cpi", "cpi_trimmed"], ids=lambda k: k)
-def test_the_price_series_still_begin_at_their_short_history_bound(key):
+def test_the_cpi_fetch_still_begins_at_its_short_history_bound():
     """Catalogue 6401.0's monthly analytical series start at April 2024.
 
     That ~28-month history is the cost of moving off the ceased 6484.0
-    indicator, and it is the tightest constraint on the Nominal block -- `cpi`
-    is that block's normaliser. If ABS publishes a longer back series the
-    recorder's `tail(36)` would just quietly gain earlier rows, and the level
-    pins would not notice. Assert the bound so the constraint lifting is news
-    here rather than a surprise at Task 6.
+    indicator, and `cpi` normalises the Nominal block. THIS IS THE FETCH, NOT
+    THE PANEL ROW: `build_panel` splices this series onto 6484.0's ceased
+    monthly indicator, so the row the model sees reaches 2017-09. The bound
+    asserted here is what the live catalogue alone provides, and the whole
+    reason the splice exists.
+
+    If ABS publishes a longer back series the recorder's `tail(36)` would just
+    quietly gain earlier rows, and the level pins would not notice. Assert the
+    bound so the constraint lifting is news here rather than a surprise.
     """
-    parsed = _parse(next(s for s in AU_SERIES if s.key == key))
+    parsed = _parse(next(s for s in AU_SERIES if s.key == "cpi"))
     assert parsed.index[0] == pd.Timestamp("2024-04-01"), (
-        f"{key} no longer starts at 2024-04; if ABS extended the series "
-        "backwards, the Nominal block's short-history constraint has eased "
-        "and sources.py should say so"
+        "cpi no longer starts at 2024-04; if ABS extended the live series "
+        "backwards, the splice in `deflator.long_monthly_cpi` may no longer "
+        "be needed and sources.py should say so"
     )

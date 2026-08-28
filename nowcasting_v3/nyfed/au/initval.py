@@ -94,8 +94,9 @@ def seed_lambda(panel: Panel, spec_path=SPEC_PATH) -> np.ndarray:
     # every free loading in the column (`construct_prior`, precision 10, so a
     # prior standard deviation near 0.32), so a flipped column pulls the whole
     # block toward the wrong sign while the normaliser stays pinned at +1.
-    # Measured on the real panel before this line existed: the Global column
-    # was seeded negative for 12 of 15 series, its own normaliser included, and
+    # Measured on the real panel before this line existed (the 15-series panel
+    # of the time, which still carried `cpi_trimmed`): the Global column was
+    # seeded negative for 12 of 15 series, its own normaliser included, and
     # GDP's Global loading was still -0.76 after 3,000 sweeps -- real GDP growth
     # loading the broadest factor against real consumption growth. A block with
     # no normaliser (Soft) has no sign to be consistent with and is left alone.

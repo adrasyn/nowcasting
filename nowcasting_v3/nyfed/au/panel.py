@@ -20,8 +20,8 @@ than a hand-built test index.
 **Imports is negative.** ABS reports imports as a debit, so the row is wholly
 negative while exports is wholly positive. That is fine for a ratio ``pch`` and
 fatal for a log-difference one: ``np.log`` of a negative number is NaN and
-raises nothing, so the panel would quietly carry fourteen live series instead of
-fifteen. ``_check_imports_survived`` turns that into a refusal.
+raises nothing, so the panel would quietly carry thirteen live series instead of
+fourteen. ``_check_imports_survived`` turns that into a refusal.
 
 **The transform runs before standardisation.** ``assemble`` applies the spec's
 ``Transformation`` column (``nyfed/au/transform.py``) to the aligned raw matrix
@@ -67,18 +67,39 @@ class Panel:
     deflator_skipped: dict[str, str] = field(default_factory=dict)
 
 
+MIN_OBS_TO_STANDARDISE = 2
+
+
 def standardise(raw: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Centre and scale each row, ignoring NaN.
 
     A constant row has zero standard deviation; scale it by 1.0 rather than
     dividing by zero, which would turn a degenerate series into NaN and hide it.
 
-    An all-NaN row is refused outright. ``np.nanmean`` would return NaN with a
-    RuntimeWarning rather than an error, and a row of NaN is not a degenerate
-    series -- it is a series that never arrived.
+    A row with fewer than ``MIN_OBS_TO_STANDARDISE`` finite observations is
+    refused, and this is the same refusal as the all-NaN one rather than a
+    stricter cousin of it. ``np.nanstd(..., ddof=1)`` on a single observation
+    is not a small sample, it is UNDEFINED: numpy returns NaN with a
+    RuntimeWarning, the ``~np.isfinite`` fallback below then substitutes 1.0,
+    and the row goes into the filter standardised against a number nobody
+    computed. The warning is the only evidence, and the sampler runs on to a
+    plausible answer either way.
+
+    THE BOUNDARY THIS GUARDS IS REACHABLE. Dropping ``cpi_trimmed`` on
+    2026-08-28 moved Plan C's earliest buildable vintage from 2024-07 to
+    2021-04, and the first thing found there was ``job_ads`` -- ANZ-Indeed
+    begins 2021-01, so at a 2021-04 vintage the row was one observation with an
+    invented scale of 1.0. It is 2021-05 that is honestly buildable.
+
+    Two is the arithmetic floor, not an informativeness one: it is where
+    ``ddof=1`` becomes defined. It is not where a row becomes USEFUL --
+    ``job_ads``' own scale reads 0.50 at n=2, 2.31 at n=3 and only settles near
+    6.3 from about n=7 (2021-10) -- and choosing a window on that basis belongs
+    to the backtest design, not to this primitive.
     """
     raw = np.atleast_2d(np.asarray(raw, dtype=float))
-    empty = np.flatnonzero(~np.isfinite(raw).any(axis=1))
+    n_obs = np.isfinite(raw).sum(axis=1)
+    empty = np.flatnonzero(n_obs == 0)
     if empty.size:
         raise ValueError(
             f"row(s) {[int(i) for i in empty]} carry no finite observation at "
@@ -86,6 +107,15 @@ def standardise(raw: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
             "row of NaN is not missing data the filter can handle around, it is "
             "a series that never arrived -- check the alignment mask and the "
             "series' date range."
+        )
+    thin = np.flatnonzero(n_obs < MIN_OBS_TO_STANDARDISE)
+    if thin.size:
+        raise ValueError(
+            f"row(s) {[int(i) for i in thin]} carry fewer than "
+            f"{MIN_OBS_TO_STANDARDISE} finite observations "
+            f"({[int(n_obs[i]) for i in thin]}), so their standard deviation is "
+            "undefined and the scale below would be an invented 1.0. Build at a "
+            "later `asof`, where the series has started."
         )
     location = np.nanmean(raw, axis=1, keepdims=True)
     scale = np.nanstd(raw, axis=1, ddof=1, keepdims=True)

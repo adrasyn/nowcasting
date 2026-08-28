@@ -35,7 +35,7 @@ ahead of its release -- a monthly is dated to the first of its reference month
 and published about two months later, a quarterly to the LAST month of its
 quarter and published about three -- so cutting on the observation date admits
 data that had not been published at ``asof``: at
-``asof="2026-07-01"`` under the observation-date rule, seven of the fifteen
+``asof="2026-07-01"`` under the observation-date rule, six of the fourteen
 series carried a 2026-07-01 observation, and this repo pins the release date of
 one of them -- ``tests/test_au_fetch_rba.py`` records the 2026-07 commodity
 index as released 4 August 2026, five weeks after the vintage claimed to stop.
@@ -91,7 +91,7 @@ TWO GUARDS, NOT ONE
 ``check_freshness`` refuses a panel whose inputs have gone stale. The second
 guard is further down and refuses a *model*: :func:`state_space` raises
 :class:`CollapsedFactorError` when the fitted chain has left the nowcast target
-disconnected from the factor its monthly series feed. Half the sampler seeds
+disconnected from the factor its monthly series feed. 18 of 30 sampler seeds
 land there, the result runs and produces a plausible number, and that number is
 not a nowcast. Neither guard has a bypass flag.
 
@@ -166,31 +166,38 @@ DEFAULT_START = "1990-01-01"
 # space built from a sampler run may be used. See `CollapsedFactorError`.
 #
 # Measured over THIRTY seeds at n_gs=200, n_burn=100 on the 2026-06-01 vintage,
-# and on TWO panels -- the shipping one and a control with the `cpi` row cut
-# back to the live tier alone. Sixty chains in total.
+# and on THREE panels -- ninety chains in total.
 #
-# THERE ARE THREE GROUPS, NOT TWO, AND THE EARLIER TEN-SEED MEASUREMENT MISSED
-# THE MIDDLE ONE. On both panels three chains sit between the basins:
+# THERE ARE THREE GROUPS, NOT TWO, AND THE EARLIEST TEN-SEED MEASUREMENT MISSED
+# THE MIDDLE ONE. On every panel measured, chains sit between the basins:
 #
-#   control panel (28-obs cpi):  0.045..0.522 | 0.783 0.901 0.924 | 1.124..1.866
-#   shipping panel (103-obs cpi): 0.041..0.683 | 0.785 0.823 0.843 | 1.089..1.637
+#   15-series, 28-obs cpi:   0.045..0.522 | 0.783 0.901 0.924 | 1.124..1.866
+#   15-series, 103-obs cpi:  0.041..0.683 | 0.785 0.823 0.843 | 1.089..1.637
+#   14-series (shipping):    0.065..0.745 | 0.796 0.856       | 1.096..1.712
 #
-# The old floor of 0.75 ADMITTED that middle band on both panels: three chains
-# in thirty cleared the guard while sitting nowhere near the identified basin,
-# and a warm-started run begun from one would inherit it silently. 1.0 sits
-# inside the widest gap on BOTH panels (0.924->1.124 and 0.843->1.089), so it is
-# justified on two independent panels rather than on one ten-seed sample.
+# The old floor of 0.75 ADMITTED that middle band on all three: chains cleared
+# the guard while sitting nowhere near the identified basin, and a warm-started
+# run begun from one would inherit it silently. 1.0 sits inside the widest gap
+# on ALL THREE (0.924->1.124, 0.843->1.089 and 0.856->1.096), so it is justified
+# on three independent panels rather than on one ten-seed sample.
+#
+# The third panel is the one that ships: `cpi_trimmed` was dropped from the
+# registry on 2026-08-28 (see `nyfed/au/sources.py`), and the floor was
+# RE-MEASURED rather than carried over, because dropping a series changes which
+# seed lands where -- two of the three seeds pinned in the end-to-end gate had
+# swapped basins.
 #
 # It also has a reading, though the measurement is the justification: the
 # normalising series' loading is fixed at exactly 1.0, so the rule is that the
 # target must be at least as connected to the common factor as the series that
 # defines that factor's scale.
 #
-# Cost, disclosed: the `cpi` splice roughly doubles the COLD-START collapse
-# rate (9/30 -> 17/30 against this floor's predecessor). That is a property of
-# the starting lottery, not of the fitted model, and Plan C is warm-started for
-# exactly this reason -- it lands on the first vintage and the anchor fits,
-# where the guard already retries.
+# Cost, disclosed: the `cpi` splice roughly doubled the COLD-START collapse
+# rate (9/30 -> 17/30 against this floor's predecessor), and dropping
+# `cpi_trimmed` left it there (18/30). That is a property of the starting
+# lottery, not of the fitted model, and Plan C is warm-started for exactly this
+# reason -- it lands on the first vintage and the anchor fits, where the guard
+# already retries.
 COLLAPSED_GLOBAL_LOADING = 1.0
 
 
@@ -207,12 +214,12 @@ class CollapsedFactorError(Exception):
     worst seed measured, a one-sigma shock to the ENTIRE monthly panel across
     the target quarter moved it by 0.015pp.
 
-    Half the seeds land there. So this is raised rather than warned about: the
+    18 of 30 seeds land there. So this is raised rather than warned about: the
     whole point of this project's guards is to turn a plausible wrong number
     into a loud failure, and a number from a collapsed chain must not reach a
     reader.
 
-    Re-running with a different seed gets a usable chain about half the time.
+    Re-running with a different seed gets a usable chain 12 times in 30.
     That is a workaround, not a fix. The fix is a starting point that does what
     the NY Fed's fitted ``initval.mat`` does -- put the chain in the identified
     basin -- or a specification that does not make a 22-month factor compete
@@ -562,7 +569,7 @@ def estimate_short(
     n_gs: int = 200,
     n_burn: int = 100,
     n_thin: int = 1,
-    seed: int = 3,
+    seed: int = 4,
     spec_path=SPEC_PATH,
 ) -> GibbsResult:
     """A short sampler run on one assembled panel.
@@ -625,11 +632,11 @@ def state_space(
             "this chain settled in the basin where the target series is not "
             "connected to the panel, and any nowcast from it would be driven by "
             "the target's own dynamics rather than by the monthly data. "
-            "Measured over sixty chains (thirty seeds on each of two panels), "
-            "17 of 30 land below this floor on the shipping panel and 9 of 30 "
-            "on a control, and lengthening the chain to 2,000 sweeps does not "
-            "resolve it. See CollapsedFactorError for why a different seed is a "
-            "workaround and not a fix."
+            "Measured over ninety chains (thirty seeds on each of three "
+            "panels), 18 of 30 land below this floor on the shipping panel and "
+            "9 of 30 on the shortest-cpi control, and lengthening the chain to "
+            "2,000 sweeps does not resolve it. See CollapsedFactorError for why "
+            "a different seed is a workaround and not a fix."
         )
 
     latent = Latent(sigma=result.sigmas.mean(axis=2), s=result.ss.mean(axis=2))
@@ -701,7 +708,7 @@ def quick_nowcast(
     t_now: np.ndarray | None = None,
     n_gs: int = 200,
     n_burn: int = 100,
-    seed: int = 3,
+    seed: int = 4,
 ) -> float:
     """The nowcast for the first target quarter, in GDP's own units.
 
@@ -718,7 +725,7 @@ def quick_nowcast(
     An injected ``ssm`` has been through the same guard, because
     :func:`state_space` is the only thing in this module that builds one from a
     sampler run. The default seed is one that lands in the identified basin, but
-    a default is not a guard -- half the seeds collapse, so the guard is what
+    a default is not a guard -- most seeds collapse, so the guard is what
     makes this function safe to call with your own.
 
     ``ssm`` and ``t_now`` are injectable so that two panels can be compared

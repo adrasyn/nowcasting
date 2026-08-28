@@ -65,7 +65,7 @@ its VALUES, and Plan C inherits both halves.
 RELEASE INTERVALS ARE NOT ALWAYS THE FREQUENCY
 ----------------------------------------------
 ``RELEASE_INTERVAL_DAYS`` gives 31 days to a monthly and 91 to a quarterly, and
-for thirteen of the fifteen series the budget that produces ABSORBS the worst
+for twelve of the fourteen series the budget that produces ABSORBS the worst
 gap their recorded history contains -- 31 days for the monthlies, 92 for the
 quarterlies against a 91-day interval plus 21 days of slack. Two publishers skip
 a month on their ordinary calendar and would be refused for behaving exactly as
@@ -160,17 +160,37 @@ better: ~68% of household consumption against Retail Trade's ~33%, and a
 stronger pre-COVID GDP correlation in v2's panel notes (+0.29 vs +0.06). Do
 not add retail sales back without first checking whether ABS has resumed it.
 
-``cpi`` and ``cpi_trimmed`` locators point at catalogue 6401.0, not 6484.0.
-ABS retired the standalone "Monthly CPI Indicator" (6484.0) in favour of
-folding monthly data into the main "Consumer Price Index, Australia"
-(6401.0) collection from the October 2025 (pre-basis-change) release
-onward; 6484.0's series stop dead at 2025-09-01 and will never update. The
-replacement monthly, seasonally-adjusted analytical series (table 640106)
-only goes back to 2024-04-01 -- about 28 months of history as of this task,
-against 6484.0's ~8 years. That is a real short-history constraint on the
-Nominal block's normaliser and on the price factor generally; it is not a
-substitution of something close, it is what currently exists. Re-check ABS
-for a longer back series before this becomes a problem for estimation.
+``cpi`` locates catalogue 6401.0, not 6484.0, and it is the only price series
+in the registry. ABS retired the standalone "Monthly CPI Indicator" (6484.0)
+in favour of folding monthly data into the main "Consumer Price Index,
+Australia" (6401.0) collection from the October 2025 (pre-basis-change)
+release onward; 6484.0's series stop dead at 2025-09-01 and will never
+update. The replacement monthly, seasonally-adjusted analytical series
+(table 640106) only goes back to 2024-04-01. THE REGISTRY DOES NOT CARRY THE
+FIX FOR THAT: ``build_panel`` splices this locator onto 6484.0's ceased
+monthly indicator (``deflator.long_monthly_cpi``), which reaches 2017-09, so
+the panel row is ~103 observations even though this fetch returns ~28. Both
+tiers are seasonally adjusted All-groups index numbers and their monthly
+percentage changes correlate 0.92 over the 17-month overlap.
+
+NO ``cpi_trimmed`` ENTRY. The registry carried the 6401.0 monthly trimmed
+mean (``A130400381L``) as this panel's counterpart to the NY Fed's core CPI
+(``CPILFESL``) until it was dropped on 2026-08-28. It could not be spliced
+the way ``cpi`` was: 6484.0 published its trimmed mean only as a year-ended
+percentage rate (``A130184497K``), never as an index, and its EXCLUSION-based
+measures ("All groups CPI excluding volatile items") are a different
+construction from a trimmed mean. So the row was pinned at 2024-04 and it,
+alone, set the earliest vintage Plan C's backtest could build. MEASURED on the
+recorded vintage, before and after: earliest ``asof`` 2024-07-01 with the row,
+2021-05-01 without it -- about seven target quarters against about twenty.
+``test_the_earliest_buildable_vintage_is_set_by_job_ads`` pins both ends.
+
+The Nominal block keeps four other series (``exports``, ``imports``,
+``commodity_prices`` and its normaliser ``cpi``), so the block is identified
+without it; a fifth, less informative price series was not worth thirteen
+quarters of backtest. Add it back if ABS publishes a trimmed mean index with
+history, and re-measure the seeds in ``tests/test_au_end_to_end.py`` when you
+do -- dropping this row moved two of the three into different basins.
 
 ``commodity_prices`` locates ``"I2:GRCPAIAD"``: RBA statistical table I2
 carries 21 columns -- an all-items index and five sub-indices (rural,
@@ -362,10 +382,6 @@ AU_SERIES: tuple[SeriesSource, ...] = (
                  "abs", "6401.0:A130607789R", "m", 58,
                  "ABS 6401.0 CPI, Australia: June 2026 released 29/07/2026 (58 "
                  "days), July 2026 released 26/08/2026 (56)"),
-    SeriesSource("cpi_trimmed", "cpi_trimmed", "Monthly CPI trimmed mean",
-                 "abs", "6401.0:A130400381L", "m", 58,
-                 "ABS 6401.0, same release as `cpi`: June 2026 released "
-                 "29/07/2026"),
     # --- quarterly ---------------------------------------------------------
     SeriesSource("unit_labour_cost", "unit_labour_cost", "Unit labour cost",
                  "abs", "5206.0:A2433074L", "q", 94,

@@ -25,7 +25,7 @@ has no oracle and says so.
 | `nyfed/` | The Python port (the deliverable). |
 | `nyfed/run_us_reference.py` | `example_nowcast.m` end to end; the gate's runner. |
 | `nyfed/au/` | The Australian panel: fetch, deflate, guard, assemble. Nothing in `nyfed/` outside it knows about Australia. |
-| `model_spec_AU.csv` | The Australian model specification, 15 series over 5 blocks. |
+| `model_spec_AU.csv` | The Australian model specification, 14 series over 5 blocks. |
 | `nyfed_matlab/` | **Vendored MATLAB reference implementation. Read-only.** |
 | `tools/` | Octave fixture generation, `.mat` → `.npz` conversion, timing. |
 | `tests/` | Pytest suite. `tests/fixtures/*.npz` are committed. |
@@ -485,9 +485,9 @@ has gone stale; `quick_nowcast` raises `CollapsedFactorError` if the fitted
 chain left GDP disconnected from the panel. Neither has a bypass flag, and
 neither refusal is a bug — see below.
 
-### The 15 series
+### The 14 series
 
-`model_spec_AU.csv` and `nyfed/au/sources.py` carry the same 15 rows in the same
+`model_spec_AU.csv` and `nyfed/au/sources.py` carry the same 14 rows in the same
 order, and `assemble` refuses if they ever disagree — the panel is stacked from
 the registry and labelled from the spec, so a mismatch would attach every label,
 and `i_now`, to the wrong row.
@@ -504,21 +504,23 @@ and `i_now`, to the wrong row.
 | Exports | ABS 5368.0 | `A2718577A` | Nominal | `pch` |
 | Imports | ABS 5368.0 | `A2718603V` | Nominal | `pch` |
 | RBA Commodity Prices (A$) | RBA table I2 | `GRCPAIAD` | Nominal | `pch` |
-| Monthly CPI | ABS 6401.0 | `A130607789R` | Nominal* | `pch` |
-| Monthly CPI trimmed mean | ABS 6401.0 | `A130400381L` | Nominal | `pch` |
+| Monthly CPI | ABS 6401.0, **spliced to ceased 6484.0** | `A130607789R` | Nominal* | `pch` |
 | Unit labour cost | ABS 5206.0 | `A2433074L` | Labor | `pca` |
 | Real gross domestic income | ABS 5206.0 | `A2304410X` | Global | `pca` |
 | **Real GDP** (the target) | ABS 5206.0 | `A2304402X` | Global | `pca` |
 
 `*` marks the series that normalises a block. Every series also loads the Global
-factor, and all but the four price/commodity rows load the COVID factor, which
+factor, and all but the three price/commodity rows load the COVID factor, which
 `nyfed/au/restrict.py` confines to March 2020 – December 2021.
 
-Two series a reader may expect are absent, both deliberately and both documented
-in `sources.py`: **retail sales** (ABS ceased Retail Trade after the June 2025
-release; household spending covers the ground better) and the **Internet Vacancy
-Index** (v2 has never once fetched it — the JSA host is firewalled from v2's
-runner — and it duplicates job ads anyway).
+Three series a reader may expect are absent, all deliberately and all documented
+in `sources.py`: the **monthly CPI trimmed mean** (dropped 2026-08-28 — it began
+2024-04 with no back series to splice onto, and alone held Plan C's backtest to
+about seven quarters; the NY Fed's core-CPI row it mirrored is a luxury FRED's
+history affords and ours does not), **retail sales** (ABS ceased Retail Trade
+after the June 2025 release; household spending covers the ground better) and the
+**Internet Vacancy Index** (v2 has never once fetched it — the JSA host is
+firewalled from v2's runner — and it duplicates job ads anyway).
 
 ### Household spending is deflated, and that is load-bearing
 
@@ -611,7 +613,7 @@ release outright still sits inside its budget and the guard stops guarding.
 `observation date + publication_lag_days` — falls after `asof`. Cutting on the
 observation's own date instead, which this code did until the first review of
 Task 10, admits data nobody had yet: up to nine weeks of it on `gdp`. At
-`asof="2026-07-01"` seven of the fifteen series carried a 2026-07-01
+`asof="2026-07-01"` six of the fourteen series carried a 2026-07-01
 observation, and this repo pins the release date of one of them — the 2026-07
 commodity index came out on 4 August 2026.
 
@@ -682,7 +684,7 @@ That fourth point is a *consistency* check, not a leak detector, and the test
 says so. Writing April's observation into March's column — an off-by-one in
 `panel._align` — leaves the ratio above the asserted threshold at **all six
 seeds measured**, and at two of them makes it look better. One post-target
-month, published by eight of fifteen series, carries too little signal for the
+month, published by seven of fourteen series, carries too little signal for the
 statistic to separate the cases. The structural no-leak guarantee comes from the
 Octave-pinned quarterly aggregation in `construct_ssm` plus the panel's
 deterministic alignment and release-date tests. A vintage-pair leakage test
@@ -700,36 +702,66 @@ standardised sum of squares**, including all five of its largest absolute
 values. A factor confined to that window can fit the biggest moves in the target
 series almost perfectly.
 
-**The mechanism is a two-sided handover.** When GDP's Global loading collapses
-(1.334 → 0.011 between two seeds) its COVID loading rises only 1.036 → 1.318 —
-nowhere near enough, since the COVID factor is zero outside its 22 months and
-the other 135 observations still need explaining. What takes them is GDP's own
-idiosyncratic stochastic volatility, and it rises **outside** the window too:
-0.875 → 1.107 between those seeds, 0.788 → 1.119 between the two basins' means
-over ten seeds. COVID takes the in-window variance; GDP's own error takes the
-out-of-window variance the Global loading used to carry. The result is a series
-explained by itself.
+**The mechanism is a two-sided handover, and one side is far more reliable
+than the other.** Re-measured on 2026-08-28 over seven collapsed and six
+identified seeds on the shipping panel:
+
+| basin | Global | COVID | GDP's σ outside the window |
+| --- | --- | --- | --- |
+| collapsed | 0.169 | 0.798 | 1.239 |
+| identified | 1.429 | 0.751 | 0.884 |
+
+The COVID factor is zero outside its 22 months, so it cannot absorb what the
+Global loading drops — 135 observations still need explaining, and what takes
+them is GDP's own idiosyncratic stochastic volatility, up ~40% between the basin
+means. Every collapsed seed measured sits above the identified basin's mean of
+0.884; the two groups do not separate cleanly seed by seed (the highest
+identified value, 1.143, exceeds the two lowest collapsed ones, 1.017 and 1.020),
+which is why this is asserted as a basin-mean difference and not as a classifier.
+The result is a series explained by itself.
+
+The COVID half of the handover is weaker than it first looked: 0.798 against
+0.751 is barely a difference, and two of the seven collapsed seeds load the
+COVID factor *negatively*. Inside the identified basin the COVID loading falls
+as the Global loading rises (1.23 at Global 1.10, down to 0.23 at Global 1.71),
+which is the competition the premise describes; across the collapse it mostly
+does not.
 
 A likely enabler: the Global factor is normalised by household spending, which
 starts in 2012, so only **164 of the panel's 438 months** pin that factor's
 scale.
 
 **These are separate basins, not tails of one distribution.** A chain picks one
-in its first sweeps and stays. Over 400 stored draws GDP's Global loading has a
-5–95% range of −0.45…0.31 at seed 321 and 1.22…1.55 at seed 1, with each chain's
-first and last fifty draws in the same place. Lengthening to 2,000 sweeps does
-not resolve it. Five of ten seeds land in each basin.
+in its first sweeps and stays. Over the 200 stored draws at each of the two seeds
+the gate runs, GDP's Global loading has a 5–95% range of −0.150…0.293 at the
+collapsed seed (first and last fifty draws averaging 0.051 and 0.075) against
+1.106…1.631 at the identified one (1.383 and 1.311). The ranges do not overlap
+and neither chain drifts. Lengthening to 2,000 sweeps does not resolve it.
 
 **So the model refuses.** `state_space` — the one funnel from a sampler run to a
 state space — raises `CollapsedFactorError` when the target's Global loading is
-at or below **0.75**, a floor measured between the two basins: the five
-collapsed chains gave 0.011…0.554 and the five identified ones 1.192…1.348.
-Without it, a caller taking the library defaults got a plausible 2.83% number
-from a model whose response to its *entire* monthly panel was 0.015pp. The
-default seed was changed too, but a lucky default is not a guard — half the
-seeds collapse, and the next caller passes their own.
+at or below **1.0**. That floor is measured over **thirty seeds on each of three
+panels**, ninety chains:
 
-Re-running with another seed gets a usable chain about half the time. That is a
+| panel | collapsed | between | identified |
+| --- | --- | --- | --- |
+| 15-series, 28-obs `cpi` | 0.045…0.522 | 0.783 0.901 0.924 | 1.124…1.866 |
+| 15-series, 103-obs `cpi` | 0.041…0.683 | 0.785 0.823 0.843 | 1.089…1.637 |
+| **14-series (shipping)** | 0.065…0.745 | 0.796 0.856 | 1.096…1.712 |
+
+**There are three groups, not two**, and an early ten-seed measurement missed the
+middle one — which is how the floor first got set at 0.75, *inside* the band it
+was meant to exclude. 1.0 sits in the widest gap on all three panels. 18 of 30
+seeds land below it on the shipping panel.
+
+Without the guard, a caller taking the library defaults got a plausible 2.83%
+number from a model whose response to its *entire* monthly panel was 0.015pp.
+The default seed was changed too, but a lucky default is not a guard — over half
+the seeds collapse, and the next caller passes their own. (The default is also
+panel-dependent: dropping `cpi_trimmed` moved seed 3 from 1.562 to 0.856, so the
+gate's three pinned seeds were re-measured rather than carried forward.)
+
+Re-running with another seed gets a usable chain 12 times in 30. That is a
 workaround. The NY Fed does not face the coin flip at all because `initval.mat`
 ships a *fitted* starting point that puts the chain in the right basin, and
 Australia starts from a bland one. **Plan C needs a starting point with that

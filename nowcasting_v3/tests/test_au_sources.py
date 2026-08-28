@@ -1,6 +1,6 @@
 """The Australian panel's registry and spec CSV.
 
-These tests are the contract every later task builds on: fifteen series,
+These tests are the contract every later task builds on: fourteen series,
 frequency-sorted, mirroring the NY Fed spec values series by series, with
 exactly one normalising series per factor.
 """
@@ -26,6 +26,13 @@ FRED_SPEC_PATH = Path(__file__).resolve().parents[1] / "nyfed_matlab" / "model_s
 
 # Every AU series and the NY Fed series its spec row is copied from. Keep
 # this in sync with the mirroring table in the task brief.
+#
+# NOT MIRRORED, DELIBERATELY: the NY Fed runs four price series (headline
+# and core, for both CPI and PCE). Australia publishes no monthly PCE
+# deflator, so this panel could only ever mirror the CPI pair -- and the
+# core half (`cpi_trimmed` <- CPILFESL) was dropped on 2026-08-28 because
+# it had no back history to splice and alone held the earliest buildable
+# vintage at 2024-07. See the `cpi_trimmed` note in `nyfed/au/sources.py`.
 NY_FED_COUNTERPART = {
     "employment": "PAYEMS",
     "unemployment_rate": "UNRATE",
@@ -38,7 +45,6 @@ NY_FED_COUNTERPART = {
     "imports": "BOPTIMP",
     "commodity_prices": "IQ",
     "cpi": "CPIAUCSL",
-    "cpi_trimmed": "CPILFESL",
     "unit_labour_cost": "PRS85006112",
     "gdi": "A261RX1Q020SBEA",
     "gdp": "GDPC1",
@@ -69,8 +75,8 @@ KNOWN_DEVIATIONS = {
 }
 
 
-def test_the_registry_has_fifteen_series():
-    assert len(AU_SERIES) == 15
+def test_the_registry_has_fourteen_series():
+    assert len(AU_SERIES) == 14
     assert all(isinstance(s, SeriesSource) for s in AU_SERIES)
 
 
@@ -95,8 +101,8 @@ def test_the_spec_csv_row_order_matches_the_registry():
 
 def test_the_spec_csv_loads_without_tripping_the_panel_order_guard():
     spec = load_spec(SPEC_PATH)
-    assert len(spec.series_id) == 15
-    assert spec.blocks.shape == (15, 5)
+    assert len(spec.series_id) == 14
+    assert spec.blocks.shape == (14, 5)
 
 
 def test_gdp_is_the_last_row_and_is_quarterly():
@@ -147,7 +153,7 @@ def test_spec_values_mirror_the_us_counterpart(series_id, transformation, prior)
 
 
 def test_every_row_mirrors_its_ny_fed_counterpart_exactly():
-    """The mirroring rule, checked cell-by-cell for all fifteen rows.
+    """The mirroring rule, checked cell-by-cell for all fourteen rows.
 
     Every AU spec value is supposed to be copied from its NY Fed counterpart
     in ``model_spec_FRED.csv``: Frequency, Trend, all five block columns,

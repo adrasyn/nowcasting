@@ -10,7 +10,6 @@ exports,Exports,m,0,1,0,1,0,1,1,Millions of Dollars,pch,International Trade
 imports,Imports,m,0,1,0,1,0,1,1,Millions of Dollars,pch,International Trade
 commodity_prices,RBA Index of Commodity Prices,m,0,1,0,1,0,0,0,Index,pch,International Trade
 cpi,Monthly CPI,m,0,1,0,100,0,0,0,Index,pch,Prices
-cpi_trimmed,Monthly CPI trimmed mean,m,0,1,0,1,0,0,0,Index,pch,Prices
 unit_labour_cost,Unit labour cost,q,0,1,0,0,1,0,0,Index,pca,Labor
 gdi,Real gross domestic income,q,1,1,0,0,0,1,1,Millions of Dollars,pca,Income
 gdp,Real gross domestic product,q,1,1,0,0,0,1,1,Millions of Dollars,pca,Income

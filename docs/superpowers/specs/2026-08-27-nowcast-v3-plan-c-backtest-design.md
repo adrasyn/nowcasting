@@ -215,13 +215,36 @@ not the appendix.
 **How long may Phase 1 run?** That is the whole decision. Everything else
 follows from it.
 
-Why it is the only one: how far back the backtest reaches is purely a cost
-choice, not a data choice. The panel's series start at wildly different dates
-(`gdp` 1959, `aig_pmi` 2001, `household_spending` 2012, `job_ads` 2021, both
-CPI series 2024) and the Kalman filter handles a late start natively -- an
-unobserved month is simply unobserved. So no window start "keeps every series
-alive", nothing has to be trimmed to make one, and reach is bought with
-wall-clock alone.
+Why it is the only one: inside a hard floor set by the data, how far back the
+backtest reaches is a cost choice. The panel's series start at wildly different
+dates (`gdp` 1959, `aig_pmi` 2001, `household_spending` 2012, `job_ads` 2021)
+and the Kalman filter handles a late start natively -- an unobserved month is
+simply unobserved. But a series that has not started at all is a different
+thing: `check_freshness` refuses a vintage where a registered series has no
+observation, and `standardise` refuses a row too thin to have a defined scale.
+
+**THE FLOOR IS 2021-05, MEASURED.** ANZ-Indeed `job_ads` begins 2021-01, and
+that single row sets it:
+
+| asof | outcome |
+|---|---|
+| 2021-02 | `StaleSeriesError`: `job_ads` has nothing released yet |
+| 2021-03 | one observation, which `chg` consumes -- an all-NaN row |
+| 2021-04 | one finite observation; `ddof=1` sd undefined |
+| **2021-05** | **two observations: the first vintage that builds** |
+
+Two is the arithmetic floor, not an informativeness one. `job_ads`' own scale
+reads 0.50 at n=2 and 2.31 at n=3, settling near 6.3 only from about n=7
+(2021-10), so a window starting at 2021-05 spends its first months
+standardising one row against a number that is still moving. **Recommended
+start: 2021-10 or later**, which costs two quarters and buys a stable panel.
+Either way, 2022+ is comfortably inside the floor.
+
+This floor moved on 2026-08-28. `cpi_trimmed` began 2024-04 with no back series
+to splice, so it, alone, put the floor at **2024-07** -- about seven target
+quarters, which would not have covered the post-COVID window this plan is for.
+Dropping it from the registry moved the floor to 2021-05 and the reachable
+window from ~7 quarters to ~20.
 
 Illustrative arithmetic, at four as-of dates per target quarter. **The warm
 speed-up is a guess until Phase 0 measures it** -- these are here to show the
@@ -230,10 +253,13 @@ shape of the trade, not to promise a number:
 | Budget | Fits it buys (if warm is ~10x cold) | What that covers |
 |---|---|---|
 | One overnight run (~10 h) | ~65 | **17 quarters, 2022+** -- the honest post-COVID window |
-| A weekend (~48 h) | ~320 | **49 quarters** -- full like-for-like with v2's backtest |
+| A weekend (~48 h) | ~320 | more fits than the floor allows: **20 quarters is the whole reachable window** |
 
 The recommendation is to start with the overnight budget. Post-COVID is the
 window that decides the Q1 2026 question, it is the window v2's own sweep
 treats as honest, and Phase 0 will have replaced the 10x guess with a measured
-figure before anything is committed. Extending to the full 49 quarters is then
-a second run, not a redesign.
+figure before anything is committed. NOTE THAT THE WEEKEND ROW NO LONGER BUYS
+REACH: 49 quarters would need data back to 2014 and the floor is 2021. Beyond
+the overnight budget the money goes into more as-of dates per quarter, or more
+seeds per fit, not further back. Full like-for-like with v2's 49-quarter
+backtest is NOT available to v3 while `job_ads` is in the panel.

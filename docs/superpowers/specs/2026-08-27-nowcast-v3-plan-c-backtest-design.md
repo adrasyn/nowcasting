@@ -178,17 +178,64 @@ and is unmeasured warm.
 So the work is phased, and **the window is sized after measurement, not
 before**:
 
-**Phase 0 — measure (small, cheap, decides everything after it).**
-On ~6 consecutive vintages:
-- cold vs warm wall-clock per fit;
-- whether the warm start lands in the identified basin every time;
-- the chain length a warm start actually needs, against the cold default;
-- warm vs cold nowcast agreement on the same vintage.
+**Phase 0 — measure (small, cheap, decides everything after it). DONE
+2026-08-28.** Ran as `nowcasting_v3/tools/plan_c_phase0.py`; 146 fits, 122
+minutes, raw rows in `docs/measurements/2026-08-28-plan-c-phase0.csv`. Three
+blocks of six consecutive vintages (2022, 2024, 2026) rather than one, because a
+warm start that holds in 2026 says little about 2022 where `job_ads` is months
+old.
 
-Phase 0's output is a measured cost per vintage and a go/no-go on the warm
-start. If warm starts do not reliably hold the basin, Plan C stops here and the
-decision returns to the spec change (the COVID window carrying 64.5% of panel
-variance) rather than routing around it.
+**GO. The warm start held the identified basin 60 times out of 60** — every
+block, every vintage, every chain length from 50 sweeps up. Cold held 28 of 75
+(37%).
+
+| Question | Answer |
+|---|---|
+| cold vs warm wall-clock per fit | **identical per sweep** (0.096 vs 0.097 s). The saving is fewer sweeps and no retry lottery, not faster sweeps. |
+| does warm hold the basin every time | **yes, 60/60.** Cold: 28/75. |
+| chain length a warm start needs | **200 sweeps** (`n_gs=200, n_burn=100`), 28 s/vintage. |
+| warm vs cold nowcast agreement | **±0.03pp q/q at 200+ sweeps** in 2024 and 2026, against a fresh 3,000-sweep cold anchor. |
+
+Warm minus the closing cold anchor, in pp quarter-on-quarter:
+
+| `n_gs` | 2022 block | 2024 block | 2026 block |
+|---|---|---|---|
+| 50 | +0.004 | -0.068 | +0.001 |
+| 100 | -0.467 | -0.147 | -0.031 |
+| **200** | -0.442 | **-0.007** | **-0.030** |
+| 500 | -0.165 | +0.010 | -0.039 |
+
+200 is the floor: 100 undershoots by up to 0.15pp, which is the same order as
+the error the backtest exists to measure. 500 buys nothing over 200.
+
+**THE RETRY LOTTERY IS THE REAL COST, AND IT IS PER-VINTAGE.** Six cold anchors
+took eleven attempts and 55 minutes between them. No seed travels: seed 4 was
+identified at both 2022 anchors and collapsed at 2024-01, 2024-06 and 2025-12;
+seed 13 was identified at 2024-01 and collapsed at 2024-06. A cold backtest
+re-runs the lottery at every vintage with no seed it can trust in advance. That
+is what the warm start removes, and it is a larger cost than the sweep count
+suggests: 28 s warm against 21 minutes for the 2024-06 anchor, a factor of 45.
+
+**2022 IS NOT A USABLE WINDOW, and this is the finding that changes the plan.**
+Nowcast levels by block, identified warm fits, pp q/q:
+
+| block | range | median |
+|---|---|---|
+| 2022 | 0.69 .. 4.12 | **2.24** |
+| 2024 | 0.41 .. 0.73 | 0.57 |
+| 2026 | 0.51 .. 0.65 | 0.59 |
+
+Australia grew about 0.7% q/q in 2022Q1. The 2024 and 2026 blocks are
+plausible; 2022 is not, and it is also the only block where warm and cold
+disagree (0.44pp q/q at 200 sweeps, against 0.03pp elsewhere). The likely cause
+is structural rather than a warm-start defect: `restrict.py` holds the COVID
+factor active to December 2021, so a 2022 vintage sits on its edge, and
+`job_ads` is barely a year old there.
+
+**So the evaluation window starts 2023-01, not 2022-01.** That costs four target
+quarters of twenty. Including 2022 would report v3 missing badly on the quarters
+where the model is structurally weakest, which says nothing about the Q1 2026
+question this plan exists to answer.
 
 **Phase 1 — size and run.** Choose the window from the measured cost and a
 stated wall-clock budget. Report the window that was affordable, and say
@@ -210,10 +257,24 @@ not the appendix.
 | Pseudo-real-time flatters v3 | stated in the headline; v2 is scored identically so the comparison stays fair |
 | Deflator tier silently skipped | `Panel.deflator_skipped` is now carried out; record it per vintage |
 
-## The one open question for James
+## The open question, and why Phase 0 closed it
 
-**How long may Phase 1 run?** That is the whole decision. Everything else
-follows from it.
+**How long may Phase 1 run?** This was the whole decision when the spec was
+written. **Phase 0's measurement removed it.**
+
+At 28 seconds per warm vintage, the entire reachable window is affordable:
+
+| | vintages | warm fits | anchors (every 8th) | total |
+|---|---|---|---|---|
+| 2023-01 .. 2026-05, monthly | 41 | 41 x 28 s = 19 min | 6 x ~9 min = 54 min | **~1.2 h** |
+
+There is no budget trade-off left to make, because the thing that was expensive
+turned out to be the cold-start retry lottery and the warm start does not pay
+it. Phase 1 should run the whole window rather than sizing one. The remaining
+cost is anchors, and how often to place them is a precision choice, not a reach
+choice -- every 8th vintage costs under an hour and every 4th costs under two.
+
+What follows is kept for the record of how the window was bounded.
 
 Why it is the only one: inside a hard floor set by the data, how far back the
 backtest reaches is a cost choice. The panel's series start at wildly different
@@ -246,20 +307,19 @@ quarters, which would not have covered the post-COVID window this plan is for.
 Dropping it from the registry moved the floor to 2021-05 and the reachable
 window from ~7 quarters to ~20.
 
-Illustrative arithmetic, at four as-of dates per target quarter. **The warm
-speed-up is a guess until Phase 0 measures it** -- these are here to show the
-shape of the trade, not to promise a number:
+SUPERSEDED BY MEASUREMENT, kept because the guess it contained was wrong in an
+instructive direction. The draft assumed warm might be "~10x cold" and that an
+overnight run would buy 17 quarters. Measured, warm at 200 sweeps is ~45x a cold
+anchor, and the whole window costs about an hour. The trade-off table below no
+longer describes a decision:
 
 | Budget | Fits it buys (if warm is ~10x cold) | What that covers |
 |---|---|---|
-| One overnight run (~10 h) | ~65 | **17 quarters, 2022+** -- the honest post-COVID window |
-| A weekend (~48 h) | ~320 | more fits than the floor allows: **20 quarters is the whole reachable window** |
+| One overnight run (~10 h) | ~65 | 17 quarters, 2022+ |
+| A weekend (~48 h) | ~320 | more fits than the floor allows |
 
-The recommendation is to start with the overnight budget. Post-COVID is the
-window that decides the Q1 2026 question, it is the window v2's own sweep
-treats as honest, and Phase 0 will have replaced the 10x guess with a measured
-figure before anything is committed. NOTE THAT THE WEEKEND ROW NO LONGER BUYS
-REACH: 49 quarters would need data back to 2014 and the floor is 2021. Beyond
-the overnight budget the money goes into more as-of dates per quarter, or more
-seeds per fit, not further back. Full like-for-like with v2's 49-quarter
-backtest is NOT available to v3 while `job_ads` is in the panel.
+Two things about reach do still hold. 49 quarters would need data back to 2014
+and the floor is 2021, so full like-for-like with v2's backtest is NOT available
+to v3 while `job_ads` is in the panel. And beyond the reachable window the money
+goes into more as-of dates per quarter, more seeds per fit, or more frequent
+anchors -- not further back.

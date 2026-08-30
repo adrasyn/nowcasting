@@ -192,9 +192,19 @@ __all__ = [
 # monthly loadings themselves stay flat at 0.24..0.27. The factor keeps its
 # character and is simply better identified.
 #
-# WHAT THIS DOES NOT FIX: responsiveness. Every start still answers inside a
-# narrow band (1980 spans 0.61..0.69 pp q/q) while the outcomes it is predicting
-# span 0.27..0.87. Identification and responsiveness are two different faults.
+# RESPONSIVENESS: this comment claimed on 2026-08-30 that the panel start fixes
+# identification and "does not fix" responsiveness, citing a 0.61..0.69 band.
+# THAT INFERENCE WAS WRONG, and wrong in a way worth recording. The sweep above
+# runs five vintages at 2026-01..2026-05, which between them cover only TWO
+# target quarters -- a narrow band was guaranteed by the design, not measured
+# from it. Over the full backtest (`tools/plan_c_backtest.py`, 40 vintages, 14
+# target quarters) the 1980 panel spans 0.27..0.80 with sd 0.119.
+#
+# It is still UNDER-DISPERSED -- the outcomes have sd 0.265 -- and that is the
+# real residual: v3 wins on accuracy by being smooth, not by tracking. v2 is
+# closer to the right variability (sd 0.233) and less accurate (MAE 0.340
+# against 0.242). Under-dispersion is a smaller and different fault than the
+# flat line this comment originally described.
 DEFAULT_START = "1980-01-01"
 
 # The floor the nowcast target's Global loading has to clear before a state

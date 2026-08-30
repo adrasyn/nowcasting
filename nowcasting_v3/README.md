@@ -816,10 +816,18 @@ while theirs fell. Ratio of GDP's loading to the mean monthly loading, by start:
 No trend, and the monthly loadings themselves stay flat at 0.24–0.27. The factor
 keeps its character and is simply better identified.
 
-**What this does not fix: responsiveness.** Every start still answers inside a
-narrow band — 1980 spans 0.61–0.69 pp q/q while the outcomes it predicts span
-0.27–0.87. Identification and responsiveness are two different faults, and only
-the first one moved.
+**Responsiveness: an earlier version of this section was wrong.** It claimed the
+panel start fixes identification but not responsiveness, citing a 0.61–0.69
+band. That band came from five vintages covering only *two* target quarters — it
+was guaranteed by the design of the sweep, not measured from the model. Over the
+full backtest (40 vintages, 14 target quarters) the 1980 panel spans 0.27–0.80,
+sd 0.119.
+
+The model is still **under-dispersed** — outcomes have sd 0.265 — and that is
+the real residual: v3 wins on accuracy by being smooth rather than by tracking.
+v2 has closer-to-right variability (sd 0.233) and worse accuracy (MAE 0.340 vs
+0.242). Under-dispersion is a smaller and different fault than the flat line
+originally described here.
 
 **Series *length* is not a lever, and was checked separately**
 (`tools/series_length_test.py`). Cutting `job_ads` from 62 observations to 26

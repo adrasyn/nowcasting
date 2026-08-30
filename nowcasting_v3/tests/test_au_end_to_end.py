@@ -172,10 +172,28 @@ TARGET_QUARTER = (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-03-01"))
 # testing the pipeline rather than the coin flip. If the seed changes,
 # `test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor` fails and
 # names the reason.
-N_GS, N_BURN, SEED = 200, 100, 4      # 1.430 on the shipping panel
+N_GS, N_BURN, SEED = 200, 100, 4      # 1.413 on the shipping panel
 
-# A seed that lands in the OTHER basin, used to exercise the collapse guard.
-COLLAPSED_SEED = 14                   # 0.075 -- unambiguously collapsed
+# THE SHIPPING PANEL IS NO LONGER BIMODAL. Re-measured on 2026-08-30, when
+# `DEFAULT_START` moved from 1990 to 1980 (see `nyfed/au/build.py` for the
+# evidence): THIRTY of thirty seeds land in the identified basin, sorted
+#
+#   1.393 1.413 1.417 1.452 1.472 1.489 1.504 1.524 1.548 1.557 1.565 1.568
+#   1.569 1.583 1.596 1.645 1.651 1.652 1.661 1.679 1.703 1.737 1.768 1.780
+#   1.817 1.839 1.849 1.858 1.952 2.049
+#
+# against the 1990 panel's 18-collapsed/12-identified split. There is no second
+# basin and no middle band left to sample: the lowest chain sits 0.39 above the
+# floor. The COVID window's share of GDP's standardised variation falls from
+# 64.5% to 48.2% with the extra forty quarters, and that is enough.
+#
+# THE GUARD IS KEPT AND STILL TESTED, on `legacy_panel` below. A guard that
+# cannot fire on today's panel is not a dead guard -- it is one whose failure
+# mode this panel happens to avoid, and the failure mode is one vintage or one
+# spec change away from returning. `COLLAPSED_SEED` and `MIDDLE_BAND_SEED` are
+# measurements of THAT panel, not this one.
+COLLAPSED_SEED = 14                   # 0.075 on `legacy_panel` -- collapsed
+LEGACY_START = "1990-01-01"           # where the panel opened until 2026-08-30
 
 # The Global block, column 0 of `spec.blocks`.
 I_GLOBAL = 0
@@ -199,13 +217,34 @@ def fitted(panel):
 
 
 @pytest.fixture(scope="module")
-def collapsed_result(panel):
-    """One chain at seed 321, which lands in the collapsed basin.
+def legacy_panel() -> Panel:
+    """The panel as it opened until 2026-08-30: 1990, not 1980.
+
+    A REGRESSION FIXTURE, not a second production path. The collapse guard
+    protects against a chain that leaves the target disconnected from the panel,
+    and on the shipping panel that no longer happens at any of thirty seeds --
+    so the guard has nowhere to demonstrate itself. Deleting its tests because
+    the current panel is healthy would leave the guard unexercised until the day
+    it matters. This panel is where it fires.
+    """
+    return build_panel(asof=ASOF, start=LEGACY_START, vintage=VINTAGE)
+
+
+@pytest.fixture(scope="module")
+def legacy_identified_result(legacy_panel):
+    """Seed 4 on the legacy panel: 1.430, the identified basin."""
+    return estimate_short(legacy_panel, n_gs=N_GS, n_burn=N_BURN, seed=SEED)
+
+
+@pytest.fixture(scope="module")
+def collapsed_result(legacy_panel):
+    """Seed 14 on the legacy panel: 0.075, unambiguously collapsed.
 
     Shared by the bimodality measurement and the collapse-guard test so that the
     two cost a single sampler run between them.
     """
-    return estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=COLLAPSED_SEED)
+    return estimate_short(legacy_panel, n_gs=N_GS, n_burn=N_BURN,
+                          seed=COLLAPSED_SEED)
 
 
 def _with_data(panel: Panel, Y: np.ndarray) -> Panel:
@@ -959,8 +998,18 @@ def test_the_gate_runs_in_the_basin_where_gdp_loads_the_global_factor(panel, spe
 
 
 @pytest.mark.slow
-def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_result):
-    """A finding, pinned as a measurement so it cannot be mistaken for noise.
+def test_the_gdp_loading_is_bimodal_across_seeds(
+    legacy_panel, spec, legacy_identified_result, collapsed_result
+):
+    """The finding that moved `DEFAULT_START`, kept as the record of why.
+
+    THIS TEST RUNS ON ``legacy_panel`` (1990), NOT ON WHAT SHIPS. Every number
+    below was true of the panel this project ran on until 2026-08-30, and none
+    of it is true of the 1980 panel -- see
+    ``test_the_shipping_panel_is_not_bimodal``. It is kept because the mechanism
+    is still latent: the COVID window did not go away, its share of GDP's
+    variation merely fell from 64.5% to 48.2%, and a future spec or vintage that
+    pushes it back up brings all of this with it.
 
     THE PREMISE, measured on the panel rather than asserted: GDP loads only the
     Global factor and the COVID factor; the COVID factor is active for 22 months
@@ -1017,6 +1066,7 @@ def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_
     point with that job, or a spec that does not make a 22-month factor compete
     with the Global factor for the target series.
     """
+    panel = legacy_panel
     n, n_f = spec.blocks.shape
     i_gdp, i_covid = panel.series_id.index("gdp"), spec.block_names.index("COVID")
     window = (panel.dates >= COVID_START) & (panel.dates <= COVID_END)
@@ -1031,7 +1081,7 @@ def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_
     largest = np.argsort(-np.abs(np.where(observed, row, 0.0)))[:5]
     assert window[largest].all()
 
-    identified_result, _, _ = fitted
+    identified_result = legacy_identified_result
     summaries = {}
     for name, result in (("identified", identified_result),
                          ("collapsed", collapsed_result)):
@@ -1072,30 +1122,97 @@ def test_the_gdp_loading_is_bimodal_across_seeds(panel, spec, fitted, collapsed_
 
 
 @pytest.mark.slow
+def test_the_shipping_panel_is_not_bimodal(panel, spec, fitted):
+    """The other half of the finding above, and the reason the panel moved.
+
+    Thirty seeds on the 1980 panel, sorted, ALL identified:
+
+      1.393 1.413 1.417 1.452 1.472 1.489 1.504 1.524 1.548 1.557 1.565 1.568
+      1.569 1.583 1.596 1.645 1.651 1.652 1.661 1.679 1.703 1.737 1.768 1.780
+      1.817 1.839 1.849 1.858 1.952 2.049
+
+    against the legacy panel's 18 collapsed and 12 identified. No second basin,
+    no middle band, and the lowest chain sits 0.39 above the floor.
+
+    THIS TEST DOES NOT RE-RUN THIRTY SEEDS -- that is fifteen minutes for a
+    number already recorded above and in `nyfed/au/build.py`. It runs the two
+    seeds that were CHOSEN because they fail on the legacy panel:
+    ``COLLAPSED_SEED`` (0.075 there) and ``MIDDLE_BAND_SEED`` (0.856 there). If
+    the shipping panel's health were an artefact of seed selection, these two
+    are exactly where it would show. Both clear the floor here, and by a
+    distance.
+    """
+    result, _, _ = fitted
+    n, n_f = spec.blocks.shape
+    i_gdp = panel.series_id.index("gdp")
+
+    def loading(res):
+        par = map_parameter(np.median(res.params, axis=1), (n, n_f, P_F, P_E))
+        return float(par.Lambda[i_gdp, I_GLOBAL])
+
+    at_gate = loading(result)
+    assert at_gate > COLLAPSED_GLOBAL_LOADING, f"SEED {SEED} gives {at_gate:.3f}"
+
+    for seed, on_legacy in ((COLLAPSED_SEED, 0.075), (MIDDLE_BAND_SEED, 0.856)):
+        got = loading(estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=seed))
+        assert got > COLLAPSED_GLOBAL_LOADING, (
+            f"seed {seed} gives {got:.3f} on the shipping panel, at or below the "
+            f"{COLLAPSED_GLOBAL_LOADING} floor. It gives {on_legacy} on the "
+            "legacy panel, and the point of this test is that the 1980 start "
+            "rescues it. If that has stopped being true, re-measure the thirty "
+            "seeds before trusting anything else in this module."
+        )
+
+    # The premise behind all of it, measured rather than asserted: the extra
+    # forty quarters are what shrink the COVID window's grip on the target.
+    window = (panel.dates >= COVID_START) & (panel.dates <= COVID_END)
+    row = panel.Y[i_gdp]
+    observed = np.isfinite(row)
+    assert observed.sum() == 183, "GDP's observation count has moved"
+    share = np.nansum(row[observed & window] ** 2) / np.nansum(row[observed] ** 2)
+    assert 0.45 < share < 0.52, (
+        f"the COVID window carries {share:.1%} of GDP's variation on the "
+        "shipping panel; it was 64.5% at the 1990 start and 48.2% when the "
+        "start moved to 1980"
+    )
+
+
+@pytest.mark.slow
 def test_a_collapsed_chain_is_refused_rather_than_turned_into_a_number(
-    panel, collapsed_result
+    panel, legacy_panel, collapsed_result
 ):
     """The guard the re-review asked for, and the reason it is not just a default.
 
-    ``estimate_short`` and ``quick_nowcast`` used to default to seed 321 -- the
-    seed this module's own bimodality test asserts lands in the collapsed basin.
-    A caller taking the defaults got a plausible 2.83% number from a model whose
-    response to its entire monthly panel was 0.015pp. Switching the default is
-    not the fix, because 17 of 30 seeds collapse and the next caller passes
-    their own; the fix is that the model detects its own collapse from a
-    quantity it already computes and refuses.
+    ``estimate_short`` and ``quick_nowcast`` used to default to seed 321 -- a
+    seed that lands in the collapsed basin. A caller taking the defaults got a
+    plausible 2.83% number from a model whose response to its entire monthly
+    panel was 0.015pp. Switching the default is not the fix, because on that
+    panel 18 of 30 seeds collapsed and the next caller passes their own; the fix
+    is that the model detects its own collapse from a quantity it already
+    computes and refuses.
+
+    RUN ON ``legacy_panel``, BECAUSE THE SHIPPING PANEL CANNOT COLLAPSE. Since
+    ``DEFAULT_START`` moved to 1980 no seed of thirty leaves the identified
+    basin, so there is no collapsed chain to hand the guard. That is a property
+    of today's panel, not a repeal of the failure mode -- one spec change or one
+    thin vintage brings it back, and an unexercised guard is one nobody notices
+    has broken. The legacy panel keeps it honest.
 
     Both arms are exercised: the funnel (``state_space``) and the entry point
     (``quick_nowcast``), because it is the entry point the README advertises.
     """
     with pytest.raises(CollapsedFactorError, match=r"gdp's loading"):
-        state_space(panel, collapsed_result)
+        state_space(legacy_panel, collapsed_result)
 
     with pytest.raises(CollapsedFactorError):
-        quick_nowcast(panel, n_gs=N_GS, n_burn=N_BURN, seed=COLLAPSED_SEED)
+        quick_nowcast(legacy_panel, n_gs=N_GS, n_burn=N_BURN, seed=COLLAPSED_SEED)
 
     # ...and the identified basin is not refused, or the guard would just be a
-    # blanket refusal that happens to look right.
+    # blanket refusal that happens to look right. Checked on BOTH panels: the
+    # legacy one because that is where the refusal above happened, and the
+    # shipping one because that is what production calls.
+    assert np.isfinite(
+        quick_nowcast(legacy_panel, n_gs=N_GS, n_burn=N_BURN, seed=SEED))
     assert np.isfinite(quick_nowcast(panel, n_gs=N_GS, n_burn=N_BURN, seed=SEED))
 
 
@@ -1181,10 +1298,10 @@ def test_the_panel_cpi_row_has_no_interpolated_quarterly_months(panel):
 
 # --- the middle band the old 0.75 floor admitted ---------------------------
 
-MIDDLE_BAND_SEED = 3      # 0.856 on the shipping panel: above 0.75, below 1.0
+MIDDLE_BAND_SEED = 3      # 0.856 on `legacy_panel`: above 0.75, below 1.0
 
 
-def test_a_chain_between_the_basins_is_refused(panel):
+def test_a_chain_between_the_basins_is_refused(legacy_panel):
     """The defect that raising the floor to 1.0 fixes, pinned so it stays fixed.
 
     Thirty seeds on each of two panels showed THREE groups, not two. Chains sit
@@ -1198,15 +1315,22 @@ def test_a_chain_between_the_basins_is_refused(panel):
     The earlier ten-seed measurement did not sample the middle band at all,
     which is how a floor got set inside it.
 
-    ``MIDDLE_BAND_SEED`` is 3, which was the GATE'S OWN DEFAULT SEED until
-    2026-08-28. On the 15-series panel it sat at 1.562, comfortably identified;
-    dropping `cpi_trimmed` moved it to 0.856, into the band. Nothing about the
-    seed changed -- the panel did, which is the whole reason these three
-    constants are re-measured rather than carried forward.
+    ``MIDDLE_BAND_SEED`` is 3, and its history is the argument for re-measuring
+    these constants rather than carrying them forward. It was the gate's own
+    DEFAULT seed until 2026-08-28, sitting at 1.562 on the 15-series panel.
+    Dropping `cpi_trimmed` moved it to 0.856 -- into the band the old floor
+    admitted. Moving the panel start to 1980 moved it again, to 2.049, the
+    highest of all thirty seeds. Nothing about the seed ever changed; the panel
+    did, three times.
+
+    RUN ON ``legacy_panel``: the shipping panel has no middle band left to
+    sample, and this test exists to keep the floor's placement honest, not to
+    describe today's panel.
     """
-    result = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=MIDDLE_BAND_SEED)
+    result = estimate_short(legacy_panel, n_gs=N_GS, n_burn=N_BURN,
+                            seed=MIDDLE_BAND_SEED)
     with pytest.raises(CollapsedFactorError, match=r"gdp's loading"):
-        state_space(panel, result)
+        state_space(legacy_panel, result)
 
 
 def test_the_floor_sits_in_the_gap_measured_on_both_panels():

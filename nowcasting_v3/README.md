@@ -692,15 +692,23 @@ belongs to Plan C.
 
 ### GDP's posterior is bimodal, and the model refuses when it collapses
 
-The clearest finding from running the model end to end, and the one that
-produced the second guard.
+The clearest finding from running the model end to end, the one that produced
+the second guard — and, on 2026-08-30, the one that moved `DEFAULT_START`.
+
+**Everything in this section describes the panel as it opened until 2026-08-30
+(1990).** On the 1980 panel that ships now, none of it reproduces: thirty seeds
+of thirty land in the identified basin. It is kept because the mechanism is
+latent rather than gone, and `tests/test_au_end_to_end.py` still exercises the
+guard on a 1990-start panel. See **[Where the panel window
+opens](#where-the-panel-window-opens)** below.
 
 **The premise, measured.** GDP loads only the Global factor and the COVID
 factor. The COVID factor is active for 22 months (March 2020 – December 2021),
-and those months hold **8 of GDP's 143 observations but 64.5% of its
-standardised sum of squares**, including all five of its largest absolute
-values. A factor confined to that window can fit the biggest moves in the target
-series almost perfectly.
+and those months held **8 of GDP's 143 observations but 64.5% of its
+standardised sum of squares** at the 1990 start, including all five of its
+largest absolute values. A factor confined to that window can fit the biggest
+moves in the target series almost perfectly. At the 1980 start the same eight
+months are 48.2% of 183 observations — the same factor, a weaker grip.
 
 **The mechanism is a two-sided handover, and one side is far more reliable
 than the other.** Re-measured on 2026-08-28 over seven collapsed and six
@@ -727,9 +735,10 @@ as the Global loading rises (1.23 at Global 1.10, down to 0.23 at Global 1.71),
 which is the competition the premise describes; across the collapse it mostly
 does not.
 
-A likely enabler: the Global factor is normalised by household spending, which
-starts in 2012, so only **164 of the panel's 438 months** pin that factor's
-scale.
+A likely enabler, and still true on the shipping panel: the Global factor is
+normalised by household spending, which starts in 2012, so only **164 of the
+panel's 558 months** pin that factor's scale — a worse ratio than the 164 of 438
+it was before, and worth Plan C's attention.
 
 **These are separate basins, not tails of one distribution.** A chain picks one
 in its first sweeps and stays. Over the 200 stored draws at each of the two seeds
@@ -752,7 +761,8 @@ panels**, ninety chains:
 **There are three groups, not two**, and an early ten-seed measurement missed the
 middle one — which is how the floor first got set at 0.75, *inside* the band it
 was meant to exclude. 1.0 sits in the widest gap on all three panels. 18 of 30
-seeds land below it on the shipping panel.
+seeds landed below it at the 1990 start, and **none of thirty do on the panel
+that ships now**.
 
 Without the guard, a caller taking the library defaults got a plausible 2.83%
 number from a model whose response to its *entire* monthly panel was 0.015pp.
@@ -761,12 +771,61 @@ the seeds collapse, and the next caller passes their own. (The default is also
 panel-dependent: dropping `cpi_trimmed` moved seed 3 from 1.562 to 0.856, so the
 gate's three pinned seeds were re-measured rather than carried forward.)
 
-Re-running with another seed gets a usable chain 12 times in 30. That is a
+Re-running with another seed got a usable chain 12 times in 30. That was a
 workaround. The NY Fed does not face the coin flip at all because `initval.mat`
 ships a *fitted* starting point that puts the chain in the right basin, and
-Australia starts from a bland one. **Plan C needs a starting point with that
-job, or a spec that does not make a 22-month factor compete with the Global
+Australia starts from a bland one. **The 1980 start turned out to be the cheaper
+answer** — see below — but the alternative remains open if the problem returns:
+a starting point with that job, or a spec that does not make a 22-month factor
+compete with the Global
 factor for the target series.**
+
+### Where the panel window opens
+
+`DEFAULT_START` is **1980-01-01**. It was 1990 and uncommented until 2026-08-30,
+apparently mirroring the NY Fed's 468-month US panel — a defensible convention,
+and the wrong one for Australia.
+
+COVID's grip on the target is a function of how much history sits beside it.
+Thirty seeds at five vintages per start (`tools/panel_start_sweep.py`, rows in
+`docs/measurements/2026-08-29-panel-start-sweep.csv`):
+
+| start | months | COVID share of GDP | chains identified | MAE | s/fit |
+| --- | --- | --- | --- | --- | --- |
+| 1990 (old) | 435 | 64.5% | **33%** | 0.323 | 27 |
+| 1985 | 495 | 57.9% | 87% | 0.246 | 31 |
+| **1980 (now)** | **555** | **48.2%** | **100%** | 0.272 | 35 |
+| 1970 | 675 | 32.4% | 100% | 0.250 | 43 |
+| 1960 | 795 | 23.1% | 97% | 0.214 | 50 |
+
+1980 takes the whole identification benefit for eight seconds a fit. Going
+further back buys no more of it and buys it with hollow decades — 1960–1969
+carries **zero** monthly indicators, only `gdp` and its near-twin `gdi`.
+
+**The obvious objection was tested and rejected.** A longer window might make
+"GDP loads the Global factor" true by *construction* rather than earned: if the
+factor has little but GDP to be identified from, the collapse guard stops firing
+for the wrong reason. The discriminator is whether the **monthly** series still
+load Global — a factor collapsing into GDP's own trend would raise GDP's loading
+while theirs fell. Ratio of GDP's loading to the mean monthly loading, by start:
+
+| 1990 | 1985 | 1980 | 1970 | 1960 |
+| --- | --- | --- | --- | --- |
+| 5.59 | 6.18 | 5.76 | 5.77 | 5.68 |
+
+No trend, and the monthly loadings themselves stay flat at 0.24–0.27. The factor
+keeps its character and is simply better identified.
+
+**What this does not fix: responsiveness.** Every start still answers inside a
+narrow band — 1980 spans 0.61–0.69 pp q/q while the outcomes it predicts span
+0.27–0.87. Identification and responsiveness are two different faults, and only
+the first one moved.
+
+**Series *length* is not a lever, and was checked separately**
+(`tools/series_length_test.py`). Cutting `job_ads` from 62 observations to 26
+moved the nowcast 0.050pp; cutting `nab_conditions` from 347 to 63 moved it
+0.058pp; the sampler's own run-to-run noise is 0.078pp. Both effects sit below
+the noise floor. More data buys backtest *reach*, not accuracy.
 
 ### The gate replays a recorded vintage
 

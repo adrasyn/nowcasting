@@ -91,8 +91,9 @@ TWO GUARDS, NOT ONE
 ``check_freshness`` refuses a panel whose inputs have gone stale. The second
 guard is further down and refuses a *model*: :func:`state_space` raises
 :class:`CollapsedFactorError` when the fitted chain has left the nowcast target
-disconnected from the factor its monthly series feed. 18 of 30 sampler seeds
-land there, the result runs and produces a plausible number, and that number is
+disconnected from the factor its monthly series feed. NO seed of thirty lands
+there on the shipping panel since `DEFAULT_START` moved to 1980; 18 of 30 did
+before it, the result runs and produces a plausible number, and that number is
 not a nowcast. Neither guard has a bypass flag.
 
 VINTAGES: WHY THE GATE DOES NOT FETCH
@@ -160,7 +161,41 @@ __all__ = [
     "target_periods",
 ]
 
-DEFAULT_START = "1990-01-01"
+# Where the panel window opens. THIS IS A MODELLING CHOICE, NOT A DATA LIMIT,
+# and it is the single largest lever measured on this panel.
+#
+# It was 1990 until 2026-08-30, uncommented, apparently mirroring the NY Fed's
+# 468-month US panel. That is a defensible convention and it was the wrong one
+# for Australia, because the COVID quarters' grip on the target is a function of
+# how much history sits beside them. Thirty seeds at five vintages per start
+# (`tools/panel_start_sweep.py`, rows in
+# `docs/measurements/2026-08-29-panel-start-sweep.csv`):
+#
+#   start  cols  COVID share of GDP  chains identified  MAE   s/fit
+#   1990    435        64.5%                33%         0.323   27
+#   1985    495        57.9%                87%         0.246   31
+#   1980    555        48.2%               100%         0.272   35
+#   1970    675        32.4%               100%         0.250   43
+#   1960    795        23.1%                97%         0.214   50
+#
+# 1980 takes the whole identification benefit for eight seconds a fit. Going
+# further back buys no more of it, and buys it with hollow decades: 1960-1969
+# carries ZERO monthly indicators -- only `gdp` and its near-twin `gdi`.
+#
+# THE OBVIOUS OBJECTION WAS TESTED AND REJECTED. A longer window might make "GDP
+# loads the Global factor" true by CONSTRUCTION rather than earned -- if the
+# factor has nothing but GDP to be identified from, the collapse guard would stop
+# firing for the wrong reason. The discriminator is whether the MONTHLY series
+# still load Global; a factor collapsing into GDP's own trend would raise GDP's
+# loading while theirs fell. Ratio of GDP's loading to the mean monthly loading,
+# by start: 5.59, 6.18, 5.76, 5.77, 5.68 (1990 -> 1960). No trend, and the
+# monthly loadings themselves stay flat at 0.24..0.27. The factor keeps its
+# character and is simply better identified.
+#
+# WHAT THIS DOES NOT FIX: responsiveness. Every start still answers inside a
+# narrow band (1980 spans 0.61..0.69 pp q/q) while the outcomes it is predicting
+# span 0.27..0.87. Identification and responsiveness are two different faults.
+DEFAULT_START = "1980-01-01"
 
 # The floor the nowcast target's Global loading has to clear before a state
 # space built from a sampler run may be used. See `CollapsedFactorError`.
@@ -205,8 +240,9 @@ class CollapsedFactorError(Exception):
     """The fitted model does not connect the target series to the panel.
 
     GDP loads only the Global factor and the COVID factor, and the COVID factor
-    is active for the 22 months holding 64.5% of GDP's standardised variation
-    (8 of 143 observations, including the five largest). When a chain lets the
+    is active for the 22 months holding 48.2% of GDP's standardised variation
+    on the shipping panel (8 of 183 observations, including the five largest) and
+    64.5% before `DEFAULT_START` moved to 1980. When a chain lets the
     COVID factor take the in-window variation and GDP's own idiosyncratic
     stochastic volatility take the rest, GDP's Global loading collapses toward
     zero -- and the Global factor is what every monthly series feeds. The result
@@ -214,12 +250,20 @@ class CollapsedFactorError(Exception):
     worst seed measured, a one-sigma shock to the ENTIRE monthly panel across
     the target quarter moved it by 0.015pp.
 
-    18 of 30 seeds land there. So this is raised rather than warned about: the
-    whole point of this project's guards is to turn a plausible wrong number
-    into a loud failure, and a number from a collapsed chain must not reach a
-    reader.
+    NO SEED OF THIRTY LANDS THERE TODAY, and this is still raised rather than
+    warned about. 18 of 30 collapsed at the 1990 start, and what changed is the
+    window the panel opens at, not the mechanism: the COVID factor is still
+    there, still confined to 22 months, still able to explain the target if a
+    chain lets it. A spec change, a thinner vintage, or a shorter window brings
+    it back. The whole point of this project's guards is to turn a plausible
+    wrong number into a loud failure, and a guard that costs one comparison per
+    fit does not need to justify itself by firing.
 
-    Re-running with a different seed gets a usable chain 12 times in 30.
+    ``tests/test_au_end_to_end.py`` keeps exercising it on a 1990-start panel
+    for exactly that reason.
+
+    Re-running with a different seed got a usable chain 12 times in 30 at the
+    1990 start.
     That is a workaround, not a fix. The fix is a starting point that does what
     the NY Fed's fitted ``initval.mat`` does -- put the chain in the identified
     basin -- or a specification that does not make a 22-month factor compete
@@ -633,7 +677,7 @@ def state_space(
             "connected to the panel, and any nowcast from it would be driven by "
             "the target's own dynamics rather than by the monthly data. "
             "Measured over ninety chains (thirty seeds on each of three "
-            "panels), 18 of 30 land below this floor on the shipping panel and "
+            "panels), 18 of 30 landed below this floor at the 1990 start and "
             "9 of 30 on the shortest-cpi control, and lengthening the chain to "
             "2,000 sweeps does not resolve it. See CollapsedFactorError for why "
             "a different seed is a workaround and not a fix."

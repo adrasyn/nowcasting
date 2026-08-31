@@ -102,8 +102,12 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
                                           : "95% probability band"];
               }}
             />
-            <Area dataKey="band95" stroke="none" fill={chartColors.band} fillOpacity={0.12} />
-            <Area dataKey="band68" stroke="none" fill={chartColors.band} fillOpacity={0.28} />
+            {/* The theme's own green (`--color-green`, chartColors.accent), the
+                same one the headline card uses for this quarter's estimate.
+                `chartColors.band` is a blend of primary and accent that reads as
+                a third green next to the other two. */}
+            <Area dataKey="band95" stroke="none" fill={chartColors.accent} fillOpacity={0.14} />
+            <Area dataKey="band68" stroke="none" fill={chartColors.accent} fillOpacity={0.32} />
             <ReferenceLine y={0} stroke={chartColors.label} strokeWidth={1} />
             <ReferenceLine x={0} stroke={chartColors.label} strokeDasharray="4 4">
               <Label value="ABS release" angle={-90} position="insideTopRight"

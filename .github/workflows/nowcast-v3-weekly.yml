@@ -72,6 +72,13 @@ jobs:
       - name: Refresh the indicator panel
         run: python -u tools/emit_indicators.py
 
+      # The track record is mostly a fixed backtest, but it grows: once the ABS
+      # prints a quarter this model called live, that quarter becomes a row.
+      # Without this step the fix in `emit_backtest_json.py` would never run and
+      # the table would sit at its backtested quarters forever.
+      - name: Refresh the track record
+        run: python -u tools/emit_backtest_json.py
+
       # A refusal is a successful run — the runner writes `status: "refused"` and
       # exits 0, and the site renders that rather than last week's number. Say so
       # in the log so a green tick that published nothing is not mistaken for a
@@ -97,6 +104,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/latest_v3.json data/indicators_v3.json
           git add data/nowcast_history_v3.json
+          git add data/performance_v3.json data/backtest_v3.json
           if git diff --staged --quiet; then
             echo "No v3 changes to commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"

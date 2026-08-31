@@ -2,41 +2,150 @@ import { loadDashboardData } from "@/lib/data";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StalenessBanner from "@/components/StalenessBanner";
-import HeadlineCard from "@/components/HeadlineCard";
-import NowcastHeadline from "@/components/NowcastHeadline";
-import VintageChart from "@/components/VintageChart";
 import IndicatorGrid from "@/components/IndicatorGrid";
 import PerformanceSection from "@/components/PerformanceSection";
-import MethodologyPanel from "@/components/MethodologyPanel";
+import V3RbaCompare from "@/components/V3RbaCompare";
+import V3MethodologyPanel from "@/components/V3MethodologyPanel";
+import ModelSwitch from "@/components/ModelSwitch";
+import V3Headline from "@/components/V3Headline";
+import V3VintageChart from "@/components/V3VintageChart";
+
+// The published nowcast. v3 replaced v2 here in September 2026, on the strength
+// of a 14-quarter backtest (MAE 0.242pp against v2's 0.340) and a calibration
+// check v2 fails. v2 is still built, still updated weekly, and still reachable
+// at /v2 — the comparison only stays honest while both keep running.
+//
+// SAME STRUCTURE AS /v2, ON PURPOSE. Banner, header, headline card, nowcast
+// evolution, indicator panel, track record, methodology — in that order, and
+// rendered by the same components wherever the payload shape allows. The site
+// exists to compare two models, so everything around the model is held constant
+// and only the model differs.
+//
+// The one section with no v2 counterpart is the evolution chart, because it
+// carries a probability band the v2 payload cannot support. The v3-vs-v2
+// comparison and the calibration table that used to sit here were removed: they
+// are analysis of the model rather than the nowcast a reader came for, and they
+// live in `docs/measurements/` and the PR instead.
+
+function Refused({ reason, detail, asOf }: {
+  reason: string; detail: string; asOf: string;
+}) {
+  return (
+    <section className="mb-8 border border-border-heavy p-6">
+      <p className="text-[10px] uppercase tracking-wider text-label">
+        No nowcast published · {asOf}
+      </p>
+      <h2 className="mt-2 font-headline text-3xl">
+        The model declined to publish
+      </h2>
+      <p className="mt-3 max-w-2xl text-sm">
+        <span className="font-semibold">{reason}.</span> {detail}
+      </p>
+      <p className="mt-4 max-w-2xl text-sm text-label">
+        This is the model working, not an outage. v3 refuses rather than
+        publishing a figure it cannot stand behind — a feed that has stopped
+        updating, or a fitted model that has left GDP disconnected from its
+        monthly indicators. In either case the number it would have produced
+        looks entirely plausible, which is the reason for a refusal rather than
+        a warning.
+      </p>
+    </section>
+  );
+}
 
 export default function Home() {
   const data = loadDashboardData();
-  const v2 = data.latestV2;
-  const generatedAt = v2 ? v2.generated_at : data.latest.generated_at;
+  const v3 = data.latestV3;
 
-  // v2 evolution chart: the qa nowcast at each Monday (emitted in latest_v2.json).
-  const v2Nowcasts = v2 ? { vintages: v2.vintages } : data.nowcasts;
+  if (!v3) {
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+          <p className="text-sm">
+          No <code>data/latest_v3.json</code> yet — run{" "}
+          <code>nowcasting_v3/tools/run_au_nowcast.py</code>.
+        </p>
+      </main>
+    );
+  }
+
+  const nowcast = v3.horizons.find((h) => h.kind === "nowcast");
+  const forecasts = v3.horizons.filter((h) => h.kind === "forecast");
 
   return (
-    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <StalenessBanner generatedAt={generatedAt} />
-      <Header generatedAt={generatedAt} />
-      {v2 ? (
-        <NowcastHeadline
-          headline={v2.models.headline}
-          gdp={data.gdp}
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <StalenessBanner generatedAt={v3.generated_at} />
+      <Header generatedAt={v3.generated_at} />
+
+      {v3.status === "refused" || !nowcast ? (
+        <Refused
+          reason={v3.refusal_reason ?? "unavailable"}
+          detail={v3.refusal_detail ?? ""}
+          asOf={v3.as_of}
         />
       ) : (
-        <HeadlineCard latest={data.latest} gdp={data.gdp} />
+        <V3Headline latest={v3} gdp={data.gdp} />
       )}
-      <VintageChart nowcasts={v2Nowcasts} latest={data.latest} targetQuarter={v2 ? v2.target_quarter : undefined} />
-      <IndicatorGrid indicators={data.indicatorsV2 ?? data.indicators} />
-      <PerformanceSection
-        performance={data.performanceV2 ?? data.performance}
-        isBacktest={!!data.performanceV2}
-        showGap={false}
-      />
-      <MethodologyPanel />
+
+      {forecasts.length > 0 && (
+        <section className="mb-8 border border-border p-4">
+          <p className="text-[10px] uppercase tracking-wider text-label">
+            Also forecast, at no extra cost
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {forecasts.map((f) => (
+              <li key={f.quarter}>
+                <span className="font-semibold">{f.quarter}</span>{" "}
+                {f.qoq_growth_pct > 0 ? "+" : ""}
+                {f.qoq_growth_pct.toFixed(2)}%
+                {f.ci_68_low !== undefined && (
+                  <span className="text-label">
+                    {" "}· 68% band {f.ci_68_low.toFixed(2)}% to{" "}
+                    {f.ci_68_high!.toFixed(2)}%
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {v3.status === "ok" && v3.vintages && v3.vintages.length > 0 && (
+        <V3VintageChart
+          vintages={v3.vintages}
+          targetQuarter={v3.target_quarter ?? ""}
+          releaseDate={v3.next_gdp_release_date ?? ""}
+        />
+      )}
+
+      {data.indicatorsV3 && <IndicatorGrid indicators={data.indicatorsV3} />}
+
+      {data.performanceV3 && (
+        <PerformanceSection
+          performance={data.performanceV3}
+          isBacktest
+          sourceFile="data/backtest_v3.json"
+          title="Track record"
+          intro="These are backtested estimates, not live nowcasts."
+          notes={
+            "MAE (mean absolute error) is the average size of the miss, ignoring " +
+            "direction. Bias is the average signed miss, so a positive value means " +
+            "the model tends to come in a little high. For comparison, the RBA " +
+            "column shows the RBA's forecast published mid-quarter (about two " +
+            "months before our full-quarter estimate) for each June and December " +
+            "quarter."
+          }
+          showGap={false}
+          showRbaTile={false}
+          tileBasis="quarterly growth"
+          afterTiles={
+            <V3RbaCompare rba={data.performanceV3.rba_comparison} />
+          }
+        />
+      )}
+
+
+      <V3MethodologyPanel performance={data.performanceV3} />
+      <ModelSwitch here="v3" />
       <Footer />
     </main>
   );

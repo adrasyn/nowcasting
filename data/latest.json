@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-08-10T04:02:08Z",
+  "generated_at": "2026-08-31T08:37:53Z",
   "target_quarter": "2026 Q2",
   "data_through": "2026-08",
   "next_gdp_release_date": "2026-09-02",
   "nowcast": {
-    "gdp_chain_volume_millions": 700774,
+    "gdp_chain_volume_millions": 700755,
     "qoq_growth_pct": 0.69,
     "yoy_growth_pct": 2.24,
-    "ci_68_low": 697378,
-    "ci_68_high": 701144,
-    "ci_95_low": 695571,
-    "ci_95_high": 702951
+    "ci_68_low": 697412,
+    "ci_68_high": 701226,
+    "ci_95_low": 695582,
+    "ci_95_high": 703057
   },
   "latest_actual": {
     "quarter": "2026 Q1",
@@ -19,26 +19,44 @@
     "released_days_before_next": -91
   },
   "data_updates": {
-    "run_date": "2026-08-10",
-    "nowcast_delta_pp": 0.1,
+    "run_date": "2026-08-31",
+    "nowcast_delta_pp": 0,
     "series": [
+      {
+        "id": "employment",
+        "name": "Employment",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "unemp_rate",
+        "name": "Unemployment Rate",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "part_rate",
+        "name": "Participation Rate",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "hours_worked",
+        "name": "Hours Worked",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
       {
         "id": "household_spending",
         "name": "Household Spending",
-        "prev_period": "2026-05",
-        "latest_period": "2026-06"
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
       },
       {
-        "id": "goods_exp",
-        "name": "Goods Exports",
-        "prev_period": "2026-05",
-        "latest_period": "2026-06"
-      },
-      {
-        "id": "goods_imp",
-        "name": "Goods Imports",
-        "prev_period": "2026-05",
-        "latest_period": "2026-06"
+        "id": "bus_conf",
+        "name": "Business Confidence",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
       }
     ]
   }

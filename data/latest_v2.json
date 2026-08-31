@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-08-10T02:00:00Z",
+  "generated_at": "2026-08-31T02:00:00Z",
   "schema": "v2-staged-2",
-  "as_of": "2026-08-10",
+  "as_of": "2026-08-31",
   "target_quarter": "2026 Q2",
-  "data_through": "2026-07",
+  "data_through": "2026-08",
   "prev_level": {
     "value": 695945,
     "date": "2026 Q1",
@@ -14,14 +14,14 @@
       "model_id": "v2_qa_a10",
       "model_name": "MAI to per-stage U-MIDAS",
       "target_quarter": "2026 Q2",
-      "gdp_chain_volume_millions": 699193,
-      "qoq_growth_pct": 0.47,
-      "qoq_growth_raw_pct": 0.47,
-      "yoy_growth_pct": 2.01,
-      "ci_68_low": 697046,
-      "ci_68_high": 701339,
-      "ci_95_low": 694785,
-      "ci_95_high": 703601,
+      "gdp_chain_volume_millions": 699604,
+      "qoq_growth_pct": 0.53,
+      "qoq_growth_raw_pct": 0.53,
+      "yoy_growth_pct": 2.07,
+      "ci_68_low": 697457,
+      "ci_68_high": 701750,
+      "ci_95_low": 695195,
+      "ci_95_high": 704012,
       "n_months_in_quarter": 3,
       "estimator": "QA-UMIDAS",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -178,6 +178,18 @@
       "ci_95_low": 694781,
       "ci_95_high": 703598,
       "data_through": "2026-08"
+    },
+    {
+      "run_date": "2026-08-31",
+      "target_quarter": "2026 Q2",
+      "point": 699604,
+      "qoq_growth_pct": 0.53,
+      "days_until_release": -2,
+      "ci_68_low": 697457,
+      "ci_68_high": 701750,
+      "ci_95_low": 695195,
+      "ci_95_high": 704012,
+      "data_through": "2026-08"
     }
   ],
   "v1_comparison": {
@@ -185,79 +197,121 @@
     "target_quarter": "2026 Q2",
     "qoq_growth_pct": 0.69,
     "yoy_growth_pct": 2.24,
-    "gdp_chain_volume_millions": 700774,
+    "gdp_chain_volume_millions": 700755,
     "source": "data/latest.json"
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
   "data_updates": {
-    "run_date": "2026-08-10",
-    "nowcast_delta_pp": 0.0,
+    "run_date": "2026-08-31",
+    "nowcast_delta_pp": 0.06,
     "series": [
+      {
+        "id": "emp",
+        "name": "Employment",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "ft_emp",
+        "name": "Full-time employment",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "pt_emp",
+        "name": "Part-time employment",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "ue",
+        "name": "Unemployment",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "ud",
+        "name": "Underemployment",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "hours",
+        "name": "Hours worked",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
       {
         "id": "household_spending",
         "name": "Household spending",
-        "prev_period": "2026-05",
-        "latest_period": "2026-06"
-      },
-      {
-        "id": "export",
-        "name": "Exports",
-        "prev_period": "2026-05",
-        "latest_period": "2026-06"
-      },
-      {
-        "id": "fcmygbag3",
-        "name": "3yr govt bond yield",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "fcmygbag5",
-        "name": "5yr govt bond yield",
+        "id": "credit",
+        "name": "Total credit",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "fcmygbag10",
-        "name": "10yr govt bond yield",
+        "id": "credit_housing",
+        "name": "Housing credit",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "scrigbag3",
-        "name": "3yr yield spread",
+        "id": "credit_business",
+        "name": "Business credit",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "scrigbag5",
-        "name": "5yr yield spread",
+        "id": "nab_conf",
+        "name": "Business confidence",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "scrigbag10",
-        "name": "10yr yield spread",
+        "id": "nab_cond",
+        "name": "Business conditions",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "firmmbab90",
-        "name": "Bank bill rate",
+        "id": "nab_trade",
+        "name": "Trading conditions",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "credit_card",
-        "name": "Credit card spending",
-        "prev_period": "2026-05",
-        "latest_period": "2026-06"
-      },
-      {
-        "id": "anz_ads",
-        "name": "Job ads",
+        "id": "nab_profit",
+        "name": "Profitability",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
+      },
+      {
+        "id": "nab_emp",
+        "name": "Hiring intentions",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "nab_forward",
+        "name": "Forward orders",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "nab_cu",
+        "name": "Capacity use",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
+      },
+      {
+        "id": "wmi_sent",
+        "name": "Consumer sentiment (Westpac)",
+        "prev_period": "2026-07",
+        "latest_period": "2026-08"
       }
     ]
   }

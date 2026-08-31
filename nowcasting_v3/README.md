@@ -802,6 +802,14 @@ Thirty seeds at five vintages per start (`tools/panel_start_sweep.py`, rows in
 further back buys no more of it and buys it with hollow decades — 1960–1969
 carries **zero** monthly indicators, only `gdp` and its near-twin `gdi`.
 
+**The NY Fed made the same move, for the same stated reason.** Staff Nowcast 2.0,
+p8: *"we use all the data in the sample from 1985, unlike the legacy model which
+only used the most recent 15 years of data in the estimation … including more
+data spanning periods of recession and recovery allows for more precise
+estimation of underlying dynamics of the business cycle."* The 1990 start this
+project began with was the length of their panel without the reasoning behind
+it.
+
 **The obvious objection was tested and rejected.** A longer window might make
 "GDP loads the Global factor" true by *construction* rather than earned: if the
 factor has little but GDP to be identified from, the collapse guard stops firing

@@ -2,6 +2,7 @@ import { loadDashboardData } from "@/lib/data";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import V3TrackRecord from "@/components/V3TrackRecord";
+import V3VintageChart from "@/components/V3VintageChart";
 import type { V3Horizon, V3Score } from "@/lib/types";
 
 // PREVIEW. v3 is not the published nowcast — nowcast.wlsn.me still serves v2.
@@ -64,7 +65,7 @@ function Headline({ h, ciBasis }: { h: V3Horizon; ciBasis?: string }) {
         <span className="font-headline text-6xl text-teal">{pct(h.qoq_growth_pct)}</span>
         {has68 && (
           <span className="text-lg text-label">
-            68% band {pct(h.ci_68_low!)} to {pct(h.ci_68_high!)}
+            68% probability band {pct(h.ci_68_low!)} to {pct(h.ci_68_high!)}
           </span>
         )}
       </div>
@@ -81,17 +82,20 @@ function Headline({ h, ciBasis }: { h: V3Horizon; ciBasis?: string }) {
         )}
         {h.ci_95_low !== undefined && (
           <div>
-            <dt className="text-label">95% band</dt>
+            <dt className="text-label">95% probability band</dt>
             <dd>{pct(h.ci_95_low)} to {pct(h.ci_95_high!)}</dd>
           </div>
         )}
       </dl>
       {ciBasis && (
         <p className="mt-4 max-w-2xl text-xs text-label">
-          Bands are the model&apos;s own posterior — the same chain that produced
-          the point estimate, so a harder quarter widens them. v2&apos;s bands are
-          reconstructed afterwards from how wrong it has been on average, which
-          cannot know that.
+          A probability band, not a confidence interval: it is where the
+          model&apos;s posterior puts 68% of its mass, from the same chain that
+          produced the point estimate, so a harder quarter widens it. Reporting
+          these alongside the point estimate is one of the reasons the NY Fed
+          rebuilt this model as Bayesian. v2&apos;s interval is a different
+          object — its own past errors, which cannot know that this quarter is
+          harder than average.
         </p>
       )}
     </section>
@@ -235,7 +239,7 @@ export default function V3Preview() {
                     {pct(f.qoq_growth_pct)}
                     {f.ci_68_low !== undefined && (
                       <span className="text-label">
-                        {" "}· 68% {pct(f.ci_68_low)} to {pct(f.ci_68_high!)}
+                        {" "}· 68% band {pct(f.ci_68_low)} to {pct(f.ci_68_high!)}
                       </span>
                     )}
                   </li>
@@ -261,6 +265,16 @@ export default function V3Preview() {
             </section>
           )}
         </>
+      )}
+
+      {v3.status === "ok" && v3.vintages && v3.vintages.length > 0 && (
+        <div className="mt-10">
+          <V3VintageChart
+            vintages={v3.vintages}
+            targetQuarter={v3.target_quarter ?? ""}
+            releaseDate={v3.next_gdp_release_date ?? ""}
+          />
+        </div>
       )}
 
       {bt && (

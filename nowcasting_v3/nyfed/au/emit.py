@@ -61,7 +61,14 @@ def qoq_to_annualised(qoq):
 # `data/latest_v3.json`, read by the site's `/v3` route. Two things about its
 # shape are deliberate and worth stating before the fields.
 #
-# THE BANDS ARE THE MODEL'S OWN. v2 carries `ci_basis: "empirical
+# THE BANDS ARE PROBABILITY BANDS, IN THE NY FED'S OWN SENSE. Their paper names
+# reporting them as one of the reasons the model was rebuilt Bayesian -- "our
+# Bayesian estimation approach ... enables us to report probability intervals
+# alongside each point estimate of real GDP growth" (Staff Nowcast 2.0, p2) --
+# and their figures label the shaded area "Probability band". The site uses
+# their words, because the distinction is the one v2's chart got wrong.
+#
+# v2 carries `ci_basis: "empirical
 # pseudo-out-of-sample error dispersion"` -- its bands are reconstructed after
 # the fact from how wrong it has been, which cannot know that THIS quarter is
 # harder than average. v3 draws from `density_nowcast`, so the interval is the
@@ -90,6 +97,8 @@ def nowcast_payload(
     draws,
     prev_level: float | None,
     prev_quarter: str | None,
+    vintages: list[dict] | None = None,
+    next_gdp_release_date: str | None = None,
     generated_at: str,
     asof: str,
     gdp_global_loading: float,
@@ -140,9 +149,16 @@ def nowcast_payload(
             {"value": round(float(prev_level)), "quarter": prev_quarter}
             if prev_level is not None else None),
         "horizons": out_h,
+        # The weekly path for the CURRENT quarter, for the site's evolution
+        # chart. Empty until `tools/band_coverage.py` has produced it: a chart
+        # is not worth a fabricated point.
+        "vintages": vintages or [],
+        "next_gdp_release_date": next_gdp_release_date,
         "ci_basis": (
-            f"posterior credible interval from {int(np.isfinite(draws).all(axis=1).sum())} "
-            "density_nowcast draws (the model's own, not recalibrated from past errors)"),
+            "probability band: the 68%/95% mass of the model's posterior, from "
+            f"{int(np.isfinite(draws).all(axis=1).sum())} density_nowcast draws on the same "
+            "chain as the point estimate. Not a confidence interval, and not "
+            "recalibrated from past errors."),
         "panel": {
             "n_series": int(panel.Y.shape[0]),
             "n_months": int(panel.Y.shape[1]),

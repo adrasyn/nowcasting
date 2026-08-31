@@ -30,10 +30,11 @@ import numpy as np
 import pandas as pd
 
 from nyfed.au.build import (
-    COLLAPSED_GLOBAL_LOADING, P_E, P_F, CollapsedFactorError, build_panel,
-    estimate_short, fetch_vintage, load_vintage, state_space, target_periods,
+    COLLAPSED_GLOBAL_LOADING, P_E, P_F, CollapsedFactorError, Panel,
+    build_panel, estimate_short, fetch_vintage, load_vintage, state_space,
+    target_periods,
 )
-from nyfed.au.emit import nowcast_payload, refusal_payload
+from nyfed.au.emit import annualised_to_qoq, nowcast_payload, refusal_payload
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.sources import AU_SERIES
 from nyfed.nowcast import density_nowcast, point_nowcast
@@ -155,10 +156,61 @@ def main() -> int:
         loc + scl * density_nowcast(panel.Y, ssm, panel.i_now, t_now, rng)
         for _ in range(N_DENSITY if not args.quick else 200)])
 
+
+    # ---- the weekly path, from THIS state space --------------------------
+    # COMPUTED HERE RATHER THAN READ FROM A FILE, and that is the whole point.
+    # An earlier draft produced the evolution in a separate tool with its own
+    # 200-sweep estimation, which put +0.64 in the headline and +0.67 as the
+    # chart's last point -- the same quarter, the same day, two numbers. A
+    # reader cannot be expected to know that is sampler noise between two fits.
+    # One fitted model, one chart, one headline.
+    #
+    # Only the DATA changes across weeks; the parameters and the standardisation
+    # are held. Re-standardising per week would move the line because the scale
+    # moved, which is not information arriving.
+    vintages = []
+    release = None
+    site_latest = SITE_DATA / "latest.json"
+    if site_latest.is_file():
+        release = json.loads(site_latest.read_text()).get("next_gdp_release_date")
+
+    tgt = panel.dates[t_now[0]]
+    label = _quarter(tgt)
+    print(f"weekly path for {label}, through the same state space...", flush=True)
+    for d0 in pd.date_range(pd.Timestamp(tgt.year, tgt.month, 1),
+                            pd.Timestamp(asof), freq="W-MON"):
+        try:
+            pv = build_panel(asof=str(d0.date()), vintage=vintage)
+        except Exception:                                       # noqa: BLE001
+            continue
+        Yv = np.full_like(panel.Y, np.nan)
+        k = min(pv.Y.shape[1], panel.Y.shape[1])
+        Yv[:, :k] = pv.Y[:, :k]
+        vp = Panel(Y=Yv, y_location=panel.y_location, y_scale=panel.y_scale,
+                   dates=panel.dates, series_id=panel.series_id,
+                   i_now=panel.i_now)
+        pv_pt = point_nowcast(vp.Y, vp.Y, ssm, ssm, vp.i_now, t_now)
+        pv_point = float(annualised_to_qoq(
+            loc + scl * float(pv_pt.nowcast[3, 0])))
+        pv_draws = np.array([
+            loc + scl * density_nowcast(vp.Y, ssm, vp.i_now, t_now, rng)[0]
+            for _ in range(N_DENSITY if not args.quick else 200)])
+        q = np.nanpercentile(annualised_to_qoq(pv_draws), [2.5, 16, 84, 97.5])
+        seen = pd.DatetimeIndex(pv.dates)[np.isfinite(pv.Y).any(axis=0)]
+        vintages.append({
+            "run_date": str(d0.date()), "target_quarter": label,
+            "qoq_growth_pct": round(pv_point, 4),
+            "ci_68_low": round(q[1], 4), "ci_68_high": round(q[2], 4),
+            "ci_95_low": round(q[0], 4), "ci_95_high": round(q[3], 4),
+            "data_through": str(seen[-1].date())[:7]})
+        print(f"  {d0.date()}  {pv_point:+.3f}  "
+              f"68% [{q[1]:+.3f},{q[2]:+.3f}]", flush=True)
+
     gdp = vintage.series["gdp"].dropna()
     payload = nowcast_payload(
         panel=panel, horizons=horizons, draws=draws,
         prev_level=float(gdp.iloc[-1]), prev_quarter=_quarter(gdp.index[-1]),
+        vintages=vintages, next_gdp_release_date=release,
         generated_at=now, asof=asof, gdp_global_loading=loading,
         collapse_floor=COLLAPSED_GLOBAL_LOADING,
         n_gs=settings["n_gs"], n_burn=settings["n_burn"], seed=SEED)

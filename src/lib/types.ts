@@ -238,6 +238,8 @@ export interface LatestV3 {
   data_through?: string;
   prev_level?: { value: number; quarter: string } | null;
   horizons: V3Horizon[];
+  vintages?: V3Vintage[];
+  next_gdp_release_date?: string;
   ci_basis?: string;
   panel?: {
     n_series: number;
@@ -253,6 +255,17 @@ export interface LatestV3 {
     n_burn: number;
     seed: number;
   };
+}
+
+export interface V3Vintage {
+  run_date: string;
+  target_quarter: string;
+  qoq_growth_pct: number;
+  ci_68_low: number;
+  ci_68_high: number;
+  ci_95_low: number;
+  ci_95_high: number;
+  data_through: string;
 }
 
 export interface V3Score {

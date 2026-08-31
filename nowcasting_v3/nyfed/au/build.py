@@ -182,6 +182,14 @@ __all__ = [
 # further back buys no more of it, and buys it with hollow decades: 1960-1969
 # carries ZERO monthly indicators -- only `gdp` and its near-twin `gdi`.
 #
+# THE NY FED MADE THE SAME MOVE, FOR THE SAME STATED REASON. Their Staff Nowcast
+# 2.0 paper, p8: "we use all the data in the sample from 1985, unlike the legacy
+# model which only used the most recent 15 years of data in the estimation ...
+# including more data spanning periods of recession and recovery allows for more
+# precise estimation of underlying dynamics of the business cycle." Their sample
+# is ~40 years; a 1980 start gives this panel ~46. The 1990 start this project
+# began with was the length of THEIR panel without the reasoning behind it.
+#
 # THE OBVIOUS OBJECTION WAS TESTED AND REJECTED. A longer window might make "GDP
 # loads the Global factor" true by CONSTRUCTION rather than earned -- if the
 # factor has nothing but GDP to be identified from, the collapse guard would stop

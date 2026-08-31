@@ -153,6 +153,7 @@ export default function V3Preview() {
           }
           showGap={false}
           showRbaTile={false}
+          tileBasis="quarterly growth"
           afterTiles={
             <V3RbaCompare rba={data.performanceV3.rba_comparison} />
           }

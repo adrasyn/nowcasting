@@ -23,6 +23,11 @@ interface Props {
   // Rendered between the tiles and the table, where a comparison belongs:
   // after the summary figures, before the quarter-by-quarter detail.
   afterTiles?: ReactNode;
+  // Prefixed into the MAE and Bias subtitles. Both tiles report a miss in
+  // pp, and so does the RBA comparison below them — but on a different
+  // basis and a different number of quarters. Without each saying which,
+  // 0.26 beside 0.27 reads as one of them being wrong.
+  tileBasis?: string;
 }
 
 export default function PerformanceSection({
@@ -35,6 +40,7 @@ export default function PerformanceSection({
   showGap = true,
   showRbaTile = true,
   afterTiles,
+  tileBasis,
 }: Props) {
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
@@ -65,7 +71,11 @@ export default function PerformanceSection({
           </p>
         ))}
       <div className={`grid gap-3 mb-4 ${showRbaTile ? "grid-cols-3" : "grid-cols-2"}`}>
-        <Tile label="MAE" value={`${performance.mae_pct.toFixed(2)}pp`} sub={formatMillions(performance.mae_millions)} />
+        <Tile
+          label="MAE"
+          value={`${performance.mae_pct.toFixed(2)}pp`}
+          sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
+        />
         <Tile
           label="Bias"
           value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}

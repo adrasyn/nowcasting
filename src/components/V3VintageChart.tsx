@@ -58,6 +58,39 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
     }))
     .sort((a, b) => a.x - b.x);
 
+  // ONE POINT IS NOT A CHART. On the first Monday of a quarter the history holds
+  // a single estimate, and Recharts draws that as an empty box: no line to join,
+  // areas with nothing to span, and an axis collapsed around one value. That is
+  // the homepage on the first Monday of every quarter, so it says what it has
+  // instead of drawing a frame around nothing.
+  if (data.length < 2) {
+    const only = data[0];
+    return (
+      <section className="mb-10">
+        <p className="font-headline text-3xl text-black">Nowcast evolution</p>
+        <p className="mb-3 text-xs text-label">
+          The first weekly estimate for {targetQuarter}. This chart traces how
+          the nowcast moves as indicator data arrives, so it fills in over the
+          quarter.
+        </p>
+        {only && (
+          <div className="border border-border p-4 text-sm">
+            <span className="font-semibold">{only.runDate}</span>
+            <span className="text-label"> · data through {only.dataThrough}</span>
+            <div className="mt-1">
+              {only.point > 0 ? "+" : ""}
+              {only.point.toFixed(2)}%
+              <span className="text-label">
+                {" "}· 68% probability band {only.band68[0].toFixed(2)}% to{" "}
+                {only.band68[1].toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   const all = data.flatMap((d) => [d.band95[0], d.band95[1]]).concat(0);
   const STEP = 0.25;
   const yMin = Math.floor((Math.min(...all) - 0.05) / STEP) * STEP;

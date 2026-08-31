@@ -72,3 +72,6 @@ __pycache__/
 /nowcasting_v3/*.egg-info/
 /nowcasting_v3/tools/fixtures_mat/
 /nowcasting_v3/tools/probe_out.mat
+# v3: readabs' on-disk download cache, created in the working tree by the
+# ABS fetcher and the fixture recorder. Regenerable, and ~1GB.
+/nowcasting_v3/.readabs_cache/

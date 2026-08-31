@@ -1,0 +1,97 @@
+name: Quarterly Estimate (v3)
+
+# Re-fits the model and commits `nowcasting_v3/state/au_estimate.npz`, which the
+# weekly workflow loads. 18,000 sweeps: ~75 minutes on a fast laptop, and slower
+# here, which is exactly why it does not happen weekly.
+#
+# WHY THE 10th. The ABS publishes national accounts on the first Wednesday of
+# March, June, September and December, so by the 10th the quarter's GDP is out
+# and the estimate is fitted to it. A cron with both day-of-month and day-of-week
+# set would be OR'd by cron's rules and fire far more often than intended, so
+# this pins the day of month and leaves day-of-week open.
+
+on:
+  schedule:
+    - cron: "0 6 10 3,6,9,12 *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: nowcast-weekly
+  cancel-in-progress: false
+
+jobs:
+  estimate:
+    runs-on: ubuntu-latest
+    # Generous against the ~75-minute local figure: a hosted runner is slower,
+    # and a job killed at 90% leaves the previous quarter's estimate in place,
+    # which the weekly job will use until it ages past its 200-day limit.
+    timeout-minutes: 330
+    defaults:
+      run:
+        working-directory: nowcasting_v3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Estimate
+        run: python -u tools/estimate_au.py
+
+      # The tool refuses to save a collapsed chain, so reaching here means the
+      # fit is usable. Print what changed: a quarter-on-quarter jump in GDP's
+      # loading is the first sign the panel or the spec has moved underneath us.
+      - name: Report
+        run: |
+          python - <<'PY'
+          import json, numpy as np
+          m = json.loads(str(np.load("state/au_estimate.npz")["meta"]))
+          print(f"estimated {m['asof']} in {m['minutes']} min")
+          print(f"  panel {m['panel_rows']}x{m['panel_cols']} "
+                f"({m['panel_first']}..{m['panel_last']})")
+          print(f"  GDP Global loading {m['gdp_global_loading']} "
+                f"(floor {m['collapse_floor']})")
+          PY
+
+      - name: Commit
+        run: |
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nowcasting_v3/state/au_estimate.npz
+          if git diff --staged --quiet; then
+            echo "Estimate unchanged"
+            exit 0
+          fi
+          git commit -m "state: v3 quarterly estimate $(date -u +%Y-%m-%d)"
+          git status --porcelain
+          git pull --rebase --autostash origin main
+          git push
+
+      - name: Alert on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: "v3 quarterly estimate failed",
+              body: `The quarterly re-estimate failed.\n\n${runUrl}\n\n` +
+                `The weekly nowcast keeps running on the previous estimate and ` +
+                `will refuse once it is more than 200 days old, so this is not ` +
+                `urgent — but it is the clock starting.`,
+              labels: ["pipeline-failure"],
+              assignees: [context.repo.owner],
+            });

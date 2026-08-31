@@ -1,0 +1,132 @@
+{
+  "schema": "v3-backtest-1",
+  "window": {
+    "first_target": "2022Q4",
+    "last_target": "2026Q1",
+    "n_vintages": 40,
+    "n_quarters": 14
+  },
+  "scores": {
+    "v3": {
+      "mae": 0.2418,
+      "rmse": 0.2687,
+      "bias": 0.1197,
+      "r_squared": 0.1586,
+      "dispersion_ratio": 0.4477,
+      "calibrated_ratio": 0.3983
+    },
+    "v2": {
+      "mae": 0.3397,
+      "rmse": 0.4046,
+      "bias": 0.272,
+      "r_squared": 0.0701,
+      "dispersion_ratio": 0.879,
+      "calibrated_ratio": 0.2648
+    }
+  },
+  "by_quarter": [
+    {
+      "target": "2022Q4",
+      "actual": 0.8252,
+      "v3": 0.6805,
+      "v2": 1.0156,
+      "n_vintages": 2
+    },
+    {
+      "target": "2023Q1",
+      "actual": 0.4779,
+      "v3": 0.6985,
+      "v2": 1.0055,
+      "n_vintages": 3
+    },
+    {
+      "target": "2023Q2",
+      "actual": 0.4551,
+      "v3": 0.562,
+      "v2": 0.8486,
+      "n_vintages": 3
+    },
+    {
+      "target": "2023Q3",
+      "actual": 0.4032,
+      "v3": 0.5455,
+      "v2": 0.5046,
+      "n_vintages": 3
+    },
+    {
+      "target": "2023Q4",
+      "actual": -0.0078,
+      "v3": 0.3345,
+      "v2": 0.5512,
+      "n_vintages": 3
+    },
+    {
+      "target": "2024Q1",
+      "actual": 0.2443,
+      "v3": 0.5972,
+      "v2": 0.8656,
+      "n_vintages": 3
+    },
+    {
+      "target": "2024Q2",
+      "actual": 0.2518,
+      "v3": 0.3829,
+      "v2": 0.6447,
+      "n_vintages": 3
+    },
+    {
+      "target": "2024Q3",
+      "actual": 0.3056,
+      "v3": 0.4408,
+      "v2": 0.8901,
+      "n_vintages": 3
+    },
+    {
+      "target": "2024Q4",
+      "actual": 0.4372,
+      "v3": 0.6379,
+      "v2": 0.6877,
+      "n_vintages": 3
+    },
+    {
+      "target": "2025Q1",
+      "actual": 0.2604,
+      "v3": 0.5725,
+      "v2": 0.2688,
+      "n_vintages": 3
+    },
+    {
+      "target": "2025Q2",
+      "actual": 0.9687,
+      "v3": 0.4939,
+      "v2": 0.7903,
+      "n_vintages": 3
+    },
+    {
+      "target": "2025Q3",
+      "actual": 0.382,
+      "v3": 0.6241,
+      "v2": 0.5112,
+      "n_vintages": 3
+    },
+    {
+      "target": "2025Q4",
+      "actual": 0.8731,
+      "v3": 0.6303,
+      "v2": 0.6248,
+      "n_vintages": 3
+    },
+    {
+      "target": "2026Q1",
+      "actual": 0.2743,
+      "v3": 0.6099,
+      "v2": 0.8115,
+      "n_vintages": 2
+    }
+  ],
+  "notes": {
+    "pseudo_real_time": "Both models see REVISED data and are scored against revised outcomes. That flatters both, comparably. A first-print backtest does not exist for either.",
+    "window_start": "Starts 2023. The COVID factor runs to December 2021, so a 2022 vintage sits on its edge and v3 runs a quarter behind through it -- 2.12pp mean error in 2022 against 0.45pp in 2024.",
+    "v2_config": "v2 at cache/ci_recalib/qa_a10_acc.csv, its shipping backtest. Its predictor selection is fixed to the full sample, a look-ahead that flatters v2 and has no counterpart in v3."
+  }
+}

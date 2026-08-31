@@ -1,0 +1,172 @@
+{
+  "schema": "v3-history-1",
+  "runs": [
+    {
+      "run_date": "2026-06-01",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.633,
+      "ci_95_low": -0.0411,
+      "ci_68_low": 0.2891,
+      "ci_68_high": 0.9442,
+      "ci_95_high": 1.2725,
+      "data_through": "2026-04",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-06-08",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.4841,
+      "ci_95_low": -0.1729,
+      "ci_68_low": 0.1467,
+      "ci_68_high": 0.7847,
+      "ci_95_high": 1.1155,
+      "data_through": "2026-05",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-06-15",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.489,
+      "ci_95_low": -0.1662,
+      "ci_68_low": 0.1851,
+      "ci_68_high": 0.7955,
+      "ci_95_high": 1.104,
+      "data_through": "2026-05",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-06-22",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.4937,
+      "ci_95_low": -0.1055,
+      "ci_68_low": 0.1807,
+      "ci_68_high": 0.8056,
+      "ci_95_high": 1.0955,
+      "data_through": "2026-05",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-06-29",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.489,
+      "ci_95_low": -0.1191,
+      "ci_68_low": 0.1629,
+      "ci_68_high": 0.8025,
+      "ci_95_high": 1.088,
+      "data_through": "2026-05",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-07-06",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.598,
+      "ci_95_low": 0.048,
+      "ci_68_low": 0.2887,
+      "ci_68_high": 0.892,
+      "ci_95_high": 1.1529,
+      "data_through": "2026-06",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-07-13",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.5988,
+      "ci_95_low": -0.0269,
+      "ci_68_low": 0.298,
+      "ci_68_high": 0.884,
+      "ci_95_high": 1.1579,
+      "data_through": "2026-06",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-07-20",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.5993,
+      "ci_95_low": 0.0068,
+      "ci_68_low": 0.2896,
+      "ci_68_high": 0.8726,
+      "ci_95_high": 1.1955,
+      "data_through": "2026-06",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-07-27",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.6012,
+      "ci_95_low": -0.0185,
+      "ci_68_low": 0.298,
+      "ci_68_high": 0.8839,
+      "ci_95_high": 1.1941,
+      "data_through": "2026-06",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-08-03",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.6008,
+      "ci_95_low": -0.0139,
+      "ci_68_low": 0.2842,
+      "ci_68_high": 0.9016,
+      "ci_95_high": 1.163,
+      "data_through": "2026-06",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-08-10",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.637,
+      "ci_95_low": 0.0485,
+      "ci_68_low": 0.3316,
+      "ci_68_high": 0.943,
+      "ci_95_high": 1.2247,
+      "data_through": "2026-07",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-08-17",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.6366,
+      "ci_95_low": 0.0209,
+      "ci_68_low": 0.3449,
+      "ci_68_high": 0.9543,
+      "ci_95_high": 1.2195,
+      "data_through": "2026-07",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-08-24",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.6361,
+      "ci_95_low": 0.0913,
+      "ci_68_low": 0.3442,
+      "ci_68_high": 0.9328,
+      "ci_95_high": 1.2352,
+      "data_through": "2026-07",
+      "estimate_asof": "2026-08-31",
+      "backfilled": true
+    },
+    {
+      "run_date": "2026-08-31",
+      "target_quarter": "2026 Q2",
+      "qoq_growth_pct": 0.6354,
+      "ci_95_low": 0.1004,
+      "ci_68_low": 0.3548,
+      "ci_68_high": 0.9269,
+      "ci_95_high": 1.2098,
+      "data_through": "2026-08",
+      "estimate_asof": "2026-08-31"
+    }
+  ]
+}

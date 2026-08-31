@@ -114,11 +114,26 @@ export interface AccuracyError {
   yoy_rba: number | null;
   somp_release: string | null;
   edge_pp: number | null;
+  // TRUE when this row is what the model actually published before the ABS
+  // printed the quarter, rather than a backtest re-run over data that was
+  // already known. The distinction is the whole credibility of a track record:
+  // a backtest can be tuned to its own history, a live call cannot. Absent on
+  // v2's payload and on every v3 row until the first quarter completes.
+  is_live?: boolean;
+  // The date the live figure was published, so a reader can check it against
+  // `data/nowcast_history_v3.json`.
+  live_run_date?: string;
 }
 
 export interface RbaComparison {
   n: number;
   avg_edge_pp: number | null;
+  // The two error rates side by side, and who landed closer. A mean signed gap
+  // hides how big either forecaster's misses were and cancels one large error
+  // in each direction to nothing. Optional: v2's payload predates these.
+  ours_mae?: number | null;
+  rba_mae?: number | null;
+  we_were_closer?: number | null;
 }
 
 export interface Performance {
@@ -204,6 +219,100 @@ export interface BackcastData {
   backcasts: Backcast[];
 }
 
+// ---------------------------------------------------------------------------
+// v3 (NY Fed Staff Nowcast 2.0 port, Australian panel)
+// ---------------------------------------------------------------------------
+
+// A REFUSAL IS A STATUS, NOT AN ABSENT FILE. v3 declines to publish rather than
+// emit a figure it does not trust — a stale feed, or a chain that left GDP
+// disconnected from the panel. The page must render that as a refusal; falling
+// back to the previous file would show last week's number as if it were
+// current, which is the failure the model's guards exist to prevent.
+export interface V3Horizon {
+  quarter: string;
+  kind: "nowcast" | "forecast";
+  qoq_growth_pct: number;
+  annualised_growth_pct: number;
+  ci_68_low?: number;
+  ci_68_high?: number;
+  ci_95_low?: number;
+  ci_95_high?: number;
+  gdp_chain_volume_millions?: number;
+}
+
+export interface LatestV3 {
+  schema: string;
+  status: "ok" | "refused";
+  generated_at: string;
+  as_of: string;
+  // present when status === "refused"
+  refusal_reason?: string;
+  refusal_detail?: string;
+  // present when status === "ok"
+  target_quarter?: string;
+  data_through?: string;
+  prev_level?: { value: number; quarter: string } | null;
+  horizons: V3Horizon[];
+  vintages?: V3Vintage[];
+  next_gdp_release_date?: string;
+  ci_basis?: string;
+  panel?: {
+    n_series: number;
+    n_months: number;
+    first_month: string;
+    series: string[];
+    deflator_skipped: Record<string, string>;
+  };
+  diagnostics?: {
+    gdp_global_loading: number;
+    collapse_floor: number;
+    n_gs: number;
+    n_burn: number;
+    seed: number;
+  };
+}
+
+export interface V3Vintage {
+  run_date: string;
+  target_quarter: string;
+  qoq_growth_pct: number;
+  ci_68_low: number;
+  ci_68_high: number;
+  ci_95_low: number;
+  ci_95_high: number;
+  data_through: string;
+}
+
+export interface V3Score {
+  mae: number;
+  rmse: number;
+  bias: number;
+  r_squared: number;
+  // An honest conditional mean varies at sqrt(R^2) of the outcome's spread.
+  // Varying more than that is confidence the model has not earned.
+  dispersion_ratio: number;
+  calibrated_ratio: number;
+}
+
+export interface V3Backtest {
+  schema: string;
+  window: {
+    first_target: string;
+    last_target: string;
+    n_vintages: number;
+    n_quarters: number;
+  };
+  scores: { v3: V3Score; v2: V3Score };
+  by_quarter: {
+    target: string;
+    actual: number;
+    v3: number;
+    v2: number;
+    n_vintages: number;
+  }[];
+  notes: Record<string, string>;
+}
+
 export interface DashboardData {
   latest: LatestNowcast;
   gdp: GdpSeries;
@@ -215,4 +324,9 @@ export interface DashboardData {
   backcasts?: BackcastData;
   performanceV2?: Performance; // backcast track record in the live $M schema
   indicatorsV2?: IndicatorData; // the v2 model's input panel
+  // v3 preview artifacts (optional — present once the v3 runner has emitted them).
+  latestV3?: LatestV3;
+  backtestV3?: V3Backtest;
+  indicatorsV3?: IndicatorData; // the v3 model's input panel
+  performanceV3?: Performance;  // v3's backtest track record
 }

@@ -1,0 +1,749 @@
+<title>Where v3 Can See</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,400;0,500;0,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --paper:      #F6F8FA;
+  --paper-2:    #FFFFFF;
+  --sunk:       #EDF1F5;
+  --ink:        #101820;
+  --muted:      #586472;
+  --faint:      #7C8896;
+  --rule:       #D9E0E7;
+  --rule-soft:  #E6EBF0;
+  --accent:     #0B6E77;
+  --accent-bg:  #E2F0F1;
+  --warn:       #A8481A;
+  --warn-bg:    #F8EAE1;
+  --good:       #2F6B4F;
+  --good-bg:    #E4EFE8;
+  --shadow:     0 1px 2px rgba(16,24,32,.05), 0 8px 24px -16px rgba(16,24,32,.28);
+
+  --measure: 66ch;
+  --wide: 62rem;
+
+  --step--1: clamp(.83rem, .8rem + .12vw, .89rem);
+  --step-0:  clamp(1.06rem, 1.02rem + .2vw, 1.16rem);
+  --step-1:  clamp(1.3rem, 1.2rem + .4vw, 1.5rem);
+  --step-2:  clamp(1.6rem, 1.4rem + .8vw, 2.1rem);
+  --step-3:  clamp(2.1rem, 1.7rem + 1.7vw, 3.2rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:     #0C1116;
+    --paper-2:   #121A21;
+    --sunk:      #101820;
+    --ink:       #DEE6ED;
+    --muted:     #94A2B0;
+    --faint:     #75838F;
+    --rule:      #24303B;
+    --rule-soft: #1B242D;
+    --accent:    #45B3BC;
+    --accent-bg: #11302F;
+    --warn:      #DB8551;
+    --warn-bg:   #2E1F16;
+    --good:      #6FB08D;
+    --good-bg:   #14261D;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:     #0C1116;
+  --paper-2:   #121A21;
+  --sunk:      #101820;
+  --ink:       #DEE6ED;
+  --muted:     #94A2B0;
+  --faint:     #75838F;
+  --rule:      #24303B;
+  --rule-soft: #1B242D;
+  --accent:    #45B3BC;
+  --accent-bg: #11302F;
+  --warn:      #DB8551;
+  --warn-bg:   #2E1F16;
+  --good:      #6FB08D;
+  --good-bg:   #14261D;
+  --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: var(--step-0);
+  font-optical-sizing: auto;
+  line-height: 1.62;
+  margin: 0;
+  padding: 0 1.25rem 6rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: var(--wide); margin: 0 auto; }
+.col  { max-width: var(--measure); margin-inline: auto; }
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  padding: 4.5rem 0 2.25rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 1.1rem;
+}
+h1 {
+  font-size: var(--step-3);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -.02em;
+  text-wrap: balance;
+  margin: 0 0 1rem;
+}
+.standfirst {
+  font-size: var(--step-1);
+  line-height: 1.5;
+  color: var(--muted);
+  font-weight: 300;
+  text-wrap: pretty;
+  margin: 0;
+  max-width: 54ch;
+}
+.byline {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: var(--step--1);
+  color: var(--faint);
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.5rem;
+}
+
+/* ---------- sections ---------- */
+
+section { margin-bottom: 4rem; }
+
+h2 {
+  font-size: var(--step-2);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  margin: 0 0 1.2rem;
+}
+h3 {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  margin: 2.2rem 0 .7rem;
+}
+.kicker {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 .6rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.kicker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+p { margin: 0 0 1.1rem; text-wrap: pretty; }
+p:last-child { margin-bottom: 0; }
+
+strong { font-weight: 600; }
+em { font-style: italic; }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+code, .mono {
+  font-family: "IBM Plex Sans", ui-monospace, monospace;
+  font-size: .88em;
+  background: var(--sunk);
+  padding: .08em .34em;
+  border-radius: 3px;
+  border: 1px solid var(--rule-soft);
+}
+
+ul.plain { margin: 0 0 1.1rem; padding-left: 1.15rem; }
+ul.plain li { margin-bottom: .55rem; }
+
+/* ---------- summary card ---------- */
+
+.summary {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  padding: 1.75rem 1.9rem;
+  margin-bottom: 3.5rem;
+}
+.summary h2 { font-size: var(--step-1); margin-bottom: 1.1rem; }
+.summary dl { margin: 0; display: grid; gap: 1.05rem; }
+.summary dt {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: .74rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: .18rem;
+}
+.summary dd { margin: 0; }
+
+/* ---------- exhibits ---------- */
+
+.exhibit {
+  margin: 2.5rem 0;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.exhibit-body { padding: 1.5rem 1.5rem .75rem; overflow-x: auto; }
+.exhibit figcaption {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: var(--step--1);
+  line-height: 1.55;
+  color: var(--muted);
+  padding: .9rem 1.5rem 1.1rem;
+  border-top: 1px solid var(--rule-soft);
+  background: var(--sunk);
+}
+.exhibit figcaption b {
+  color: var(--ink);
+  font-weight: 600;
+}
+svg { display: block; width: 100%; height: auto; }
+svg text { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+
+/* ---------- tables ---------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: .87rem;
+  font-variant-numeric: tabular-nums;
+}
+caption { text-align: left; }
+th, td {
+  text-align: left;
+  padding: .55rem .7rem;
+  border-bottom: 1px solid var(--rule-soft);
+  white-space: nowrap;
+}
+thead th {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: bottom;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; }
+tr.total td { border-top: 1px solid var(--rule); font-weight: 600; }
+
+.pill {
+  display: inline-block;
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: .12rem .45rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.pill.bad  { background: var(--warn-bg);   color: var(--warn); }
+.pill.ok   { background: var(--good-bg);   color: var(--good); }
+.pill.note { background: var(--accent-bg); color: var(--accent); }
+
+/* error bar cell */
+.bar { position: relative; width: 100%; min-width: 8rem; height: .55rem; background: var(--sunk); border-radius: 2px; }
+.bar > span { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+
+/* ---------- callouts ---------- */
+
+.note {
+  border-left: 2px solid var(--accent);
+  background: var(--accent-bg);
+  padding: 1.1rem 1.3rem;
+  margin: 2rem 0;
+  border-radius: 0 3px 3px 0;
+}
+.note.caution { border-left-color: var(--warn); background: var(--warn-bg); }
+.note p { font-size: .97rem; }
+.note .kicker { color: var(--accent); margin-bottom: .45rem; }
+.note.caution .kicker { color: var(--warn); }
+.note .kicker::after { display: none; }
+
+.pullnum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2.5rem;
+  margin: 2rem 0;
+  padding: 1.4rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.pullnum div { flex: 1 1 8rem; }
+.pullnum .n {
+  font-size: var(--step-2);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  display: block;
+  margin-bottom: .35rem;
+}
+.pullnum .n.bad { color: var(--warn); }
+.pullnum .n.ok  { color: var(--good); }
+.pullnum .l {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: var(--step--1);
+  color: var(--muted);
+  line-height: 1.4;
+  display: block;
+}
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding-top: 1.75rem;
+  margin-top: 4rem;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: var(--step--1);
+  color: var(--faint);
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="masthead col">
+  <p class="eyebrow">Nowcast v3 &middot; briefing</p>
+  <h1>Where v3 Can See</h1>
+  <p class="standfirst">The model can't reach back before 2021, shouldn't be trusted before 2023, and produced a wild answer for 2022. Here is why, in plain English.</p>
+  <p class="byline">
+    <span>29 August 2026</span>
+    <span>Based on 146 model fits run 28 August</span>
+    <span>Written for someone coming to this fresh</span>
+  </p>
+</header>
+
+<div class="col">
+
+<div class="summary">
+  <h2>The whole thing in four points</h2>
+  <dl>
+    <div>
+      <dt>The wall</dt>
+      <dd>One data feed — online job ads — only starts in January 2021. The model refuses to run without it. That sets a hard floor at <strong>May 2021</strong>.</dd>
+    </div>
+    <div>
+      <dt>The 2022 blowup</dt>
+      <dd>Not a bug. The model is built with a special dial for the lockdown period, and in 2022 it is still steering by that. It predicts the COVID rebound one quarter <em>after</em> the rebound ended.</dd>
+    </div>
+    <div>
+      <dt>The good news</dt>
+      <dd>From 2023 onward the machinery is stable and cheap to run. Every reliability test passed.</dd>
+    </div>
+    <div>
+      <dt>The bad news, and it's the real one</dt>
+      <dd>In the years where it <em>is</em> stable, v3 says almost the same number every time — around 0.6% — no matter what the data does. It barely beats simply guessing the long-run average.</dd>
+    </div>
+  </dl>
+</div>
+
+<section>
+  <p class="kicker">First, the machine</p>
+  <h2>What the model is doing, in one minute</h2>
+
+  <p>The model watches 14 Australian data series — jobs, exports, building approvals, business surveys, prices. Most of them come out monthly. GDP comes out quarterly, months late. The job is to guess the GDP number before the ABS publishes it.</p>
+
+  <p>It works by assuming a few hidden <em>trends</em> sit underneath everything. A "general economy" trend, a "labour market" trend, a "prices" trend. Each visible series is a noisy reflection of one or more of them. If exports and job ads both jump, the general trend probably moved, and GDP probably moved with it.</p>
+
+  <p>Those hidden trends can't be measured directly. They have to be estimated. And that estimation is where the strange behaviour comes from.</p>
+</section>
+
+<section>
+  <p class="kicker">The bit you asked about</p>
+  <h2>Warm and cold</h2>
+
+  <p>The model isn't solved with a formula. It's solved by trial and error, at scale. The computer starts with a guess for every hidden trend, then nudges everything thousands of times until the numbers stop moving. Statisticians call each nudge a <em>sweep</em>.</p>
+
+  <p>Here's the problem: <strong>where it starts changes where it ends up.</strong></p>
+
+  <p>Picture a marble on a hilly landscape. Drop it and it rolls downhill into a valley. But there are two valleys. One is the right answer, where GDP moves with the monthly data. The other is a wrong answer, where the model decides GDP just does its own thing and ignores everything else — that one still produces a confident-looking number, and it's meaningless.</p>
+
+  <figure class="exhibit">
+    <div class="exhibit-body">
+      <svg viewBox="0 0 800 300" role="img" aria-label="Two valleys. Cold starts drop marbles from random positions and most land in the wrong valley. A warm start places the marble directly in the right valley.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"></path>
+          </marker>
+        </defs>
+
+        <!-- landscape -->
+        <path d="M 30 70 C 90 70, 120 205, 200 205 C 280 205, 300 110, 390 110 C 480 110, 500 200, 580 200 C 660 200, 690 78, 770 78"
+              fill="none" stroke="var(--rule)" stroke-width="2.5"></path>
+
+        <!-- valley labels -->
+        <text x="200" y="243" text-anchor="middle" font-size="14" font-weight="600" fill="var(--warn)">The wrong valley</text>
+        <text x="200" y="262" text-anchor="middle" font-size="12.5" fill="var(--muted)">GDP ignores the data.</text>
+        <text x="200" y="279" text-anchor="middle" font-size="12.5" fill="var(--muted)">Confident, meaningless.</text>
+
+        <text x="580" y="238" text-anchor="middle" font-size="14" font-weight="600" fill="var(--good)">The right valley</text>
+        <text x="580" y="257" text-anchor="middle" font-size="12.5" fill="var(--muted)">GDP tracks the panel.</text>
+
+        <!-- cold drops -->
+        <text x="335" y="26" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="1.2" fill="var(--faint)">COLD START — DROPPED AT RANDOM</text>
+        <g stroke="var(--faint)" stroke-width="1.2" stroke-dasharray="3 3" fill="none" opacity=".85">
+          <path d="M 120 42 C 130 120, 170 160, 196 196"></path>
+          <path d="M 175 42 C 178 120, 190 165, 200 194"></path>
+          <path d="M 232 42 C 232 120, 214 165, 205 195"></path>
+          <path d="M 290 42 C 290 130, 240 175, 210 197"></path>
+          <path d="M 470 42 C 470 130, 520 170, 570 191"></path>
+          <path d="M 545 42 C 545 130, 565 165, 578 190"></path>
+        </g>
+        <g fill="var(--faint)">
+          <circle cx="120" cy="40" r="5"></circle>
+          <circle cx="175" cy="40" r="5"></circle>
+          <circle cx="232" cy="40" r="5"></circle>
+          <circle cx="290" cy="40" r="5"></circle>
+          <circle cx="470" cy="40" r="5"></circle>
+          <circle cx="545" cy="40" r="5"></circle>
+        </g>
+
+        <!-- warm placement -->
+        <path d="M 700 150 C 660 150, 630 178, 604 194" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#ah)"></path>
+        <text x="712" y="140" font-size="12.5" font-weight="600" fill="var(--accent)">WARM START</text>
+        <text x="712" y="158" font-size="12.5" fill="var(--muted)">placed where last</text>
+        <text x="712" y="175" font-size="12.5" fill="var(--muted)">month finished</text>
+
+        <!-- resting marbles -->
+        <circle cx="200" cy="199" r="7.5" fill="var(--warn)"></circle>
+        <circle cx="580" cy="194" r="7.5" fill="var(--accent)"></circle>
+      </svg>
+    </div>
+    <figcaption><b>The two valleys are real, and we measured them.</b> Started cold from a blank slate, the model landed in the right valley <b>28 times out of 75</b>. Started warm — placed where the previous month's run finished — it landed correctly <b>60 times out of 60</b>.</figcaption>
+  </figure>
+
+  <p>So: <strong>cold</strong> means starting from a blank, neutral guess. <strong>Warm</strong> means starting from last month's finished answer. Since a month of new data barely changes the picture, last month's answer is already very close to this month's — the marble is placed in the right valley instead of dropped from the sky.</p>
+
+  <p>Two things surprised me when I measured it.</p>
+
+  <p>First, <strong>warm isn't faster per sweep</strong>. It's identical. What warm saves is having to <em>retry</em>. A cold run that lands in the wrong valley has to be thrown away and re-run with a different random start, and there's no way to know in advance which will work. Six cold runs took eleven attempts between them.</p>
+
+  <p>Second, <strong>there is no lucky number you can reuse.</strong> A random start that works at one date fails at the next. We test them; the one that worked in 2022 failed at three later dates. So a cold-started backtest re-runs that lottery at every single date. That is the real cost, and warm removes it entirely.</p>
+
+  <div class="note">
+    <p class="kicker">Why this matters practically</p>
+    <p>A warm run takes <strong>28 seconds</strong>. The equivalent cold run, including its failed attempts, took <strong>21 minutes</strong> at one date. That's why we can now afford to test the model across the whole usable history instead of picking a short window.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Problem one</p>
+  <h2>The data is younger than you'd think</h2>
+
+  <p>Australia's official statistics go back a long way — GDP itself starts in 1959. But the model can only start when its <em>newest</em> series starts, because it refuses to run with a series that hasn't begun yet. That's deliberate: a blank row isn't missing data the model can work around, it's a series that doesn't exist.</p>
+
+  <figure class="exhibit">
+    <div class="exhibit-body">
+      <svg viewBox="0 0 800 400" role="img" aria-label="Timeline showing when each of the 14 data series begins. Job ads begins in 2021, far later than everything else, setting the wall.">
+        <!-- axis: x = 70 + (year - 1960) * 10.606, ending 2026 at 770 -->
+        <g font-size="11" fill="var(--faint)">
+          <text x="70"  y="392" text-anchor="middle">1960</text>
+          <text x="282" y="392" text-anchor="middle">1980</text>
+          <text x="494" y="392" text-anchor="middle">2000</text>
+          <text x="706" y="392" text-anchor="middle">2020</text>
+        </g>
+        <g stroke="var(--rule-soft)" stroke-width="1">
+          <line x1="70"  y1="18" x2="70"  y2="376"></line>
+          <line x1="282" y1="18" x2="282" y2="376"></line>
+          <line x1="494" y1="18" x2="494" y2="376"></line>
+          <line x1="706" y1="18" x2="706" y2="376"></line>
+        </g>
+
+        <!-- the wall: January 2021 -->
+        <rect x="717" y="18" width="53" height="358" fill="var(--warn-bg)"></rect>
+        <line x1="717" y1="10" x2="717" y2="376" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 3"></line>
+        <text x="709" y="30" font-size="12" font-weight="600" text-anchor="end" fill="var(--warn)">THE WALL &mdash; JAN 2021</text>
+        <text x="709" y="47" font-size="11.5" text-anchor="end" fill="var(--warn)">nothing earlier can be built</text>
+
+        <!-- bars: x = 70 + (year-1960)*10.6 ; end 770 -->
+        <g font-size="12" fill="var(--muted)">
+          <text x="0" y="72">GDP &amp; income</text>
+          <text x="0" y="99">Exports, imports</text>
+          <text x="0" y="126">Employment</text>
+          <text x="0" y="153">Unemployment rate</text>
+          <text x="0" y="180">Commodity prices</text>
+          <text x="0" y="207">Building approvals</text>
+          <text x="0" y="234">Unit labour cost</text>
+          <text x="0" y="261">NAB conditions</text>
+          <text x="0" y="288">AiG factory survey</text>
+          <text x="0" y="315">Household spending</text>
+          <text x="0" y="342">Monthly CPI</text>
+          <text x="0" y="369" font-weight="600" fill="var(--warn)">Online job ads</text>
+        </g>
+        <g>
+          <rect x="70"  y="61"  width="700" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="187" y="88"  width="583" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="261" y="115" width="509" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="261" y="142" width="509" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="303" y="169" width="467" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="314" y="196" width="456" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="335" y="223" width="435" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="462" y="250" width="308" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="504" y="277" width="266" height="14" rx="2" fill="var(--rule)"></rect>
+          <rect x="620" y="304" width="150" height="14" rx="2" fill="var(--muted)"></rect>
+          <rect x="672" y="331" width="98"  height="14" rx="2" fill="var(--muted)"></rect>
+          <rect x="717" y="358" width="53"  height="14" rx="2" fill="var(--warn)"></rect>
+        </g>
+      </svg>
+    </div>
+    <figcaption><b>The newest series sets the floor.</b> Eleven of the fourteen series stretch back decades. Online job ads starts January 2021, and that alone is what stops the model running at any earlier date. Household spending (2012) and monthly CPI (2017) are the next-youngest.</figcaption>
+  </figure>
+
+  <h3>Three data problems sit behind that picture</h3>
+
+  <p><strong>The ABS keeps killing monthly series.</strong> Five have been discontinued since March 2025 — retail trade, the monthly CPI indicator, business turnover, payroll jobs, and employee earnings. A dead series doesn't announce itself. It just stops updating, and looks fine until you check the dates.</p>
+
+  <p><strong>Monthly inflation is split in half.</strong> The live ABS catalogue only publishes monthly CPI back to April 2024. The rest — back to September 2017 — sits in a closed catalogue that will never update again. We now stitch the two together, which is why the CPI bar above reaches 2017 and not 2024.</p>
+
+  <p><strong>One series couldn't be stitched, so we removed it.</strong> There was a second inflation measure (the "trimmed mean"). The old catalogue only ever published it as a percentage rate, not as an index, and you can't join a rate onto an index. It was stuck at April 2024, and being stuck, <em>it</em> was setting the floor — no test could start before July 2024. Dropping it moved the floor back to May 2021 and roughly tripled the testable history. That was yesterday's change.</p>
+</section>
+
+<section>
+  <p class="kicker">Problem two, and it's the interesting one</p>
+  <h2>Why 2022 comes out so huge</h2>
+
+  <p>The short answer: <strong>COVID is still in the model's field of view, and in 2022 it is most of what the model can see.</strong></p>
+
+  <p>Look at Australian quarterly GDP growth. Normal quarters move by a few tenths of a percent. The lockdown quarters move by multiples of that — one of them by nearly seven percent.</p>
+
+  <figure class="exhibit">
+    <div class="exhibit-body">
+      <svg viewBox="0 0 800 300" role="img" aria-label="Australian quarterly GDP growth 2018 to 2026. The 2020 to 2021 quarters dwarf every other quarter, including a fall of 6.7 percent and rebounds above 3 percent.">
+        <!-- covid band: bars 9..16 of 33 -->
+        <rect x="204" y="14" width="178" height="256" fill="var(--warn-bg)"></rect>
+        <text x="293" y="32" text-anchor="middle" font-size="11.5" font-weight="600" letter-spacing=".5" fill="var(--warn)">THE COVID WINDOW</text>
+        <text x="293" y="49" text-anchor="middle" font-size="11" fill="var(--warn)">the model's special dial</text>
+        <text x="293" y="65" text-anchor="middle" font-size="11" fill="var(--warn)">is switched on here</text>
+
+        <!-- zero line: 0% at y=170; scale 14px per 1% -->
+        <line x1="30" y1="170" x2="780" y2="170" stroke="var(--rule)" stroke-width="1"></line>
+        <text x="8" y="174" font-size="11" fill="var(--faint)">0%</text>
+        <line x1="30" y1="128" x2="780" y2="128" stroke="var(--rule-soft)" stroke-width="1"></line>
+        <text x="8" y="132" font-size="11" fill="var(--faint)">+3</text>
+        <line x1="30" y1="226" x2="780" y2="226" stroke="var(--rule-soft)" stroke-width="1"></line>
+        <text x="8" y="230" font-size="11" fill="var(--faint)">−4</text>
+
+        <g id="bars"></g>
+
+        <text x="40"  y="292" font-size="11" text-anchor="middle" fill="var(--faint)">2018</text>
+        <text x="216" y="292" font-size="11" text-anchor="middle" fill="var(--faint)">2020</text>
+        <text x="392" y="292" font-size="11" text-anchor="middle" fill="var(--faint)">2022</text>
+        <text x="568" y="292" font-size="11" text-anchor="middle" fill="var(--faint)">2024</text>
+        <text x="744" y="292" font-size="11" text-anchor="middle" fill="var(--faint)">2026</text>
+      </svg>
+    </div>
+    <figcaption><b>Eight quarters out of thirty-three hold 91% of all the movement.</b> Measured properly: taking 2018 to today, the eight COVID quarters account for 91.1% of the total squared variation in GDP growth. Everything since 2022 is the thin band near the zero line.</figcaption>
+  </figure>
+
+  <p>The model was given a dedicated dial to absorb that period — an extra hidden trend that is switched on only between March 2020 and December 2021, and off everywhere else. Without it, the lockdown quarters would distort everything.</p>
+
+  <p>But that dial creates its own problem. Because COVID is such a huge share of GDP's total movement, the dial is doing most of the work of explaining GDP. And when you ask the model to predict a quarter in early 2022, it is standing right at the edge of that window, with barely any post-COVID data to learn from. The most recent thing it has seen is the biggest economic shock in the series.</p>
+
+  <h3>So it predicts the rebound, one quarter late</h3>
+
+  <p>This is the clearest way to see it. Below, what the model said, against what actually happened.</p>
+
+  <figure class="exhibit">
+    <div class="exhibit-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Run date</th>
+            <th>Quarter being predicted</th>
+            <th class="num">Model said</th>
+            <th class="num">Actually was</th>
+            <th class="num">Miss</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Feb 2022</td><td>2021 Q4</td><td class="num">+0.69%</td><td class="num">+3.63%</td><td class="num"><span class="pill bad">−2.94</span></td></tr>
+          <tr><td>Mar 2022</td><td>2021 Q4</td><td class="num">+1.93%</td><td class="num">+3.63%</td><td class="num"><span class="pill bad">−1.70</span></td></tr>
+          <tr><td>Apr 2022</td><td>2022 Q1</td><td class="num">+4.12%</td><td class="num">+0.93%</td><td class="num"><span class="pill bad">+3.19</span></td></tr>
+          <tr><td>May 2022</td><td>2022 Q1</td><td class="num">+2.60%</td><td class="num">+0.93%</td><td class="num"><span class="pill bad">+1.67</span></td></tr>
+          <tr><td>Jun 2022</td><td>2022 Q1</td><td class="num">+2.04%</td><td class="num">+0.93%</td><td class="num"><span class="pill bad">+1.11</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption><b>The model is a quarter behind.</b> While the real rebound was happening (2021 Q4, +3.6%) it predicted +0.7%, far too low. Then, once the rebound was over and growth had returned to +0.9%, it predicted +4.1% — far too high. It caught up to the rebound exactly when the rebound stopped.</figcaption>
+  </figure>
+
+  <p>Average miss in 2022: <strong>2.1 percentage points</strong>. For a number that normally lives between 0% and 1%, that is not a forecast, it's noise.</p>
+
+  <div class="note caution">
+    <p class="kicker">The practical conclusion</p>
+    <p>Don't test the model on 2022. It isn't a fair test — it is asking the model to work in the one window where its own design guarantees it can't. I'd start the evaluation at <strong>January 2023</strong>. That costs four quarters out of twenty and removes a source of noise that would tell us nothing.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">The part I think you're reacting to</p>
+  <h2>Even where it works, it barely says anything</h2>
+
+  <p>Once you leave 2022 behind, the model stops producing crazy numbers. The misses shrink a lot.</p>
+
+  <div class="pullnum">
+    <div><span class="n bad">2.12</span><span class="l">average miss in 2022, percentage points</span></div>
+    <div><span class="n">0.45</span><span class="l">average miss in 2024</span></div>
+    <div><span class="n ok">0.28</span><span class="l">average miss in 2026</span></div>
+  </div>
+
+  <p>That looks like progress, and in one narrow sense it is: on the Q1 2026 quarter that started this whole project — where v2 called +0.77% against an outcome near +0.3%, a miss of about half a point — v3 missed by about 0.30. Better, on that one quarter.</p>
+
+  <p>But look at <em>how</em> it gets there.</p>
+
+  <figure class="exhibit">
+    <div class="exhibit-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Quarter</th>
+            <th class="num">What happened</th>
+            <th class="num">v3 said</th>
+            <th class="num">Miss</th>
+            <th style="width:38%">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>2023 Q4</td><td class="num">−0.01%</td><td class="num">+0.56 to +0.67%</td><td class="num">0.57&ndash;0.68</td>
+            <td><div class="bar"><span style="left:0;width:62%;background:var(--warn)"></span></div></td></tr>
+          <tr><td>2024 Q1</td><td class="num">+0.24%</td><td class="num">+0.55 to +0.67%</td><td class="num">0.31&ndash;0.43</td>
+            <td><div class="bar"><span style="left:0;width:37%;background:var(--warn)"></span></div></td></tr>
+          <tr><td>2025 Q4</td><td class="num">+0.87%</td><td class="num">+0.58 to +0.64%</td><td class="num">0.23&ndash;0.29</td>
+            <td><div class="bar"><span style="left:0;width:25%;background:var(--accent)"></span></div></td></tr>
+          <tr><td>2026 Q1</td><td class="num">+0.27%</td><td class="num">+0.56 to +0.59%</td><td class="num">0.29&ndash;0.32</td>
+            <td><div class="bar"><span style="left:0;width:28%;background:var(--accent)"></span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption><b>Reality ranged from −0.01% to +0.87%. v3 answered between +0.55% and +0.67% every single time.</b> It is not tracking the economy. It is saying roughly the average, and the average is a decent guess, so the misses look respectable.</figcaption>
+  </figure>
+
+  <p>The fair way to judge that is against the dumbest possible alternatives. Two of them: "assume this quarter matches last quarter," and "assume this quarter matches the ten-year average."</p>
+
+  <figure class="exhibit">
+    <div class="exhibit-body">
+      <table>
+        <thead>
+          <tr><th>Method</th><th class="num">Average miss</th><th class="num">RMS error</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>v3 nowcast</strong></td><td class="num">0.366</td><td class="num">0.392</td><td><span class="pill note">best, barely</span></td></tr>
+          <tr><td>Just say the 10-year average</td><td class="num">0.381</td><td class="num">0.400</td><td><span class="pill note">4% worse</span></td></tr>
+          <tr><td>Just repeat last quarter</td><td class="num">0.425</td><td class="num">0.444</td><td><span class="pill note">16% worse</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption><b>v3 beats "say the average" by 4%.</b> Ten scored predictions across four distinct quarters, so this is a thin sample and not a verdict. But it is the right shape of question, and the answer is not yet encouraging.</figcaption>
+  </figure>
+
+  <p>So your instinct was right. The reliability results are genuinely good; the <em>usefulness</em> results are not, yet. A nowcast that answers "about 0.6%" regardless of the incoming data isn't reading the data.</p>
+
+  <p>Why might that be? The most likely reason is the same COVID problem, one level deeper. Because those eight quarters hold 91% of GDP's movement, fitting GDP is mostly an exercise in fitting COVID. The link between GDP and the monthly indicators — which is the entire point of a nowcast — ends up weak, even in the "right valley". The model isn't broken. It's being drowned out.</p>
+</section>
+
+<section>
+  <p class="kicker">Caveats, stated plainly</p>
+  <h2>What this does and doesn't prove</h2>
+
+  <ul class="plain">
+    <li><strong>These runs weren't designed as an accuracy test.</strong> They were designed to measure cost and stability. The accuracy read above is a bonus I extracted afterwards, on ten predictions across four quarters. That's a hint, not a result.</li>
+    <li><strong>The comparison flatters v3.</strong> The model was fed today's revised figures, not the figures that existed at the time. Real forecasting is harder than this. A proper test needs the original data as first published.</li>
+    <li><strong>"Miss" is measured against revised GDP too</strong> — the ABS itself revises these numbers, sometimes substantially.</li>
+    <li><strong>The reliability findings are solid.</strong> 60 out of 60, and 28 out of 75, are large enough to trust.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">Where I'd go next</p>
+  <h2>Three things, in order</h2>
+
+  <h3>1. Run the full test properly, 2023 onward</h3>
+  <p>Now affordable — about an hour and a half of compute for every quarter we can reach. That turns the ten-prediction hint above into a real answer, scored against v2 and against the dumb benchmarks on the same terms.</p>
+
+  <h3>2. Deal with the COVID problem directly</h3>
+  <p>This is the root cause of both the 2022 blowup and the flat-line behaviour. Options exist — shorten the window the special dial covers, start the model's history after COVID entirely, or handle those quarters differently. Each is a real change with real trade-offs, and it is the question worth spending time on.</p>
+
+  <h3>3. Only then, look at the panel</h3>
+  <p>The original theory was that v2 was blind to commodity and survey signals. v3 added those. But if GDP's link to <em>all</em> the monthly data is weak, adding more series won't help — the problem is upstream of which series we picked.</p>
+
+  <div class="note">
+    <p class="kicker">The one-line version</p>
+    <p>The plumbing is now fast, reliable, and honest about its limits. The model is not yet earning its keep, and the reason looks structural rather than a matter of tuning.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Sources: 146 model fits run 28 August 2026, recorded at <span class="mono">docs/measurements/2026-08-28-plan-c-phase0.csv</span>. GDP figures from the project's own recorded ABS vintage (5206.0, chain volume, seasonally adjusted). Series start dates from <span class="mono">nowcasting_v3/tests/fixtures/au/vintage</span>. Every number in this page is reproducible from those files.</p>
+</footer>
+
+</div>
+</div>
+
+<script>
+(function () {
+  var d = [1.03,0.74,0.38,0.25,0.73,0.31,0.58,0.59,-0.22,-6.74,3.47,3.40,2.16,0.82,-1.71,3.63,
+           0.93,0.99,0.48,0.83,0.48,0.46,0.40,-0.01,0.24,0.25,0.31,0.44,0.26,0.97,0.38,0.87,0.27];
+  var g = document.getElementById("bars");
+  if (!g) return;
+  var x0 = 32, w = 16, gap = 6, zero = 170, scale = 14;
+  var ns = "http://www.w3.org/2000/svg";
+  d.forEach(function (v, i) {
+    var h = Math.abs(v) * scale;
+    var r = document.createElementNS(ns, "rect");
+    r.setAttribute("x", x0 + i * (w + gap));
+    r.setAttribute("y", v >= 0 ? zero - h : zero);
+    r.setAttribute("width", w);
+    r.setAttribute("height", Math.max(h, 1));
+    r.setAttribute("rx", "1.5");
+    var covid = i >= 8 && i <= 15;
+    r.setAttribute("fill", covid ? "var(--warn)" : "var(--muted)");
+    if (!covid) r.setAttribute("opacity", ".55");
+    g.appendChild(r);
+  });
+})();
+</script>

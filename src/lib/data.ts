@@ -9,6 +9,8 @@ import type {
   DashboardData,
   LatestV2,
   BackcastData,
+  LatestV3,
+  V3Backtest,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -74,5 +76,9 @@ export function loadDashboardData(): DashboardData {
     backcasts: readJsonOptional<BackcastData>("backcasts.json"),
     performanceV2: readJsonOptional<Performance>("performance_v2.json"),
     indicatorsV2: readJsonOptional<IndicatorData>("indicators_v2.json"),
+    latestV3: readJsonOptional<LatestV3>("latest_v3.json"),
+    backtestV3: readJsonOptional<V3Backtest>("backtest_v3.json"),
+    indicatorsV3: readJsonOptional<IndicatorData>("indicators_v3.json"),
+    performanceV3: readJsonOptional<Performance>("performance_v3.json"),
   };
 }

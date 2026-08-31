@@ -104,14 +104,38 @@ def main() -> int:
     # means to a reader. Averaging a quarter's three vintages would flatter the
     # model by cancelling revisions within the quarter.
     gdp = load_vintage(ROOT / "nowcasting_v3/tests/fixtures/au/vintage").series["gdp"].dropna()
+
+    # The RBA's own Statement on Monetary Policy forecast, where one lines up.
+    # Only the June and December quarters have one: the SoMP publishes a
+    # YEAR-ENDED forecast, so the comparison is on year-ended growth, and only
+    # those quarters have a SoMP released roughly two months before our
+    # full-quarter estimate. Scored exactly as v2 does it (04_emit_json.R:593):
+    #     edge = |our error| - |RBA error|,  negative meaning we landed closer.
+    somp = pd.read_csv(ROOT / "pipeline/rba_somp_forecasts_v2.csv")
+    somp = somp.set_index("target_quarter")
+
     last = m.sort_values("asof").groupby("target", as_index=False).last()
     errors = []
     for r in last.itertuples():
+        label = r.target.replace("Q", " Q")
         lvl = float(gdp[gdp.index < r.target_date].iloc[-1])
         actual_lvl = lvl * (1 + r.actual_qq / 100)
         nowcast_lvl = lvl * (1 + r.nowcast_qq / 100)
+
+        # Year-ended: this quarter's level against the level four quarters back.
+        back = gdp[gdp.index < r.target_date]
+        yoy_nc = yoy_ac = yoy_rba = edge = release = None
+        if len(back) >= 4:
+            base = float(back.iloc[-4])
+            yoy_nc = round(100 * (nowcast_lvl / base - 1), 2)
+            yoy_ac = round(100 * (actual_lvl / base - 1), 2)
+            if label in somp.index:
+                yoy_rba = float(somp.loc[label, "yoy_forecast_pct"])
+                release = str(somp.loc[label, "somp_release"])
+                edge = round(abs(yoy_nc - yoy_ac) - abs(yoy_rba - yoy_ac), 2)
+
         errors.append({
-            "target_quarter": r.target.replace("Q", " Q"),
+            "target_quarter": label,
             "final_nowcast": round(nowcast_lvl),
             "actual": round(actual_lvl),
             "error_millions": round(nowcast_lvl - actual_lvl),
@@ -119,12 +143,8 @@ def main() -> int:
             "qoq_nowcast_pct": round(float(r.nowcast_qq), 2),
             "qoq_actual_pct": round(float(r.actual_qq), 2),
             "qoq_error_pp": round(float(r.nowcast_qq - r.actual_qq), 2),
-            # Carried explicitly as null rather than omitted. The site's
-            # `PerformanceSection` renders v2's payload, which has these, and an
-            # absent key is not the same as a stated "no comparison" -- v3 has
-            # no RBA forecast to score against, and the table should say so.
-            "yoy_nowcast": None, "yoy_actual": None, "yoy_rba": None,
-            "somp_release": None, "edge_pp": None,
+            "yoy_nowcast": yoy_nc, "yoy_actual": yoy_ac, "yoy_rba": yoy_rba,
+            "somp_release": release, "edge_pp": edge,
         })
     e = pd.DataFrame(errors)
     perf = {
@@ -132,7 +152,13 @@ def main() -> int:
         "mae_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
         "bias_millions": round(float(e.error_millions.mean())),
         "bias_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).mean()), 2),
-        "rba_comparison": {"n": 0, "avg_edge_pp": None},
+        "rba_comparison": {
+            "n": int(sum(1 for x in errors if x["edge_pp"] is not None)),
+            "avg_edge_pp": (
+                round(float(np.mean([x["edge_pp"] for x in errors
+                                     if x["edge_pp"] is not None])), 2)
+                if any(x["edge_pp"] is not None for x in errors) else None),
+        },
         "errors": errors,
     }
     perf_path = ROOT / "data" / "performance_v3.json"

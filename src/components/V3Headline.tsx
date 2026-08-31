@@ -1,30 +1,24 @@
 "use client";
 
 import { Bar, BarChart, Cell, ResponsiveContainer } from "recharts";
-import type { GdpSeries, LatestV3, Performance } from "@/lib/types";
+import type { GdpSeries, LatestV3 } from "@/lib/types";
 import { chartColors } from "@/lib/chartTheme";
 import { formatPct } from "@/lib/format";
 
 // The homepage headline card, with v3's numbers.
 //
-// ONE DELIBERATE DIFFERENCE FROM THE v2 CARD: this one shows an interval. v2's
-// card carries a note explaining why it does not — its band was the point
-// estimate plus or minus a standard deviation of past errors, labelled "about a
-// 2-in-3 chance", and it did not hold. v3's is a probability band: the mass of
-// the model's own posterior, which the Staff Nowcast 2.0 paper names as one of
-// the reasons the model was rebuilt Bayesian. Different object, so it is shown.
-//
-// The track-record line below the number is kept from v2's card regardless.
-// An interval says what the model believes; the track record says how that has
-// gone. A reader deserves both, and the second is the one that has teeth.
+// Deliberately just the numbers. The probability band is on the evolution
+// chart, where its width can be seen changing week to week — printed here it was
+// a second row of digits competing with the figure it qualifies. The track
+// record moved to Methodology, which is where a reader goes to ask how much to
+// trust any of this.
 
 interface Props {
   latest: LatestV3;
   gdp: GdpSeries;
-  performance?: Performance;
 }
 
-export default function V3Headline({ latest, gdp, performance }: Props) {
+export default function V3Headline({ latest, gdp }: Props) {
   const nowcast = latest.horizons.find((h) => h.kind === "nowcast");
   if (!nowcast) return null;
 
@@ -50,17 +44,11 @@ export default function V3Headline({ latest, gdp, performance }: Props) {
   const yoy =
     level && fourBack ? ((level / fourBack - 1) * 100) : undefined;
 
-  const has68 =
-    nowcast.ci_68_low !== undefined && nowcast.ci_68_high !== undefined;
-
   return (
     <section className="mb-8 border border-border-heavy p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] uppercase tracking-wider text-label">
           {nowcast.quarter} — our GDP estimate
-        </p>
-        <p className="text-[10px] uppercase tracking-wider text-label">
-          data through {latest.data_through}
         </p>
       </div>
 
@@ -73,7 +61,7 @@ export default function V3Headline({ latest, gdp, performance }: Props) {
         </div>
         {yoy !== undefined && (
           <div className="flex items-baseline gap-x-2">
-            <span className="font-headline text-2xl text-teal-500">
+            <span className="font-headline text-5xl text-teal-500">
               {formatPct(yoy)}
             </span>
             <span className="text-xs text-label">vs a year ago</span>
@@ -81,28 +69,7 @@ export default function V3Headline({ latest, gdp, performance }: Props) {
         )}
       </div>
 
-      {has68 && (
-        <p className="mt-2 text-xs text-label">
-          68% probability band {formatPct(nowcast.ci_68_low!)} to{" "}
-          {formatPct(nowcast.ci_68_high!)}
-          {nowcast.ci_95_low !== undefined && (
-            <> · 95% {formatPct(nowcast.ci_95_low)} to {formatPct(nowcast.ci_95_high!)}</>
-          )}
-        </p>
-      )}
 
-      {performance && performance.errors.length > 0 && (
-        <p className="mt-3 text-xs text-label">
-          Over the last {performance.errors.length} quarters this estimate has
-          missed the eventual figure by {performance.mae_pct.toFixed(2)}pp on
-          average
-          {performance.bias_pct > 0.05 &&
-            `, and has tended to run ${performance.bias_pct.toFixed(2)}pp high`}
-          {performance.bias_pct < -0.05 &&
-            `, and has tended to run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
-          .
-        </p>
-      )}
 
       <div className="mt-4 h-20">
         <ResponsiveContainer>

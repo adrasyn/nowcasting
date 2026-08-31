@@ -4,8 +4,8 @@
   "bias_millions": 795,
   "bias_pct": 0.12,
   "rba_comparison": {
-    "n": 0,
-    "avg_edge_pp": null
+    "n": 6,
+    "avg_edge_pp": -0.05
   },
   "errors": [
     {
@@ -17,8 +17,8 @@
       "qoq_nowcast_pct": 0.56,
       "qoq_actual_pct": 0.83,
       "qoq_error_pp": -0.26,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 2.99,
+      "yoy_actual": 3.26,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -32,8 +32,8 @@
       "qoq_nowcast_pct": 0.68,
       "qoq_actual_pct": 0.48,
       "qoq_error_pp": 0.2,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 3.01,
+      "yoy_actual": 2.8,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -47,11 +47,11 @@
       "qoq_nowcast_pct": 0.61,
       "qoq_actual_pct": 0.46,
       "qoq_error_pp": 0.15,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 2.41,
+      "yoy_actual": 2.26,
+      "yoy_rba": 1.75,
+      "somp_release": "2023-05",
+      "edge_pp": -0.36
     },
     {
       "target_quarter": "2023 Q3",
@@ -62,8 +62,8 @@
       "qoq_nowcast_pct": 0.57,
       "qoq_actual_pct": 0.4,
       "qoq_error_pp": 0.17,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 2.35,
+      "yoy_actual": 2.18,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -77,11 +77,11 @@
       "qoq_nowcast_pct": 0.38,
       "qoq_actual_pct": -0.01,
       "qoq_error_pp": 0.39,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.73,
+      "yoy_actual": 1.33,
+      "yoy_rba": 1.5,
+      "somp_release": "2023-11",
+      "edge_pp": 0.23
     },
     {
       "target_quarter": "2024 Q1",
@@ -92,8 +92,8 @@
       "qoq_nowcast_pct": 0.56,
       "qoq_actual_pct": 0.24,
       "qoq_error_pp": 0.32,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 1.42,
+      "yoy_actual": 1.1,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -107,11 +107,11 @@
       "qoq_nowcast_pct": 0.4,
       "qoq_actual_pct": 0.25,
       "qoq_error_pp": 0.15,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.05,
+      "yoy_actual": 0.89,
+      "yoy_rba": 1.2,
+      "somp_release": "2024-05",
+      "edge_pp": -0.15
     },
     {
       "target_quarter": "2024 Q3",
@@ -122,8 +122,8 @@
       "qoq_nowcast_pct": 0.49,
       "qoq_actual_pct": 0.31,
       "qoq_error_pp": 0.19,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 0.98,
+      "yoy_actual": 0.8,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -137,11 +137,11 @@
       "qoq_nowcast_pct": 0.67,
       "qoq_actual_pct": 0.44,
       "qoq_error_pp": 0.23,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.48,
+      "yoy_actual": 1.24,
+      "yoy_rba": 1.5,
+      "somp_release": "2024-11",
+      "edge_pp": -0.02
     },
     {
       "target_quarter": "2025 Q1",
@@ -152,8 +152,8 @@
       "qoq_nowcast_pct": 0.53,
       "qoq_actual_pct": 0.26,
       "qoq_error_pp": 0.27,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 1.53,
+      "yoy_actual": 1.26,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -167,11 +167,11 @@
       "qoq_nowcast_pct": 0.54,
       "qoq_actual_pct": 0.97,
       "qoq_error_pp": -0.42,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 1.56,
+      "yoy_actual": 1.98,
+      "yoy_rba": 1.8,
+      "somp_release": "2025-05",
+      "edge_pp": 0.24
     },
     {
       "target_quarter": "2025 Q3",
@@ -182,8 +182,8 @@
       "qoq_nowcast_pct": 0.61,
       "qoq_actual_pct": 0.38,
       "qoq_error_pp": 0.23,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 2.3,
+      "yoy_actual": 2.06,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
@@ -197,11 +197,11 @@
       "qoq_nowcast_pct": 0.61,
       "qoq_actual_pct": 0.87,
       "qoq_error_pp": -0.26,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null
+      "yoy_nowcast": 2.24,
+      "yoy_actual": 2.51,
+      "yoy_rba": 2.0,
+      "somp_release": "2025-11",
+      "edge_pp": -0.24
     },
     {
       "target_quarter": "2026 Q1",
@@ -212,8 +212,8 @@
       "qoq_nowcast_pct": 0.59,
       "qoq_actual_pct": 0.27,
       "qoq_error_pp": 0.32,
-      "yoy_nowcast": null,
-      "yoy_actual": null,
+      "yoy_nowcast": 2.84,
+      "yoy_actual": 2.52,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null

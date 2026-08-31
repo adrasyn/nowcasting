@@ -52,23 +52,19 @@ export default function V3Headline({ latest, gdp }: Props) {
         </p>
       </div>
 
-      {/* Figure and label set at one size, so each reads as a phrase rather than
-          a headline with a caption under it. The figure keeps the headline serif
-          and the teal; the label stays in the body face and muted, which is
-          enough hierarchy without a size jump. */}
       <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
         <div className="flex items-baseline gap-x-2">
-          <span className="font-headline text-3xl text-teal">
+          <span className="font-headline text-5xl text-teal">
             {formatPct(nowcast.qoq_growth_pct)}
           </span>
-          <span className="text-3xl text-label">growth this quarter</span>
+          <span className="text-xs text-label">growth this quarter</span>
         </div>
         {yoy !== undefined && (
           <div className="flex items-baseline gap-x-2">
-            <span className="font-headline text-3xl text-teal-500">
+            <span className="font-headline text-5xl text-teal-500">
               {formatPct(yoy)}
             </span>
-            <span className="text-3xl text-label">vs a year ago</span>
+            <span className="text-xs text-label">vs a year ago</span>
           </div>
         )}
       </div>

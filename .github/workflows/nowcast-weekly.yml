@@ -183,13 +183,27 @@ jobs:
           git add data/
           git add nowcasting_v2/data_raw/
           git add pipeline/.cache/model_output/vintages/vintage_tracking.csv
+          # `03d_sync_nab_from_v2.R` derives this file from the v2 scrape on
+          # EVERY run (added 2026-08-23 to fix the stale-v1 failures of #16).
+          # It is tracked, it was never added here, so from 2026-08-24 the tree
+          # was dirty at the rebase below and the job died three weeks running.
+          # The fix for the first failure caused the second.
+          git add pipeline/nab_business_confidence_raw.csv
           if git diff --staged --quiet; then
             echo "No JSON changes to commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "data: weekly nowcast $(date -u +%Y-%m-%d)"
-          git pull --rebase origin main
+          # Name whatever is still dirty BEFORE the rebase. The failure this
+          # replaces said only "You have unstaged changes" and cost a diagnosis
+          # to turn into a filename; the next one should say it outright.
+          echo "--- working tree before rebase ---"
+          git status --porcelain
+          # --autostash so that a tracked file some future pipeline step rewrites,
+          # and nobody remembers to add, cannot take the whole weekly job down
+          # again. The three-week outage above is the argument for the flag.
+          git pull --rebase --autostash origin main
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
 

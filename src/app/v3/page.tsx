@@ -1,21 +1,30 @@
 import { loadDashboardData } from "@/lib/data";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import V3TrackRecord from "@/components/V3TrackRecord";
+import StalenessBanner from "@/components/StalenessBanner";
+import IndicatorGrid from "@/components/IndicatorGrid";
+import PerformanceSection from "@/components/PerformanceSection";
+import MethodologyPanel from "@/components/MethodologyPanel";
+import V3Headline from "@/components/V3Headline";
 import V3VintageChart from "@/components/V3VintageChart";
-import type { V3Horizon, V3Score } from "@/lib/types";
+import V3TrackRecord from "@/components/V3TrackRecord";
+import type { V3Score } from "@/lib/types";
 
 // PREVIEW. v3 is not the published nowcast — nowcast.wlsn.me still serves v2.
-// This page exists to run v3 against live data and to design what replacing
-// that would look like.
+// This page exists to run v3 against live data and to design what replacing it
+// would look like.
+//
+// SAME STRUCTURE AS THE HOMEPAGE, ON PURPOSE. Banner, header, headline card,
+// nowcast evolution, indicator panel, track record, methodology. The point of
+// the comparison is the model, so everything around it is held constant and the
+// existing components are reused where the payload shape allows. Two sections
+// are v3-only, and both earn it: the evolution chart carries a probability band
+// the v2 payload cannot support, and the head-to-head against v2 has no
+// counterpart on a page that only knows about one model.
 
 export const metadata = {
   title: "v3 preview — Australian GDP nowcast",
 };
-
-function pct(n: number, dp = 2) {
-  return `${n >= 0 ? "+" : ""}${n.toFixed(dp)}%`;
-}
 
 function Banner() {
   return (
@@ -34,11 +43,13 @@ function Refused({ reason, detail, asOf }: {
   reason: string; detail: string; asOf: string;
 }) {
   return (
-    <section className="border border-border-heavy p-6">
-      <p className="text-xs uppercase tracking-wide text-label">
+    <section className="mb-8 border border-border-heavy p-6">
+      <p className="text-[10px] uppercase tracking-wider text-label">
         No nowcast published · {asOf}
       </p>
-      <h1 className="mt-2 font-headline text-3xl">The model declined to publish</h1>
+      <h2 className="mt-2 font-headline text-3xl">
+        The model declined to publish
+      </h2>
       <p className="mt-3 max-w-2xl text-sm">
         <span className="font-semibold">{reason}.</span> {detail}
       </p>
@@ -47,103 +58,8 @@ function Refused({ reason, detail, asOf }: {
         publishing a figure it cannot stand behind — a feed that has stopped
         updating, or a fitted model that has left GDP disconnected from its
         monthly indicators. In either case the number it would have produced
-        looks entirely plausible, which is the reason for the refusal rather
-        than a warning.
-      </p>
-    </section>
-  );
-}
-
-function Headline({ h, ciBasis }: { h: V3Horizon; ciBasis?: string }) {
-  const has68 = h.ci_68_low !== undefined && h.ci_68_high !== undefined;
-  return (
-    <section className="border border-border-heavy p-6">
-      <p className="text-xs uppercase tracking-wide text-label">
-        Nowcast · {h.quarter} · quarter on quarter
-      </p>
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-4">
-        <span className="font-headline text-6xl text-teal">{pct(h.qoq_growth_pct)}</span>
-        {has68 && (
-          <span className="text-lg text-label">
-            68% probability band {pct(h.ci_68_low!)} to {pct(h.ci_68_high!)}
-          </span>
-        )}
-      </div>
-      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-        <div>
-          <dt className="text-label">Annualised</dt>
-          <dd>{pct(h.annualised_growth_pct)}</dd>
-        </div>
-        {h.gdp_chain_volume_millions !== undefined && (
-          <div>
-            <dt className="text-label">Implied level</dt>
-            <dd>${h.gdp_chain_volume_millions.toLocaleString()}m</dd>
-          </div>
-        )}
-        {h.ci_95_low !== undefined && (
-          <div>
-            <dt className="text-label">95% probability band</dt>
-            <dd>{pct(h.ci_95_low)} to {pct(h.ci_95_high!)}</dd>
-          </div>
-        )}
-      </dl>
-      {ciBasis && (
-        <p className="mt-4 max-w-2xl text-xs text-label">
-          A probability band, not a confidence interval: it is where the
-          model&apos;s posterior puts 68% of its mass, from the same chain that
-          produced the point estimate, so a harder quarter widens it. Reporting
-          these alongside the point estimate is one of the reasons the NY Fed
-          rebuilt this model as Bayesian. v2&apos;s interval is a different
-          object — its own past errors, which cannot know that this quarter is
-          harder than average.
-        </p>
-      )}
-    </section>
-  );
-}
-
-function Scoreboard({ v3, v2, window: w }: {
-  v3: V3Score; v2: V3Score; window: { n_vintages: number; n_quarters: number };
-}) {
-  const rows: [string, keyof V3Score, number][] = [
-    ["Mean absolute error", "mae", 3],
-    ["RMSE", "rmse", 3],
-    ["Bias", "bias", 3],
-  ];
-  const better = (k: keyof V3Score) => Math.abs(v3[k]) < Math.abs(v2[k]);
-  return (
-    <section className="mt-10">
-      <h2 className="font-headline text-2xl">Scoreboard</h2>
-      <p className="mt-1 text-sm text-label">
-        Percentage points of quarterly growth, over {w.n_quarters} quarters.
-        Smaller is better — for bias that means closer to zero, in either
-        direction.
-      </p>
-      <table className="mt-4 w-full text-sm tabular-nums">
-        <thead>
-          <tr className="border-b border-border-heavy text-left text-xs uppercase tracking-wide text-label">
-            <th className="py-2">Measure</th>
-            <th className="py-2 text-right">v3</th>
-            <th className="py-2 text-right">v2</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([label, key, dp]) => (
-            <tr key={key} className="border-b border-border">
-              <td className="py-2">{label}</td>
-              <td className={`py-2 text-right ${better(key) ? "font-semibold text-teal" : ""}`}>
-                {v3[key].toFixed(dp)}
-              </td>
-              <td className="py-2 text-right">{v2[key].toFixed(dp)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-3 text-xs text-label">
-        Both models see revised data and are scored against revised outcomes.
-        That flatters both, comparably. v2&apos;s backtest also fixes its
-        predictor selection using the full sample — a look-ahead with no
-        counterpart in v3 — so if anything the gap is understated.
+        looks entirely plausible, which is the reason for a refusal rather than
+        a warning.
       </p>
     </section>
   );
@@ -165,17 +81,18 @@ function Calibration({ v3, v2 }: { v3: V3Score; v2: V3Score }) {
     );
   };
   return (
-    <section className="mt-10">
-      <h2 className="font-headline text-2xl">Is it honest about what it knows?</h2>
-      <p className="mt-1 max-w-2xl text-sm text-label">
-        A forecast that is a genuine best guess should vary <em>less</em> than
-        reality — by exactly the square root of how much of the variation it can
-        explain. Swinging around more than that is claiming skill it does not
-        have.
+    <section className="mb-10">
+      <p className="font-headline text-3xl text-black">
+        Is it honest about what it knows?
       </p>
-      <table className="mt-4 w-full text-sm tabular-nums">
+      <p className="mb-2 max-w-2xl text-xs text-label">
+        A forecast that is a genuine best guess should vary <em>less</em> than
+        reality — by the square root of how much of the variation it can
+        explain. Varying more than that is claiming skill it does not have.
+      </p>
+      <table className="w-full text-sm tabular-nums">
         <thead>
-          <tr className="border-b border-border-heavy text-left text-xs uppercase tracking-wide text-label">
+          <tr className="border-b border-border-heavy text-left text-[10px] uppercase tracking-wider text-label">
             <th className="py-2">Model</th>
             <th className="py-2 text-right">Variation explained</th>
             <th className="py-2 text-right">Should vary at</th>
@@ -185,21 +102,23 @@ function Calibration({ v3, v2 }: { v3: V3Score; v2: V3Score }) {
         </thead>
         <tbody>{row("v3", v3)}{row("v2", v2)}</tbody>
       </table>
-      <p className="mt-3 max-w-2xl text-xs text-label">
+      <p className="mt-2 max-w-2xl text-[10px] text-label-light">
         v3 looks steadier than v2 and that is the point, not a shortcoming.
-        Scaling its answers up to match reality&apos;s spread was tested and made
-        it monotonically worse.
+        Scaling its answers up to match reality&rsquo;s spread was tested and
+        made it monotonically worse.
       </p>
     </section>
   );
 }
 
 export default function V3Preview() {
-  const { latestV3: v3, backtestV3: bt } = loadDashboardData();
+  const data = loadDashboardData();
+  const v3 = data.latestV3;
+  const bt = data.backtestV3;
 
   if (!v3) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <Banner />
         <p className="text-sm">
           No <code>data/latest_v3.json</code> yet — run{" "}
@@ -213,8 +132,9 @@ export default function V3Preview() {
   const forecasts = v3.horizons.filter((h) => h.kind === "forecast");
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <Banner />
+      <StalenessBanner generatedAt={v3.generated_at} />
       <Header generatedAt={v3.generated_at} />
 
       {v3.status === "refused" || !nowcast ? (
@@ -224,73 +144,70 @@ export default function V3Preview() {
           asOf={v3.as_of}
         />
       ) : (
-        <>
-          <Headline h={nowcast} ciBasis={v3.ci_basis} />
+        <V3Headline
+          latest={v3}
+          gdp={data.gdp}
+          performance={data.performanceV3}
+        />
+      )}
 
-          {forecasts.length > 0 && (
-            <section className="mt-6 border border-border p-4">
-              <p className="text-xs uppercase tracking-wide text-label">
-                Also forecast, at no extra cost
-              </p>
-              <ul className="mt-2 space-y-1 text-sm">
-                {forecasts.map((f) => (
-                  <li key={f.quarter}>
-                    <span className="font-semibold">{f.quarter}</span>{" "}
-                    {pct(f.qoq_growth_pct)}
-                    {f.ci_68_low !== undefined && (
-                      <span className="text-label">
-                        {" "}· 68% band {pct(f.ci_68_low)} to {pct(f.ci_68_high!)}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {v3.panel && (
-            <section className="mt-6 grid grid-cols-2 gap-x-6 gap-y-2 border border-border p-4 text-sm sm:grid-cols-4">
-              <div><dt className="text-label">Panel</dt><dd>{v3.panel.n_series} series</dd></div>
-              <div><dt className="text-label">History from</dt><dd>{v3.panel.first_month}</dd></div>
-              <div><dt className="text-label">Data through</dt><dd>{v3.data_through}</dd></div>
-              <div>
-                <dt className="text-label">GDP factor loading</dt>
-                <dd>
-                  {v3.diagnostics?.gdp_global_loading.toFixed(2)}
+      {forecasts.length > 0 && (
+        <section className="mb-8 border border-border p-4">
+          <p className="text-[10px] uppercase tracking-wider text-label">
+            Also forecast, at no extra cost
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {forecasts.map((f) => (
+              <li key={f.quarter}>
+                <span className="font-semibold">{f.quarter}</span>{" "}
+                {f.qoq_growth_pct > 0 ? "+" : ""}
+                {f.qoq_growth_pct.toFixed(2)}%
+                {f.ci_68_low !== undefined && (
                   <span className="text-label">
-                    {" "}(refuses below {v3.diagnostics?.collapse_floor})
+                    {" "}· 68% band {f.ci_68_low.toFixed(2)}% to{" "}
+                    {f.ci_68_high!.toFixed(2)}%
                   </span>
-                </dd>
-              </div>
-            </section>
-          )}
-        </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {v3.status === "ok" && v3.vintages && v3.vintages.length > 0 && (
-        <div className="mt-10">
-          <V3VintageChart
-            vintages={v3.vintages}
-            targetQuarter={v3.target_quarter ?? ""}
-            releaseDate={v3.next_gdp_release_date ?? ""}
-          />
-        </div>
+        <V3VintageChart
+          vintages={v3.vintages}
+          targetQuarter={v3.target_quarter ?? ""}
+          releaseDate={v3.next_gdp_release_date ?? ""}
+        />
+      )}
+
+      {data.indicatorsV3 && <IndicatorGrid indicators={data.indicatorsV3} />}
+
+      {data.performanceV3 && (
+        <PerformanceSection
+          performance={data.performanceV3}
+          isBacktest
+          sourceFile="data/backtest_v3.json"
+        />
       )}
 
       {bt && (
         <>
           <V3TrackRecord backtest={bt} />
-          <Scoreboard v3={bt.scores.v3} v2={bt.scores.v2} window={bt.window} />
           <Calibration v3={bt.scores.v3} v2={bt.scores.v2} />
-          <section className="mt-10 border-t border-border pt-4">
-            <h2 className="font-headline text-lg">What this does not show</h2>
-            <ul className="mt-2 max-w-2xl list-disc space-y-1 pl-5 text-xs text-label">
-              {Object.values(bt.notes).map((n) => <li key={n}>{n}</li>)}
+          <section className="mb-10 border-t border-border pt-4">
+            <p className="font-headline text-lg">What this does not show</p>
+            <ul className="mt-2 max-w-2xl list-disc space-y-1 pl-5 text-[10px] text-label-light">
+              {Object.values(bt.notes).map((n) => (
+                <li key={n}>{n}</li>
+              ))}
             </ul>
           </section>
         </>
       )}
 
+      <MethodologyPanel />
       <Footer />
     </main>
   );

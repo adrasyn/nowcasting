@@ -4,9 +4,18 @@ import { formatMillions, formatPct } from "@/lib/format";
 interface Props {
   performance: Performance;
   isBacktest?: boolean;
+  // Where the underlying runs live. v2's backtest writes `backcasts.json`;
+  // v3's writes `backtest_v3.json`. Naming the wrong file is worse than naming
+  // none — it sends a reader checking the number to a file that does not
+  // contain it.
+  sourceFile?: string;
 }
 
-export default function PerformanceSection({ performance, isBacktest = false }: Props) {
+export default function PerformanceSection({
+  performance,
+  isBacktest = false,
+  sourceFile = "data/backcasts.json",
+}: Props) {
   const edge = performance.rba_comparison.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
   // Only claim an edge when it's material (|gap| >= 0.1pp); a 0.05pp average over
@@ -28,7 +37,7 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
           <strong>These are backtested estimates, not live nowcasts.</strong> The model was re-run
           over past quarters using only the data that had been published at the time, to give it a
           track record before it had accumulated one. No figure below was actually produced on the
-          day. See <code>data/backcasts.json</code> for the underlying runs.
+          day. See <code>{sourceFile}</code> for the underlying runs.
         </p>
       )}
       <div className="grid grid-cols-3 gap-3 mb-4">
@@ -92,10 +101,10 @@ export default function PerformanceSection({ performance, isBacktest = false }: 
                 {e.yoy_nowcast == null ? "—" : `${e.yoy_nowcast.toFixed(2)}%`}
               </td>
               <td className="py-2 text-label">
-                {e.yoy_rba === null ? "—" : `${e.yoy_rba.toFixed(2)}%`}
+                {e.yoy_rba == null ? "—" : `${e.yoy_rba.toFixed(2)}%`}
               </td>
               <td className={`py-2 ${e.edge_pp === null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
-                {e.edge_pp === null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}
+                {e.edge_pp == null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}
               </td>
             </tr>
           ))}

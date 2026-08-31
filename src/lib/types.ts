@@ -312,4 +312,6 @@ export interface DashboardData {
   // v3 preview artifacts (optional — present once the v3 runner has emitted them).
   latestV3?: LatestV3;
   backtestV3?: V3Backtest;
+  indicatorsV3?: IndicatorData; // the v3 model's input panel
+  performanceV3?: Performance;  // v3's backtest track record
 }

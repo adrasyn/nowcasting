@@ -78,5 +78,7 @@ export function loadDashboardData(): DashboardData {
     indicatorsV2: readJsonOptional<IndicatorData>("indicators_v2.json"),
     latestV3: readJsonOptional<LatestV3>("latest_v3.json"),
     backtestV3: readJsonOptional<V3Backtest>("backtest_v3.json"),
+    indicatorsV3: readJsonOptional<IndicatorData>("indicators_v3.json"),
+    performanceV3: readJsonOptional<Performance>("performance_v3.json"),
   };
 }

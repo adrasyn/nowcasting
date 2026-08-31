@@ -18,6 +18,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from nyfed.au.build import load_vintage
+
 REPO = Path(__file__).resolve().parents[1]
 ROOT = REPO.parent
 OUT = ROOT / "data" / "backtest_v3.json"
@@ -94,6 +96,49 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {OUT}")
+
+    # ---- the same numbers in the site's existing Performance shape ---------
+    # So `PerformanceSection` renders v3 without a v3-specific component. One
+    # row per target quarter, scored at that quarter's LAST vintage -- the
+    # figure that stood when the ABS published, which is what "how wrong was it"
+    # means to a reader. Averaging a quarter's three vintages would flatter the
+    # model by cancelling revisions within the quarter.
+    gdp = load_vintage(ROOT / "nowcasting_v3/tests/fixtures/au/vintage").series["gdp"].dropna()
+    last = m.sort_values("asof").groupby("target", as_index=False).last()
+    errors = []
+    for r in last.itertuples():
+        lvl = float(gdp[gdp.index < r.target_date].iloc[-1])
+        actual_lvl = lvl * (1 + r.actual_qq / 100)
+        nowcast_lvl = lvl * (1 + r.nowcast_qq / 100)
+        errors.append({
+            "target_quarter": r.target.replace("Q", " Q"),
+            "final_nowcast": round(nowcast_lvl),
+            "actual": round(actual_lvl),
+            "error_millions": round(nowcast_lvl - actual_lvl),
+            "error_pct": round(100 * (nowcast_lvl - actual_lvl) / actual_lvl, 3),
+            "qoq_nowcast_pct": round(float(r.nowcast_qq), 2),
+            "qoq_actual_pct": round(float(r.actual_qq), 2),
+            "qoq_error_pp": round(float(r.nowcast_qq - r.actual_qq), 2),
+            # Carried explicitly as null rather than omitted. The site's
+            # `PerformanceSection` renders v2's payload, which has these, and an
+            # absent key is not the same as a stated "no comparison" -- v3 has
+            # no RBA forecast to score against, and the table should say so.
+            "yoy_nowcast": None, "yoy_actual": None, "yoy_rba": None,
+            "somp_release": None, "edge_pp": None,
+        })
+    e = pd.DataFrame(errors)
+    perf = {
+        "mae_millions": round(float(e.error_millions.abs().mean())),
+        "mae_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
+        "bias_millions": round(float(e.error_millions.mean())),
+        "bias_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).mean()), 2),
+        "rba_comparison": {"n": 0, "avg_edge_pp": None},
+        "errors": errors,
+    }
+    perf_path = ROOT / "data" / "performance_v3.json"
+    perf_path.write_text(json.dumps(perf, indent=2) + "\n")
+    print(f"wrote {perf_path}  ({len(errors)} quarters, "
+          f"MAE {perf['mae_pct']}pp, bias {perf['bias_pct']}pp)")
     for k, v in payload["scores"].items():
         print(f"  {k}: MAE {v['mae']}  R2 {v['r_squared']:.1%}  "
               f"varies at {v['dispersion_ratio']} vs calibrated "

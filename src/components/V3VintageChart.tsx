@@ -68,9 +68,7 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
       <p className="font-headline text-3xl text-black">Nowcast evolution</p>
       <p className="mb-2 text-xs text-label">
         Each point is a weekly point estimate for {targetQuarter}. The shaded
-        areas are the model&rsquo;s 68% and 95% probability bands, drawn from its
-        own posterior rather than from past errors — so they respond to how hard
-        the quarter is, not just to how wrong the model has been on average.
+        areas are the model&rsquo;s 68% and 95% probability bands.
       </p>
       <div className="h-[340px]">
         <ResponsiveContainer>

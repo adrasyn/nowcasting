@@ -5,7 +5,10 @@
   "bias_pct": 0.12,
   "rba_comparison": {
     "n": 6,
-    "avg_edge_pp": -0.05
+    "avg_edge_pp": -0.05,
+    "ours_mae": 0.27,
+    "rba_mae": 0.32,
+    "we_were_closer": 4
   },
   "errors": [
     {

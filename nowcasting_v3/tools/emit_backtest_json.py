@@ -147,17 +147,34 @@ def main() -> int:
             "somp_release": release, "edge_pp": edge,
         })
     e = pd.DataFrame(errors)
+    # The quarters where an RBA forecast exists, with each side's absolute miss
+    # against the ABS year-ended actual.
+    paired = pd.DataFrame([
+        {"our_err": abs(x["yoy_nowcast"] - x["yoy_actual"]),
+         "rba_err": abs(x["yoy_rba"] - x["yoy_actual"]),
+         "edge": x["edge_pp"]}
+        for x in errors if x["edge_pp"] is not None])
     perf = {
         "mae_millions": round(float(e.error_millions.abs().mean())),
         "mae_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
         "bias_millions": round(float(e.error_millions.mean())),
         "bias_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).mean()), 2),
+        # A MEAN SIGNED GAP IS NOT A LEGIBLE ACCURACY CLAIM. "-0.05pp average
+        # edge" tells a reader almost nothing: it hides how big either
+        # forecaster's misses were, and one large error in each direction
+        # cancels to zero. The two error rates side by side, and a count of who
+        # landed closer, say the same thing in a form that can be argued with.
+        # `avg_edge_pp` is kept because v2's page reads it.
         "rba_comparison": {
-            "n": int(sum(1 for x in errors if x["edge_pp"] is not None)),
-            "avg_edge_pp": (
-                round(float(np.mean([x["edge_pp"] for x in errors
-                                     if x["edge_pp"] is not None])), 2)
-                if any(x["edge_pp"] is not None for x in errors) else None),
+            "n": int(len(paired)),
+            "avg_edge_pp": (round(float(np.mean(paired["edge"])), 2)
+                            if len(paired) else None),
+            "ours_mae": (round(float(paired["our_err"].mean()), 2)
+                         if len(paired) else None),
+            "rba_mae": (round(float(paired["rba_err"].mean()), 2)
+                        if len(paired) else None),
+            "we_were_closer": (int((paired["our_err"] < paired["rba_err"]).sum())
+                               if len(paired) else None),
         },
         "errors": errors,
     }

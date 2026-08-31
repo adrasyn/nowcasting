@@ -119,6 +119,12 @@ export interface AccuracyError {
 export interface RbaComparison {
   n: number;
   avg_edge_pp: number | null;
+  // The two error rates side by side, and who landed closer. A mean signed gap
+  // hides how big either forecaster's misses were and cancels one large error
+  // in each direction to nothing. Optional: v2's payload predates these.
+  ours_mae?: number | null;
+  rba_mae?: number | null;
+  we_were_closer?: number | null;
 }
 
 export interface Performance {

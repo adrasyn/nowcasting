@@ -16,7 +16,8 @@ export default function PerformanceSection({
   isBacktest = false,
   sourceFile = "data/backcasts.json",
 }: Props) {
-  const edge = performance.rba_comparison.avg_edge_pp;
+  const rba = performance.rba_comparison;
+  const edge = rba.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
   // Only claim an edge when it's material (|gap| >= 0.1pp); a 0.05pp average over
   // 6 quarters is not significant, so call it level (Fable review B1).
@@ -47,17 +48,25 @@ export default function PerformanceSection({
           value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}
           sub={`${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
         />
-        <Tile
-          label="Accuracy gap vs RBA"
-          value={edgeValue}
-          sub={edgeSub}
-        />
+        {rba.ours_mae != null && rba.rba_mae != null ? (
+          <Tile
+            label="vs RBA · year-ended"
+            value={`${rba.ours_mae.toFixed(2)} v ${rba.rba_mae.toFixed(2)}pp`}
+            sub={
+              rba.we_were_closer != null
+                ? `average miss, ours first · closer in ${rba.we_were_closer} of ${rba.n}`
+                : `average miss, ours first · ${rba.n} quarters`
+            }
+          />
+        ) : (
+          <Tile label="Accuracy gap vs RBA" value={edgeValue} sub={edgeSub} />
+        )}
       </div>
       {isBacktest ? (
         <p className="text-xs text-label mb-3">
           MAE (mean absolute error) is the average size of the miss, ignoring direction. Bias is the
           average signed miss, so a positive value means the model tends to come in a little high. The
-          RBA gap compares our year-ended estimate with the RBA&rsquo;s forecast published mid-quarter
+          RBA column compares our year-ended estimate with the RBA&rsquo;s forecast published mid-quarter
           (about two months before our full-quarter estimate) for each June and December quarter; a
           negative gap means we landed closer to the final figure. We use more within-quarter data
           than that RBA forecast, and both are measured against later-revised GDP.
@@ -76,6 +85,7 @@ export default function PerformanceSection({
             <th className="py-2">Error (pp)</th>
             <th className="py-2">Our (YE)</th>
             <th className="py-2">RBA (YE)</th>
+            <th className="py-2">Actual (YE)</th>
             <th className="py-2">Gap (pp)</th>
           </tr>
         </thead>
@@ -102,6 +112,9 @@ export default function PerformanceSection({
               </td>
               <td className="py-2 text-label">
                 {e.yoy_rba == null ? "—" : `${e.yoy_rba.toFixed(2)}%`}
+              </td>
+              <td className="py-2 text-label">
+                {e.yoy_actual == null ? "—" : `${e.yoy_actual.toFixed(2)}%`}
               </td>
               <td className={`py-2 ${e.edge_pp === null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
                 {e.edge_pp == null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}

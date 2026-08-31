@@ -20,6 +20,12 @@ import pandas as pd
 
 from nyfed.au.build import load_vintage
 
+def _quarter_start(label: str) -> pd.Timestamp:
+    """"2026 Q2" -> 2026-06-01, the month a quarterly observation is dated to."""
+    year, q = label.split(" Q")
+    return pd.Timestamp(int(year), (int(q) - 1) * 3 + 3, 1)
+
+
 REPO = Path(__file__).resolve().parents[1]
 ROOT = REPO.parent
 OUT = ROOT / "data" / "backtest_v3.json"
@@ -134,6 +140,34 @@ def main() -> int:
     somp = somp.set_index("target_quarter")
 
     last = m.sort_values("asof").groupby("target", as_index=False).last()
+
+    # QUARTERS THE MODEL CALLED LIVE, WHICH THE BACKTEST CANNOT CONTAIN. The
+    # backtest CSV is a fixed measurement ending at 2026Q1. Every quarter after
+    # it is one this model nowcast in public and the ABS has since printed, and
+    # they have to be appended or the table silently stops growing — the first
+    # real result the project produced would never reach its own track record,
+    # which is the row a reader should care most about.
+    known = set(last["target"])
+    for q, r in sorted(live.items()):
+        key = q.replace(" ", "")
+        if key in known:
+            continue
+        tgt = _quarter_start(q)
+        if tgt not in gdp.index:
+            continue        # the ABS has not printed it yet; nothing to score
+        prev = gdp[gdp.index < tgt]
+        if prev.empty:
+            continue
+        actual_qq = 100 * (float(gdp[tgt]) / float(prev.iloc[-1]) - 1)
+        last = pd.concat([last, pd.DataFrame([{
+            "asof": r["run_date"], "target": key, "target_date": tgt,
+            "actual_qq": round(actual_qq, 4),
+            "nowcast_qq": r["qoq_growth_pct"],
+        }])], ignore_index=True)
+        print(f"  + {q}: live nowcast {r['qoq_growth_pct']:+.2f}% "
+              f"against actual {actual_qq:+.2f}%")
+    last = last.sort_values("target_date")
+
     errors = []
     for r in last.itertuples():
         label = r.target.replace("Q", " Q")

@@ -140,6 +140,17 @@ export default function V3Preview() {
           performance={data.performanceV3}
           isBacktest
           sourceFile="data/backtest_v3.json"
+          title="Track record"
+          intro="These are backtested estimates, not live nowcasts."
+          notes={
+            "MAE (mean absolute error) is the average size of the miss, ignoring " +
+            "direction. Bias is the average signed miss, so a positive value means " +
+            "the model tends to come in a little high. For comparison, the RBA " +
+            "column shows the RBA's forecast published mid-quarter (about two " +
+            "months before our full-quarter estimate) for each June and December " +
+            "quarter."
+          }
+          showGap={false}
         />
       )}
 

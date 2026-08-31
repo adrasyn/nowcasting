@@ -9,12 +9,23 @@ interface Props {
   // none — it sends a reader checking the number to a file that does not
   // contain it.
   sourceFile?: string;
+  // v3's page asks for shorter copy and one fewer column. Defaults keep the
+  // homepage exactly as it is: this component is live on production, and
+  // changing its wording is not something a v3 design pass should do quietly.
+  title?: string;
+  intro?: string;
+  notes?: string;
+  showGap?: boolean;
 }
 
 export default function PerformanceSection({
   performance,
   isBacktest = false,
   sourceFile = "data/backcasts.json",
+  title,
+  intro,
+  notes,
+  showGap = true,
 }: Props) {
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
@@ -31,16 +42,19 @@ export default function PerformanceSection({
   return (
     <section className="mb-10">
       <p className="font-headline text-3xl text-black mb-2">
-        {isBacktest ? "Track record (simulated)" : "Track record"}
+        {title ?? (isBacktest ? "Track record (simulated)" : "Track record")}
       </p>
-      {isBacktest && (
-        <p className="text-xs text-label mb-3">
-          <strong>These are backtested estimates, not live nowcasts.</strong> The model was re-run
-          over past quarters using only the data that had been published at the time, to give it a
-          track record before it had accumulated one. No figure below was actually produced on the
-          day. See <code>{sourceFile}</code> for the underlying runs.
-        </p>
-      )}
+      {isBacktest &&
+        (intro !== undefined ? (
+          <p className="text-xs text-label mb-3">{intro}</p>
+        ) : (
+          <p className="text-xs text-label mb-3">
+            <strong>These are backtested estimates, not live nowcasts.</strong> The model was re-run
+            over past quarters using only the data that had been published at the time, to give it a
+            track record before it had accumulated one. No figure below was actually produced on the
+            day. See <code>{sourceFile}</code> for the underlying runs.
+          </p>
+        ))}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <Tile label="MAE" value={`${performance.mae_pct.toFixed(2)}pp`} sub={formatMillions(performance.mae_millions)} />
         <Tile
@@ -50,26 +64,24 @@ export default function PerformanceSection({
         />
         {rba.ours_mae != null && rba.rba_mae != null ? (
           <Tile
-            label="vs RBA · year-ended"
+            label="Our miss vs RBA"
             value={`${rba.ours_mae.toFixed(2)} v ${rba.rba_mae.toFixed(2)}pp`}
-            sub={
-              rba.we_were_closer != null
-                ? `average miss, ours first · closer in ${rba.we_were_closer} of ${rba.n}`
-                : `average miss, ours first · ${rba.n} quarters`
-            }
+            sub="Average miss against actual GDP"
           />
         ) : (
           <Tile label="Accuracy gap vs RBA" value={edgeValue} sub={edgeSub} />
         )}
       </div>
-      {isBacktest ? (
+      {notes !== undefined ? (
+        <p className="text-xs text-label mb-3">{notes}</p>
+      ) : isBacktest ? (
         <p className="text-xs text-label mb-3">
           MAE (mean absolute error) is the average size of the miss, ignoring direction. Bias is the
           average signed miss, so a positive value means the model tends to come in a little high. The
-          RBA column compares our year-ended estimate with the RBA&rsquo;s forecast published mid-quarter
-          (about two months before our full-quarter estimate) for each June and December quarter; a
-          negative gap means we landed closer to the final figure. We use more within-quarter data
-          than that RBA forecast, and both are measured against later-revised GDP.
+          RBA column compares our year-ended estimate with the RBA&rsquo;s forecast published
+          mid-quarter (about two months before our full-quarter estimate) for each June and December
+          quarter; a negative gap means we landed closer to the final figure. We use more
+          within-quarter data than that RBA forecast, and both are measured against later-revised GDP.
         </p>
       ) : (
         <p className="text-xs text-label mb-3">
@@ -86,7 +98,7 @@ export default function PerformanceSection({
             <th className="py-2">Our (YE)</th>
             <th className="py-2">RBA (YE)</th>
             <th className="py-2">Actual (YE)</th>
-            <th className="py-2">Gap (pp)</th>
+            {showGap && <th className="py-2">Gap (pp)</th>}
           </tr>
         </thead>
         <tbody>
@@ -116,9 +128,11 @@ export default function PerformanceSection({
               <td className="py-2 text-label">
                 {e.yoy_actual == null ? "—" : `${e.yoy_actual.toFixed(2)}%`}
               </td>
-              <td className={`py-2 ${e.edge_pp === null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
-                {e.edge_pp == null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}
-              </td>
+              {showGap && (
+                <td className={`py-2 ${e.edge_pp == null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
+                  {e.edge_pp == null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

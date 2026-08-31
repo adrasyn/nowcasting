@@ -126,7 +126,13 @@ export default function PerformanceSection({
           {[...performance.errors]
             .sort((a, b) => b.target_quarter.localeCompare(a.target_quarter))
             .map((e) => (
-            <tr key={e.target_quarter} className="border-b border-border">
+            <tr
+              key={e.target_quarter}
+              className={`border-b border-border ${e.is_live ? "bg-panel" : ""}`}
+              title={e.is_live
+                ? `Published ${e.live_run_date} — before the ABS printed this quarter`
+                : undefined}
+            >
               <td className="py-2">{e.target_quarter}</td>
               <td className="py-2">
                 {e.qoq_nowcast_pct == null ? formatMillions(e.final_nowcast) : formatPct(e.qoq_nowcast_pct)}
@@ -158,6 +164,17 @@ export default function PerformanceSection({
           ))}
         </tbody>
       </table>
+      {performance.errors.some((e) => e.is_live) && (
+        <p className="mt-2 flex items-center gap-2 text-[10px] text-label">
+          <span
+            aria-hidden="true"
+            className="inline-block h-3 w-6 border border-border bg-panel"
+          />
+          Shaded rows are live nowcasts — published before the ABS printed that
+          quarter. The rest are backtested: the model re-run over data that was
+          already known.
+        </p>
+      )}
     </section>
   );
 }

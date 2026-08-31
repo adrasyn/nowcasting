@@ -105,6 +105,25 @@ def main() -> int:
     # model by cancelling revisions within the quarter.
     gdp = load_vintage(ROOT / "nowcasting_v3/tests/fixtures/au/vintage").series["gdp"].dropna()
 
+    # WHAT THE MODEL ACTUALLY SAID AT THE TIME, where it was running. Every row
+    # in the backtest is a re-run over data that was already known, which is the
+    # weaker claim: a backtest cannot be wrong in a way its author would notice,
+    # because the author chose the window. A live call can. As quarters complete
+    # with `nowcast_history_v3.json` behind them, their rows are replaced by what
+    # was published before the ABS printed, and flagged so the table can say so.
+    live: dict[str, dict] = {}
+    hist_path = ROOT / "data" / "nowcast_history_v3.json"
+    if hist_path.is_file():
+        for r in json.loads(hist_path.read_text())["runs"]:
+            # The LAST run before the print is the model's final word on that
+            # quarter and the only one worth scoring. A backfilled row was never
+            # published, so it cannot stand as a live call.
+            if r.get("backfilled"):
+                continue
+            q = r["target_quarter"]
+            if q not in live or r["run_date"] > live[q]["run_date"]:
+                live[q] = r
+
     # The RBA's own Statement on Monetary Policy forecast, where one lines up.
     # Only the June and December quarters have one: the SoMP publishes a
     # YEAR-ENDED forecast, so the comparison is on year-ended growth, and only
@@ -118,9 +137,15 @@ def main() -> int:
     errors = []
     for r in last.itertuples():
         label = r.target.replace("Q", " Q")
+        published = live.get(label)
         lvl = float(gdp[gdp.index < r.target_date].iloc[-1])
         actual_lvl = lvl * (1 + r.actual_qq / 100)
-        nowcast_lvl = lvl * (1 + r.nowcast_qq / 100)
+        # A live figure supersedes the backtest for its quarter. Reporting a
+        # backtested number for a quarter the model actually called would be
+        # quietly flattering: the backtest sees the whole sample.
+        nowcast_qq = (published["qoq_growth_pct"] if published
+                      else float(r.nowcast_qq))
+        nowcast_lvl = lvl * (1 + nowcast_qq / 100)
 
         # Year-ended: this quarter's level against the level four quarters back.
         back = gdp[gdp.index < r.target_date]
@@ -140,9 +165,11 @@ def main() -> int:
             "actual": round(actual_lvl),
             "error_millions": round(nowcast_lvl - actual_lvl),
             "error_pct": round(100 * (nowcast_lvl - actual_lvl) / actual_lvl, 3),
-            "qoq_nowcast_pct": round(float(r.nowcast_qq), 2),
+            "qoq_nowcast_pct": round(nowcast_qq, 2),
             "qoq_actual_pct": round(float(r.actual_qq), 2),
-            "qoq_error_pp": round(float(r.nowcast_qq - r.actual_qq), 2),
+            "qoq_error_pp": round(nowcast_qq - float(r.actual_qq), 2),
+            "is_live": bool(published),
+            "live_run_date": published["run_date"] if published else None,
             "yoy_nowcast": yoy_nc, "yoy_actual": yoy_ac, "yoy_rba": yoy_rba,
             "somp_release": release, "edge_pp": edge,
         })

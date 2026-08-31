@@ -114,6 +114,15 @@ export interface AccuracyError {
   yoy_rba: number | null;
   somp_release: string | null;
   edge_pp: number | null;
+  // TRUE when this row is what the model actually published before the ABS
+  // printed the quarter, rather than a backtest re-run over data that was
+  // already known. The distinction is the whole credibility of a track record:
+  // a backtest can be tuned to its own history, a live call cannot. Absent on
+  // v2's payload and on every v3 row until the first quarter completes.
+  is_live?: boolean;
+  // The date the live figure was published, so a reader can check it against
+  // `data/nowcast_history_v3.json`.
+  live_run_date?: string;
 }
 
 export interface RbaComparison {

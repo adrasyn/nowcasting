@@ -1,28 +1,6 @@
 {
-  "schema": "v3-preview-1",
-  "status": "ok",
-  "generated_at": "2026-08-31T13:01:28+00:00",
-  "as_of": "2026-08-31",
-  "target_quarter": "2026 Q2",
-  "data_through": "2026-08",
-  "prev_level": {
-    "value": 695945,
-    "quarter": "2026 Q1"
-  },
-  "horizons": [
-    {
-      "quarter": "2026 Q2",
-      "kind": "nowcast",
-      "qoq_growth_pct": 0.6354,
-      "annualised_growth_pct": 2.566,
-      "ci_68_low": 0.3548,
-      "ci_68_high": 0.9269,
-      "ci_95_low": 0.1004,
-      "ci_95_high": 1.2098,
-      "gdp_chain_volume_millions": 700367
-    }
-  ],
-  "vintages": [
+  "schema": "v3-history-1",
+  "runs": [
     {
       "run_date": "2026-06-01",
       "target_quarter": "2026 Q2",
@@ -190,41 +168,5 @@
       "data_through": "2026-08",
       "estimate_asof": "2026-08-31"
     }
-  ],
-  "next_gdp_release_date": "2026-09-02",
-  "ci_basis": "probability band: the 68%/95% mass of the model's posterior, from 1250 density_nowcast draws on the same chain as the point estimate. Not a confidence interval, and not recalibrated from past errors.",
-  "panel": {
-    "n_series": 14,
-    "n_months": 560,
-    "first_month": "1980-01",
-    "series": [
-      "employment",
-      "unemployment_rate",
-      "job_ads",
-      "aig_pmi",
-      "nab_conditions",
-      "building_approvals",
-      "household_spending",
-      "exports",
-      "imports",
-      "commodity_prices",
-      "cpi",
-      "unit_labour_cost",
-      "gdi",
-      "gdp"
-    ],
-    "deflator_skipped": {}
-  },
-  "diagnostics": {
-    "gdp_global_loading": 1.2957,
-    "collapse_floor": 1.0,
-    "n_gs": 10000,
-    "n_burn": 8000,
-    "seed": 4
-  },
-  "estimate": {
-    "estimated_at": "2026-08-31T12:50:51+00:00",
-    "asof": "2026-08-31",
-    "age_days": 0
-  }
+  ]
 }

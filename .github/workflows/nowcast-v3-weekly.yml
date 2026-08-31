@@ -1,0 +1,146 @@
+name: Weekly Nowcast (v3)
+
+# v3 is the NY Fed Staff Nowcast 2.0 port. It does NOT re-estimate here — that is
+# `nowcast-v3-estimate.yml`, quarterly, which commits the fitted state this job
+# loads. Re-estimating weekly took ~75 minutes on a fast laptop and would have
+# been hours on a hosted runner, every week, to redo work the model needs done
+# once a quarter. The split is the NY Fed's own cadence.
+#
+# SEPARATE WORKFLOW FROM THE R PIPELINE, NOT A JOB INSIDE IT. That one runs on
+# windows-latest for rtools; this is Python on Linux. Keeping them apart means a
+# v3 failure cannot take down the published v2 nowcast, which is what the
+# homepage still serves.
+#
+# SHARED CONCURRENCY GROUP WITH THE R PIPELINE. Both workflows commit to main.
+# Without this they can interleave and one loses its rebase — the exact failure
+# that took the site offline for three weeks in August.
+
+on:
+  schedule:
+    # 03:30 UTC Monday, an hour and a half after the R pipeline starts, so the
+    # two rarely queue behind each other even though the group would serialise
+    # them if they did.
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: nowcast-weekly
+  cancel-in-progress: false
+
+jobs:
+  nowcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: nowcasting_v3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Refuse if the fitted state is missing
+        run: |
+          if [ ! -f state/au_estimate.npz ]; then
+            echo "::error::state/au_estimate.npz is absent — run the quarterly" \
+                 "estimate workflow before this one can nowcast."
+            exit 1
+          fi
+          python - <<'PY'
+          import json, numpy as np
+          m = json.loads(str(np.load("state/au_estimate.npz")["meta"]))
+          print(f"estimate {m['asof']}, {m['n_gs']} draws, "
+                f"loading {m['gdp_global_loading']}")
+          PY
+
+      - name: Nowcast
+        run: python -u tools/run_au_nowcast.py
+
+      - name: Refresh the indicator panel
+        run: python -u tools/emit_indicators.py
+
+      # A refusal is a successful run — the runner writes `status: "refused"` and
+      # exits 0, and the site renders that rather than last week's number. Say so
+      # in the log so a green tick that published nothing is not mistaken for a
+      # green tick that published.
+      - name: Report the outcome
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          d = json.loads(pathlib.Path("../data/latest_v3.json").read_text())
+          if d["status"] == "refused":
+              print(f"::warning::v3 declined to publish — {d['refusal_reason']}: "
+                    f"{d.get('refusal_detail','')}")
+          else:
+              h = d["horizons"][0]
+              print(f"v3 nowcast {h['quarter']} {h['qoq_growth_pct']:+.2f}% q/q")
+          PY
+
+      - name: Commit
+        id: commit
+        run: |
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/latest_v3.json data/indicators_v3.json
+          git add data/nowcast_history_v3.json
+          if git diff --staged --quiet; then
+            echo "No v3 changes to commit"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "data: v3 nowcast $(date -u +%Y-%m-%d)"
+          echo "--- working tree before rebase ---"
+          git status --porcelain
+          git pull --rebase --autostash origin main
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger deploy
+        if: success() && steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main
+
+      - name: Alert on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "pipeline-failure",
+            });
+            const body = `The v3 weekly nowcast failed.\n\n${runUrl}\n\n` +
+              `This does not affect the published v2 nowcast — the two run in ` +
+              `separate workflows for that reason.`;
+            const open = existing.data.find((i) => i.title.includes("v3 weekly"));
+            if (open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: open.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: "v3 weekly nowcast failed",
+                body, labels: ["pipeline-failure"],
+                assignees: [context.repo.owner],
+              });
+            }

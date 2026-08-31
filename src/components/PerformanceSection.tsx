@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Performance } from "@/lib/types";
 import { formatMillions, formatPct } from "@/lib/format";
 
@@ -16,6 +17,12 @@ interface Props {
   intro?: string;
   notes?: string;
   showGap?: boolean;
+  // v3 renders the RBA comparison as its own paired-bar section, which a
+  // one-number tile cannot hold. Default keeps v2's third tile.
+  showRbaTile?: boolean;
+  // Rendered between the tiles and the table, where a comparison belongs:
+  // after the summary figures, before the quarter-by-quarter detail.
+  afterTiles?: ReactNode;
 }
 
 export default function PerformanceSection({
@@ -26,6 +33,8 @@ export default function PerformanceSection({
   intro,
   notes,
   showGap = true,
+  showRbaTile = true,
+  afterTiles,
 }: Props) {
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
@@ -55,23 +64,25 @@ export default function PerformanceSection({
             day. See <code>{sourceFile}</code> for the underlying runs.
           </p>
         ))}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className={`grid gap-3 mb-4 ${showRbaTile ? "grid-cols-3" : "grid-cols-2"}`}>
         <Tile label="MAE" value={`${performance.mae_pct.toFixed(2)}pp`} sub={formatMillions(performance.mae_millions)} />
         <Tile
           label="Bias"
           value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}
           sub={`${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
         />
-        {rba.ours_mae != null && rba.rba_mae != null ? (
-          <Tile
-            label="Our miss vs RBA"
-            value={`${rba.ours_mae.toFixed(2)} v ${rba.rba_mae.toFixed(2)}pp`}
-            sub="Average miss against actual GDP"
-          />
-        ) : (
-          <Tile label="Accuracy gap vs RBA" value={edgeValue} sub={edgeSub} />
-        )}
+        {showRbaTile &&
+          (rba.ours_mae != null && rba.rba_mae != null ? (
+            <Tile
+              label="Our miss vs RBA"
+              value={`${rba.ours_mae.toFixed(2)} v ${rba.rba_mae.toFixed(2)}pp`}
+              sub="Average miss against actual GDP"
+            />
+          ) : (
+            <Tile label="Accuracy gap vs RBA" value={edgeValue} sub={edgeSub} />
+          ))}
       </div>
+      {afterTiles}
       {notes !== undefined ? (
         <p className="text-xs text-label mb-3">{notes}</p>
       ) : isBacktest ? (

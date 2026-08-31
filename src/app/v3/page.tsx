@@ -4,6 +4,7 @@ import Footer from "@/components/Footer";
 import StalenessBanner from "@/components/StalenessBanner";
 import IndicatorGrid from "@/components/IndicatorGrid";
 import PerformanceSection from "@/components/PerformanceSection";
+import V3RbaCompare from "@/components/V3RbaCompare";
 import V3MethodologyPanel from "@/components/V3MethodologyPanel";
 import V3Headline from "@/components/V3Headline";
 import V3VintageChart from "@/components/V3VintageChart";
@@ -151,6 +152,10 @@ export default function V3Preview() {
             "quarter."
           }
           showGap={false}
+          showRbaTile={false}
+          afterTiles={
+            <V3RbaCompare rba={data.performanceV3.rba_comparison} />
+          }
         />
       )}
 

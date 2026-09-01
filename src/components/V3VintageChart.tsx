@@ -143,7 +143,16 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
             <Area dataKey="band68" stroke="none" fill={chartColors.accent} fillOpacity={0.32} />
             <ReferenceLine y={0} stroke={chartColors.label} strokeWidth={1} />
             <ReferenceLine x={0} stroke={chartColors.label} strokeDasharray="4 4">
+              {/* The label sits to the RIGHT of the line it names; at the
+                  default offset it sits on top of it. A vertical
+                  ReferenceLine gives the label a zero-width viewBox, so
+                  `insideTopRight` anchors at the line and a NEGATIVE offset
+                  pushes right. `insideTopLeft` would push right too, but it
+                  flips the text anchor, and with angle -90 the text then
+                  runs upward off the top of the chart. The x-domain runs to
+                  +5, which is the room this offset uses. */}
               <Label value="ABS release" angle={-90} position="insideTopRight"
+                     offset={-10}
                      style={{ fontSize: 10, fill: chartColors.label }} />
             </ReferenceLine>
             <Line

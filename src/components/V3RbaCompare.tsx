@@ -28,7 +28,7 @@ export default function V3RbaCompare({ rba }: Props) {
   return (
     <div className="mb-4 border border-border p-4">
       <p className="mb-3 text-[10px] uppercase tracking-wider text-label">
-        MAE comparison over last 3 years (year-ended)
+        MAE comparison over last 3 years (year-on-year)
       </p>
       <div className="space-y-2">
         {rows.map(([label, value]) => (

@@ -34,6 +34,7 @@ export default function Home() {
       <PerformanceSection
         performance={data.performanceV2 ?? data.performance}
         isBacktest={!!data.performanceV2}
+        showGap={false}
       />
       <MethodologyPanel />
       <Footer />

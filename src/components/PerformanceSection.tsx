@@ -99,10 +99,9 @@ export default function PerformanceSection({
         <p className="text-xs text-label mb-3">
           MAE (mean absolute error) is the average size of the miss, ignoring direction. Bias is the
           average signed miss, so a positive value means the model tends to come in a little high. The
-          RBA column compares our year-ended estimate with the RBA&rsquo;s forecast published
-          mid-quarter (about two months before our full-quarter estimate) for each June and December
-          quarter; a negative gap means we landed closer to the final figure. We use more
-          within-quarter data than that RBA forecast, and both are measured against later-revised GDP.
+          RBA column shows the RBA&rsquo;s forecast published mid-quarter (about two months before our
+          full-quarter estimate) for each June and December quarter. We use more within-quarter data
+          than that RBA forecast, and both are measured against later-revised GDP.
         </p>
       ) : (
         <p className="text-xs text-label mb-3">
@@ -113,12 +112,16 @@ export default function PerformanceSection({
         <thead>
           <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">
             <th className="py-2">Quarter</th>
-            <th className="py-2">{isBacktest ? "Simulated nowcast" : "Final nowcast"}</th>
+            {/* Header widths set the column widths in this table, so they
+                are kept short. "Simulated nowcast" was also becoming untrue:
+                the shaded rows below are live nowcasts, not simulations, and
+                the intro paragraph already says which rows are which. */}
+            <th className="py-2">Nowcast</th>
             <th className="py-2">Actual</th>
             <th className="py-2">Error (pp)</th>
-            <th className="py-2">Our (YE)</th>
-            <th className="py-2">RBA (YE)</th>
-            <th className="py-2">Actual (YE)</th>
+            <th className="py-2">Nowcast (YoY)</th>
+            <th className="py-2">RBA (YoY)</th>
+            <th className="py-2">Actual (YoY)</th>
             {showGap && <th className="py-2">Gap (pp)</th>}
           </tr>
         </thead>

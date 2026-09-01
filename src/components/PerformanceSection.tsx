@@ -116,23 +116,40 @@ export default function PerformanceSection({
           overflow, so a phone loses nothing -- the RBA comparison in the
           right-hand columns is the most interesting part of this table and
           should not be desktop-only. Only this box scrolls; the page does not.
-          `pr-4` is the gap the columns never had at any width. */}
+          `pr-4` is the gap the columns never had at any width, and it is on
+          every column including the last -- exempting the last one left the
+          rightmost value butting against the edge of the scroll box.
+
+          The min-width is 440px, not the 560px that first fitted the columns,
+          so that the sixth column is cut off mid-cell on a phone rather than
+          landing just past the edge. A clipped column is the only thing
+          telling a reader there is more to scroll to. Padding cannot do this
+          job: the table holds its minimum width regardless, so freed padding
+          is redistributed straight back into the columns -- dropping `pr-4`
+          to `pr-2` moves the sixth column six pixels. Measured at the three
+          common iPhone widths (343/361/398px of table box), 440px leaves
+          12/30/58px of that column showing. The cost is that four headers
+          wrap to two lines below 500px; at the width any real desktop gives
+          this table the minimum does not bind, so they stay on one line
+          there. The values carry `whitespace-nowrap` for the same reason in
+          reverse: at 440px "2025 Q4" broke across two lines and the rows lost
+          a common height. Headers may wrap; figures may not. */}
       <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-xs border-collapse">
+      <table className="w-full min-w-[440px] text-xs border-collapse">
         <thead>
           <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">
-            <th className="py-2 pr-4 last:pr-0">Quarter</th>
+            <th className="py-2 pr-4">Quarter</th>
             {/* Header widths set the column widths in this table, so they
                 are kept short. "Simulated nowcast" was also becoming untrue:
                 the shaded rows below are live nowcasts, not simulations, and
                 the intro paragraph already says which rows are which. */}
-            <th className="py-2 pr-4 last:pr-0">Nowcast</th>
-            <th className="py-2 pr-4 last:pr-0">Actual</th>
-            <th className="py-2 pr-4 last:pr-0">Error (pp)</th>
-            <th className="py-2 pr-4 last:pr-0">Nowcast (YoY)</th>
-            <th className="py-2 pr-4 last:pr-0">RBA (YoY)</th>
-            <th className="py-2 pr-4 last:pr-0">Actual (YoY)</th>
-            {showGap && <th className="py-2 pr-4 last:pr-0">Gap (pp)</th>}
+            <th className="py-2 pr-4">Nowcast</th>
+            <th className="py-2 pr-4">Actual</th>
+            <th className="py-2 pr-4">Error (pp)</th>
+            <th className="py-2 pr-4">Nowcast (YoY)</th>
+            <th className="py-2 pr-4">RBA (YoY)</th>
+            <th className="py-2 pr-4">Actual (YoY)</th>
+            {showGap && <th className="py-2 pr-4">Gap (pp)</th>}
           </tr>
         </thead>
         <tbody>
@@ -146,30 +163,30 @@ export default function PerformanceSection({
                 ? `Published ${e.live_run_date} — before the ABS printed this quarter`
                 : undefined}
             >
-              <td className="py-2 pr-4 last:pr-0">{e.target_quarter}</td>
-              <td className="py-2 pr-4 last:pr-0">
+              <td className="whitespace-nowrap py-2 pr-4">{e.target_quarter}</td>
+              <td className="whitespace-nowrap py-2 pr-4">
                 {e.qoq_nowcast_pct == null ? formatMillions(e.final_nowcast) : formatPct(e.qoq_nowcast_pct)}
               </td>
-              <td className="py-2 pr-4 last:pr-0">
+              <td className="whitespace-nowrap py-2 pr-4">
                 {e.qoq_actual_pct == null ? formatMillions(e.actual) : formatPct(e.qoq_actual_pct)}
               </td>
-              <td className={`py-2 pr-4 last:pr-0 ${(e.qoq_error_pp ?? e.error_pct) > 0 ? "text-teal" : "text-[#c0392b]"}`}>
+              <td className={`whitespace-nowrap py-2 pr-4 ${(e.qoq_error_pp ?? e.error_pct) > 0 ? "text-teal" : "text-[#c0392b]"}`}>
                 {(() => {
                   const v = e.qoq_error_pp ?? e.error_pct;
                   return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
                 })()}
               </td>
-              <td className="py-2 pr-4 last:pr-0 text-label">
+              <td className="whitespace-nowrap py-2 pr-4 text-label">
                 {e.yoy_nowcast == null ? "—" : `${e.yoy_nowcast.toFixed(2)}%`}
               </td>
-              <td className="py-2 pr-4 last:pr-0 text-label">
+              <td className="whitespace-nowrap py-2 pr-4 text-label">
                 {e.yoy_rba == null ? "—" : `${e.yoy_rba.toFixed(2)}%`}
               </td>
-              <td className="py-2 pr-4 last:pr-0 text-label">
+              <td className="whitespace-nowrap py-2 pr-4 text-label">
                 {e.yoy_actual == null ? "—" : `${e.yoy_actual.toFixed(2)}%`}
               </td>
               {showGap && (
-                <td className={`py-2 pr-4 last:pr-0 ${e.edge_pp == null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
+                <td className={`whitespace-nowrap py-2 pr-4 ${e.edge_pp == null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
                   {e.edge_pp == null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}
                 </td>
               )}

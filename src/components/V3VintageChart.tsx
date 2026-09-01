@@ -19,9 +19,10 @@ import { formatDayMonth } from "@/lib/format";
 // How far right of the release line its label sits. Same value the v2 chart
 // uses, so the two pages place the label identically.
 const LABEL_GAP_X = 12;
+const DAY = 86_400_000;
 
-// Same shape as the v2 chart — weekly nowcasts against days until the ABS
-// release — with the model's probability interval drawn around the path.
+// One target quarter's weekly nowcasts against days until its ABS release,
+// with the model's probability interval drawn around the path.
 //
 // WHY THIS CHART CAN SHOW A BAND AND THE v2 ONE CANNOT. They are not the same
 // object. v2's is the point estimate plus or minus one standard deviation of its
@@ -35,26 +36,45 @@ const LABEL_GAP_X = 12;
 // point estimate, and it NARROWS as data arrives, which an error-dispersion band
 // cannot. Coverage was measured before this shipped (`tools/band_coverage.py`,
 // rows in `docs/measurements/`); the page reports the band, not the audit.
-// which the NY Fed Staff Nowcast 2.0 paper names as one of the reasons the model
-// was rebuilt Bayesian ("our Bayesian estimation approach ... enables us to
-// report probability intervals alongside each point estimate"). It is computed
-// from `density_nowcast` — the NY Fed's own function — on the same chain as the
-// point. It also NARROWS as data arrives, which an error-dispersion band cannot.
 //
 // The label matters: this is a probability interval, not a confidence interval.
+//
+// ONE TARGET PER CHART. A two-target version of this drew both quarters on one
+// pair of axes; four translucent bands overlapped into a colour that belonged to
+// neither series. `V3Evolution` shows one at a time behind a toggle instead.
+//
+// X IS SHARED, Y IS NOT. The x domain is handed in so both targets sit on one
+// lifecycle — a point at -90 is the same distance from its own print whichever
+// quarter is on screen, and toggling does not slide the axis under the reader.
+// The y domain is computed HERE, from this target's own data. Sharing it made
+// the wider of the two bands set the scale for both, which flattened the
+// nowcast's line to buy resolution the forecast did not need.
+export interface VintageChartScale {
+  xDomain: [number, number];
+  xTicks: number[];
+}
+
 interface Props {
   vintages: V3Vintage[];
   targetQuarter: string;
   releaseDate: string;
+  /** Supplied by `V3Evolution` so both charts share one pair of scales. */
+  scale?: VintageChartScale;
+  height?: number;
 }
 
-export default function V3VintageChart({ vintages, targetQuarter, releaseDate }: Props) {
+export default function V3VintageChart({
+  vintages,
+  targetQuarter,
+  releaseDate,
+  scale,
+  height = 340,
+}: Props) {
   const release = new Date(releaseDate + "T00:00:00Z").getTime();
-  const day = 86_400_000;
 
   const data = vintages
     .map((v) => ({
-      x: Math.round((new Date(v.run_date + "T00:00:00Z").getTime() - release) / day),
+      x: Math.round((new Date(v.run_date + "T00:00:00Z").getTime() - release) / DAY),
       point: v.qoq_growth_pct,
       band68: [v.ci_68_low, v.ci_68_high] as [number, number],
       band95: [v.ci_95_low, v.ci_95_high] as [number, number],
@@ -63,20 +83,17 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
     }))
     .sort((a, b) => a.x - b.x);
 
-  // ONE POINT IS NOT A CHART. On the first Monday of a quarter the history holds
-  // a single estimate, and Recharts draws that as an empty box: no line to join,
-  // areas with nothing to span, and an axis collapsed around one value. That is
-  // the homepage on the first Monday of every quarter, so it says what it has
-  // instead of drawing a frame around nothing.
+  // ONE POINT IS NOT A CHART. In the week a target's first indicator lands the
+  // record holds a single estimate, and Recharts draws that as an empty box: no
+  // line to join, areas with nothing to span, and an axis collapsed around one
+  // value. It says what it has instead of drawing a frame around nothing.
   if (data.length < 2) {
     const only = data[0];
     return (
-      <section className="mb-10">
-        <p className="font-headline text-3xl text-black">Nowcast evolution</p>
-        <p className="mb-3 text-xs text-label">
-          The first weekly estimate for {targetQuarter}. This chart traces how
-          the nowcast moves as indicator data arrives, so it fills in over the
-          quarter.
+      <div>
+        <p className="mb-2 text-xs text-label">
+          {targetQuarter} — the first weekly estimate. This fills in as the
+          quarter&rsquo;s indicator data arrives.
         </p>
         {only && (
           <div className="border border-border p-4 text-sm">
@@ -92,7 +109,7 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
             </div>
           </div>
         )}
-      </section>
+      </div>
     );
   }
 
@@ -135,25 +152,20 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
   const yDp = Number.isInteger(STEP * 10) ? 1 : 2;
 
   return (
-    <section className="mb-10">
-      <p className="font-headline text-3xl text-black">Nowcast evolution</p>
-      <p className="mb-2 text-xs text-label">
-        Each point is a weekly point estimate for {targetQuarter}. The shaded
-        areas are the model&rsquo;s 68% and 95% probability bands.
-      </p>
-      <div className="h-[340px]">
+    <div>
+      <div style={{ height }}>
         <ResponsiveContainer>
           <ComposedChart data={data} margin={{ top: 20, right: 40, bottom: 20, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartColors.border} />
             <XAxis
               type="number"
               dataKey="x"
-              domain={[-95, 5]}
-              ticks={[-90, -75, -60, -45, -30, -15, 0]}
+              domain={scale?.xDomain ?? [-125, 5]}
+              ticks={scale?.xTicks}
               tick={axisTick}
               tickFormatter={(v: number) => `${v}`}
             >
-              <Label value="Days until next GDP release" offset={-12} position="insideBottom"
+              <Label value="Days until GDP release" offset={-12} position="insideBottom"
                      style={{ fontSize: 10, fill: chartColors.label }} />
             </XAxis>
             <YAxis
@@ -175,21 +187,23 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
               }}
             />
             {/* The theme's own green (`--color-green`, chartColors.accent), the
-                same one the headline card uses for this quarter's estimate.
-                `chartColors.band` is a blend of primary and accent that reads as
-                a third green next to the other two. */}
-            <Area dataKey="band95" stroke="none" fill={chartColors.accent} fillOpacity={0.14} />
-            <Area dataKey="band68" stroke="none" fill={chartColors.accent} fillOpacity={0.32} />
+                same one the headline card uses for this quarter's estimate. The
+                LINE is `primary` over it — the live pairing, kept for both
+                panels so the two quarters read as one system rather than two
+                charts that happen to sit together. */}
+            <Area type="monotone" dataKey="band95" stroke="none"
+                  fill={chartColors.accent} fillOpacity={0.14} />
+            <Area type="monotone" dataKey="band68" stroke="none"
+                  fill={chartColors.accent} fillOpacity={0.32} />
             <ReferenceLine y={0} stroke={chartColors.label} strokeWidth={1} />
             <ReferenceLine x={0} stroke={chartColors.label} strokeDasharray="4 4">
-              {/* Recharts derives both coordinates of a positioned label
-                  from the one `offset` scalar, so no value places the text
-                  clear of the line AND clear of the top of the plot: the
-                  negative offset that clears the line horizontally lifts the
-                  text above the plot edge. Drawing it ourselves separates
-                  the two, and centres it the way the v2 chart does. A
-                  vertical ReferenceLine's viewBox is the line -- `x` is the
-                  line, `y` is the top of the plot area. */}
+              {/* Recharts derives both coordinates of a positioned label from
+                  the one `offset` scalar, so no value places the text clear of
+                  the line AND clear of the top of the plot: the negative offset
+                  that clears the line horizontally lifts the text above the
+                  plot edge. Drawing it ourselves separates the two. A vertical
+                  ReferenceLine's viewBox is the line — `x` is the line, `y` is
+                  the top of the plot area. */}
               <Label content={(props) => {
                 const vb = (props as { viewBox?: { x: number; y: number; height: number } }).viewBox;
                 if (!vb) return null;
@@ -213,6 +227,6 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-    </section>
+    </div>
   );
 }

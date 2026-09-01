@@ -90,6 +90,47 @@ def _pct(x) -> float:
     return round(float(x), 4)
 
 
+def gdp_release_date(quarter: str) -> str | None:
+    """``YYYY-MM-DD`` the ABS publishes national accounts for ``quarter``.
+
+    The ABS releases quarterly GDP on the FIRST WEDNESDAY of the month three
+    months after the quarter ends: 2026 Q2 ends in June, so it prints on the
+    first Wednesday of September, 2026-09-02. Same rule the v1 pipeline uses
+    (`pipeline/04_emit_json.R:112`), ported rather than shared because the two
+    live in different languages.
+
+    This is the scheduling RULE, not a scraped calendar. The ABS has moved a
+    release before now, and `data/latest.json` carries the fetched date for the
+    NEXT one, which is the only one a reader is counting down to. Use this for
+    the quarter after that, where being a day out costs nothing and having no
+    date at all costs the chart its axis.
+    """
+    import datetime as _dt
+
+    try:
+        year_s, q_s = quarter.split(" Q")
+        year, q = int(year_s), int(q_s)
+    except (ValueError, AttributeError):
+        return None
+    if q not in (1, 2, 3, 4):
+        return None
+    month = q * 3 + 3
+    if month > 12:
+        month, year = month - 12, year + 1
+    first = _dt.date(year, month, 1)
+    # weekday(): Mon=0 .. Wed=2
+    return str(first + _dt.timedelta(days=(2 - first.weekday()) % 7))
+
+
+def _last_month_with_data(panel) -> str:
+    """``YYYY-MM`` of the last panel column carrying any observation."""
+    import numpy as np
+
+    seen = np.flatnonzero(np.isfinite(np.asarray(panel.Y)).any(axis=0))
+    j = int(seen[-1]) if seen.size else len(panel.dates) - 1
+    return str(panel.dates[j].date())[:7]
+
+
 def nowcast_payload(
     *,
     panel,
@@ -106,6 +147,7 @@ def nowcast_payload(
     n_gs: int,
     n_burn: int,
     seed: int,
+    months_with_data: list[int] | None = None,
 ) -> dict:
     """Assemble the emitted object from an already-run, already-guarded fit.
 
@@ -113,6 +155,11 @@ def nowcast_payload(
     ``target_periods`` returned them: the first is the nowcast, any after it are
     forecasts. ``draws`` is ``(n_draw, n_horizon)`` of annualised percent from
     ``density_nowcast``; the bands are percentiles of it.
+
+    ``months_with_data`` is one count per horizon: how many of that quarter's
+    three months carry an observation for any series. A forecast quarter with
+    zero is the model's unconditional anchor and nothing else, so the site is
+    given the number rather than left to infer it from ``data_through``.
 
     This function does no estimation and no fetching. It is pure so that the
     emitted shape can be tested without a sampler run.
@@ -133,6 +180,11 @@ def nowcast_payload(
         entry = {"quarter": label, "kind": "nowcast" if k == 0 else "forecast",
                  "qoq_growth_pct": _pct(qoq),
                  "annualised_growth_pct": _pct(ann), **band}
+        if months_with_data is not None and k < len(months_with_data):
+            entry["months_with_data"] = int(months_with_data[k])
+        rel = gdp_release_date(label)
+        if rel:
+            entry["release_date"] = rel
         if k == 0 and prev_level is not None:
             entry["gdp_chain_volume_millions"] = round(
                 float(prev_level) * (1.0 + qoq / 100.0))
@@ -144,7 +196,12 @@ def nowcast_payload(
         "generated_at": generated_at,
         "as_of": asof,
         "target_quarter": out_h[0]["quarter"] if out_h else None,
-        "data_through": str(panel.dates[-1].date())[:7],
+        # THE LAST MONTH WITH DATA, NOT THE LAST COLUMN. The panel is built to
+        # the as-of date and is now padded past it so the next quarter has a
+        # column to be forecast in, so `dates[-1]` is a month the model has
+        # never seen. Reporting it claimed data that does not exist: on
+        # 2026-08-31 the panel ended 2026-08 and August was entirely empty.
+        "data_through": _last_month_with_data(panel),
         "prev_level": (
             {"value": round(float(prev_level)), "quarter": prev_quarter}
             if prev_level is not None else None),

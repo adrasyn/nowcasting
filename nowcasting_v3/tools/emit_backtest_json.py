@@ -62,6 +62,15 @@ def main() -> int:
             # published, so it cannot stand as a live call.
             if r.get("backfilled"):
                 continue
+            # NOR CAN A FORECAST ROW. A quarter is the NEXT-quarter forecast for
+            # a few weeks before it becomes the nowcast, and those rows are a
+            # different and much harder claim: one month of the quarter's data
+            # rather than three. Scoring one as the live call would put a
+            # forecast in a table that says nowcast. Keyed on the explicit
+            # "forecast" value so rows written before `kind` existed, which are
+            # all nowcasts, still count.
+            if r.get("kind") == "forecast":
+                continue
             q = r["target_quarter"]
             if q not in live or r["run_date"] > live[q]["run_date"]:
                 live[q] = r

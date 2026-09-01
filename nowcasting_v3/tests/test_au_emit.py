@@ -179,3 +179,116 @@ def test_the_schema_is_stamped_so_the_site_can_refuse_an_old_shape():
                               asof="y", gdp_global_loading=1.3,
                               collapse_floor=1.0, n_gs=1, n_burn=1, seed=1)):
         assert p["schema"] == SCHEMA
+
+
+# --------------------------------------------------------------------------- #
+# The next quarter
+# --------------------------------------------------------------------------- #
+
+
+def _panel_with_gap(n_months: int = 60, empty_tail: int = 4) -> Panel:
+    """A panel whose last `empty_tail` months carry no observation at all.
+
+    That is the shape `pad_to_next_quarter` leaves behind, and also the shape a
+    real vintage has at the top of a quarter: `build_panel` ends the panel at
+    the as-of date whether or not anything has been published for those months.
+    """
+    dates = pd.date_range("2021-01-01", periods=n_months, freq="MS")
+    Y = np.zeros((3, n_months))
+    Y[:, -empty_tail:] = np.nan
+    return Panel(Y=Y, y_location=np.zeros((3, 1)), y_scale=np.ones((3, 1)),
+                 dates=dates, series_id=["a", "b", "gdp"], i_now=2)
+
+
+def _payload(panel, horizons, draws, months=None):
+    return nowcast_payload(
+        panel=panel, horizons=horizons, draws=draws,
+        prev_level=100.0, prev_quarter="2025 Q4",
+        generated_at="2026-08-31T00:00:00+00:00", asof="2026-08-31",
+        gdp_global_loading=1.3, collapse_floor=1.0,
+        n_gs=10, n_burn=5, seed=4, months_with_data=months)
+
+
+def test_data_through_is_the_last_month_with_data_not_the_last_column():
+    """The bug this replaced put a month on the page that nobody had measured.
+
+    `data_through` used to be `panel.dates[-1]`, the panel's last COLUMN. The
+    panel is built to the as-of date and is now padded past it so the next
+    quarter has somewhere to be forecast, so the last column is routinely a
+    month with no observation in it. On 2026-08-31 the shipped page said "data
+    through 2026-08" while August was entirely empty.
+    """
+    panel = _panel_with_gap(n_months=60, empty_tail=4)
+    p = _payload(panel, [("2025 Q4", 2.0)], np.full((50, 1), 2.0))
+    assert p["data_through"] == "2025-08", (
+        "data_through must name the last month carrying an observation, "
+        f"not the last column ({panel.dates[-1].date()})")
+
+
+def test_every_horizon_after_the_first_is_labelled_a_forecast():
+    horizons = [("2026 Q2", 2.5), ("2026 Q3", 3.1)]
+    draws = np.column_stack([np.full(50, 2.5), np.full(50, 3.1)])
+    p = _payload(_panel(), horizons, draws)
+    assert [h["kind"] for h in p["horizons"]] == ["nowcast", "forecast"]
+    assert p["target_quarter"] == "2026 Q2", (
+        "the target quarter is the nowcast's, never a forecast's")
+    # A level is only meaningful for the nowcast, which is anchored to the last
+    # published quarter. Chaining it onto a forecast would compound two
+    # estimates and present the result as a level.
+    assert "gdp_chain_volume_millions" in p["horizons"][0]
+    assert "gdp_chain_volume_millions" not in p["horizons"][1]
+
+
+def test_months_with_data_rides_along_per_horizon():
+    """The site's zero-month guard needs this number, and cannot derive it.
+
+    `data_through` is one date for the whole payload; how many months of a
+    GIVEN quarter carry data is a different question, and the answer for the
+    next quarter is what decides whether the page shows it at all.
+    """
+    horizons = [("2026 Q2", 2.5), ("2026 Q3", 3.1)]
+    draws = np.column_stack([np.full(50, 2.5), np.full(50, 3.1)])
+    p = _payload(_panel(), horizons, draws, months=[3, 1])
+    assert [h["months_with_data"] for h in p["horizons"]] == [3, 1]
+
+
+def test_months_with_data_is_absent_when_not_supplied():
+    """An older caller must not silently produce `months_with_data: 0`.
+
+    Zero is the site's signal to hide the forecast entirely, so defaulting to
+    it would make an unrelated caller's payload disappear from the page.
+    """
+    p = _payload(_panel(), [("2026 Q2", 2.5)], np.full((50, 1), 2.5))
+    assert "months_with_data" not in p["horizons"][0]
+
+
+def test_gdp_release_date_is_the_first_wednesday_three_months_on():
+    """The ABS's own rule, and the one date on the page a reader counts down to.
+
+    2026 Q2 is the anchor: `data/latest.json` carries the FETCHED release date
+    for it, 2026-09-02, so the rule has to reproduce that exactly or the two
+    sources disagree on the page.
+    """
+    from nyfed.au.emit import gdp_release_date
+
+    assert gdp_release_date("2026 Q2") == "2026-09-02"
+    assert gdp_release_date("2026 Q3") == "2026-12-02"
+    # Q4 rolls the year over: ends December, prints the following March.
+    assert gdp_release_date("2026 Q4") == "2027-03-03"
+    assert gdp_release_date("2027 Q1") == "2027-06-02"
+
+
+def test_gdp_release_date_refuses_a_label_it_cannot_parse():
+    """Returning a plausible-looking date for junk would put a countdown on the
+    page pointing at a day the ABS is not publishing anything."""
+    from nyfed.au.emit import gdp_release_date
+
+    for junk in ("2026Q2", "not a quarter", "2026 Q5", "", None):
+        assert gdp_release_date(junk) is None
+
+
+def test_release_date_rides_along_per_horizon():
+    horizons = [("2026 Q2", 2.5), ("2026 Q3", 3.1)]
+    draws = np.column_stack([np.full(50, 2.5), np.full(50, 3.1)])
+    p = _payload(_panel(), horizons, draws)
+    assert [h["release_date"] for h in p["horizons"]] == ["2026-09-02", "2026-12-02"]

@@ -1286,9 +1286,7 @@
       ],
       "last_release_date": "2026-08-20",
       "next_release_estimate": "2026-09-24",
-      "updated_this_run": true,
-      "prev_period": "2026-06",
-      "latest_period": "2026-07"
+      "updated_this_run": false
     },
     {
       "id": "unemp_rate",
@@ -2576,9 +2574,7 @@
       ],
       "last_release_date": "2026-08-20",
       "next_release_estimate": "2026-09-24",
-      "updated_this_run": true,
-      "prev_period": "2026-06",
-      "latest_period": "2026-07"
+      "updated_this_run": false
     },
     {
       "id": "part_rate",
@@ -3866,9 +3862,7 @@
       ],
       "last_release_date": "2026-08-20",
       "next_release_estimate": "2026-09-24",
-      "updated_this_run": true,
-      "prev_period": "2026-06",
-      "latest_period": "2026-07"
+      "updated_this_run": false
     },
     {
       "id": "hours_worked",
@@ -5156,9 +5150,7 @@
       ],
       "last_release_date": "2026-08-20",
       "next_release_estimate": "2026-09-24",
-      "updated_this_run": true,
-      "prev_period": "2026-06",
-      "latest_period": "2026-07"
+      "updated_this_run": false
     },
     {
       "id": "household_spending",
@@ -5846,9 +5838,7 @@
       ],
       "last_release_date": "2026-08-27",
       "next_release_estimate": "2026-09-29",
-      "updated_this_run": true,
-      "prev_period": "2026-06",
-      "latest_period": "2026-07"
+      "updated_this_run": false
     },
     {
       "id": "cons_conf",
@@ -7435,7 +7425,7 @@
         },
         {
           "date": "2006-02",
-          "value": 12651
+          "value": 12652
         },
         {
           "date": "2006-03",
@@ -7647,7 +7637,7 @@
         },
         {
           "date": "2010-07",
-          "value": 15229
+          "value": 15228
         },
         {
           "date": "2010-08",
@@ -7663,7 +7653,7 @@
         },
         {
           "date": "2010-11",
-          "value": 14421
+          "value": 14422
         },
         {
           "date": "2010-12",
@@ -7683,11 +7673,11 @@
         },
         {
           "date": "2011-04",
-          "value": 13805
+          "value": 13804
         },
         {
           "date": "2011-05",
-          "value": 12872
+          "value": 12873
         },
         {
           "date": "2011-06",
@@ -7695,7 +7685,7 @@
         },
         {
           "date": "2011-07",
-          "value": 13090
+          "value": 13089
         },
         {
           "date": "2011-08",
@@ -7707,7 +7697,7 @@
         },
         {
           "date": "2011-10",
-          "value": 11663
+          "value": 11662
         },
         {
           "date": "2011-11",
@@ -7719,19 +7709,19 @@
         },
         {
           "date": "2012-01",
-          "value": 10862
+          "value": 10858
         },
         {
           "date": "2012-02",
-          "value": 11530
+          "value": 11534
         },
         {
           "date": "2012-03",
-          "value": 11788
+          "value": 11791
         },
         {
           "date": "2012-04",
-          "value": 10928
+          "value": 10924
         },
         {
           "date": "2012-05",
@@ -7739,19 +7729,19 @@
         },
         {
           "date": "2012-06",
-          "value": 14826
+          "value": 14833
         },
         {
           "date": "2012-07",
-          "value": 11814
+          "value": 11809
         },
         {
           "date": "2012-08",
-          "value": 13024
+          "value": 13027
         },
         {
           "date": "2012-09",
-          "value": 15749
+          "value": 15751
         },
         {
           "date": "2012-10",
@@ -7759,11 +7749,11 @@
         },
         {
           "date": "2012-11",
-          "value": 14251
+          "value": 14249
         },
         {
           "date": "2012-12",
-          "value": 14370
+          "value": 14371
         },
         {
           "date": "2013-01",
@@ -7775,47 +7765,47 @@
         },
         {
           "date": "2013-03",
-          "value": 13338
+          "value": 13337
         },
         {
           "date": "2013-04",
-          "value": 14930
+          "value": 14920
         },
         {
           "date": "2013-05",
-          "value": 14328
+          "value": 14333
         },
         {
           "date": "2013-06",
-          "value": 13622
+          "value": 13624
         },
         {
           "date": "2013-07",
-          "value": 15051
+          "value": 15052
         },
         {
           "date": "2013-08",
-          "value": 14740
+          "value": 14746
         },
         {
           "date": "2013-09",
-          "value": 19054
+          "value": 19041
         },
         {
           "date": "2013-10",
-          "value": 17865
+          "value": 17866
         },
         {
           "date": "2013-11",
-          "value": 17690
+          "value": 17698
         },
         {
           "date": "2013-12",
-          "value": 17376
+          "value": 17360
         },
         {
           "date": "2014-01",
-          "value": 16836
+          "value": 16842
         },
         {
           "date": "2014-02",
@@ -7823,47 +7813,47 @@
         },
         {
           "date": "2014-03",
-          "value": 16007
+          "value": 16009
         },
         {
           "date": "2014-04",
-          "value": 16198
+          "value": 16199
         },
         {
           "date": "2014-05",
-          "value": 16967
+          "value": 16975
         },
         {
           "date": "2014-06",
-          "value": 16591
+          "value": 16577
         },
         {
           "date": "2014-07",
-          "value": 17030
+          "value": 17031
         },
         {
           "date": "2014-08",
-          "value": 18312
+          "value": 18310
         },
         {
           "date": "2014-09",
-          "value": 16743
+          "value": 16729
         },
         {
           "date": "2014-10",
-          "value": 18296
+          "value": 18307
         },
         {
           "date": "2014-11",
-          "value": 20549
+          "value": 20556
         },
         {
           "date": "2014-12",
-          "value": 20382
+          "value": 20383
         },
         {
           "date": "2015-01",
-          "value": 19121
+          "value": 19128
         },
         {
           "date": "2015-02",
@@ -7871,39 +7861,39 @@
         },
         {
           "date": "2015-03",
-          "value": 20726
+          "value": 20698
         },
         {
           "date": "2015-04",
-          "value": 19180
+          "value": 19195
         },
         {
           "date": "2015-05",
-          "value": 21124
+          "value": 21123
         },
         {
           "date": "2015-06",
-          "value": 19293
+          "value": 19285
         },
         {
           "date": "2015-07",
-          "value": 19859
+          "value": 19867
         },
         {
           "date": "2015-08",
-          "value": 19109
+          "value": 19112
         },
         {
           "date": "2015-09",
-          "value": 20542
+          "value": 20543
         },
         {
           "date": "2015-10",
-          "value": 22029
+          "value": 22044
         },
         {
           "date": "2015-11",
-          "value": 19228
+          "value": 19221
         },
         {
           "date": "2015-12",
@@ -7915,51 +7905,51 @@
         },
         {
           "date": "2016-02",
-          "value": 19769
+          "value": 19770
         },
         {
           "date": "2016-03",
-          "value": 20365
+          "value": 20363
         },
         {
           "date": "2016-04",
-          "value": 21175
+          "value": 21180
         },
         {
           "date": "2016-05",
-          "value": 20415
+          "value": 20404
         },
         {
           "date": "2016-06",
-          "value": 18375
+          "value": 18380
         },
         {
           "date": "2016-07",
-          "value": 21737
+          "value": 21736
         },
         {
           "date": "2016-08",
-          "value": 21406
+          "value": 21405
         },
         {
           "date": "2016-09",
-          "value": 19582
+          "value": 19580
         },
         {
           "date": "2016-10",
-          "value": 16804
+          "value": 16807
         },
         {
           "date": "2016-11",
-          "value": 18609
+          "value": 18610
         },
         {
           "date": "2016-12",
-          "value": 18369
+          "value": 18377
         },
         {
           "date": "2017-01",
-          "value": 16378
+          "value": 16379
         },
         {
           "date": "2017-02",
@@ -7967,11 +7957,11 @@
         },
         {
           "date": "2017-03",
-          "value": 16372
+          "value": 16370
         },
         {
           "date": "2017-04",
-          "value": 18566
+          "value": 18565
         },
         {
           "date": "2017-05",
@@ -7995,11 +7985,11 @@
         },
         {
           "date": "2017-10",
-          "value": 19900
+          "value": 19904
         },
         {
           "date": "2017-11",
-          "value": 23234
+          "value": 23233
         },
         {
           "date": "2017-12",
@@ -8007,7 +7997,7 @@
         },
         {
           "date": "2018-01",
-          "value": 18411
+          "value": 18408
         },
         {
           "date": "2018-02",
@@ -8015,15 +8005,15 @@
         },
         {
           "date": "2018-03",
-          "value": 19685
+          "value": 19684
         },
         {
           "date": "2018-04",
-          "value": 18769
+          "value": 18767
         },
         {
           "date": "2018-05",
-          "value": 17972
+          "value": 17971
         },
         {
           "date": "2018-06",
@@ -8031,15 +8021,15 @@
         },
         {
           "date": "2018-07",
-          "value": 18895
+          "value": 18894
         },
         {
           "date": "2018-08",
-          "value": 16287
+          "value": 16291
         },
         {
           "date": "2018-09",
-          "value": 16991
+          "value": 16993
         },
         {
           "date": "2018-10",
@@ -8047,15 +8037,15 @@
         },
         {
           "date": "2018-11",
-          "value": 15317
+          "value": 15321
         },
         {
           "date": "2018-12",
-          "value": 14130
+          "value": 14132
         },
         {
           "date": "2019-01",
-          "value": 13881
+          "value": 13888
         },
         {
           "date": "2019-02",
@@ -8063,111 +8053,111 @@
         },
         {
           "date": "2019-03",
-          "value": 15121
+          "value": 15116
         },
         {
           "date": "2019-04",
-          "value": 14725
+          "value": 14721
         },
         {
           "date": "2019-05",
-          "value": 14611
+          "value": 14612
         },
         {
           "date": "2019-06",
-          "value": 14646
+          "value": 14650
         },
         {
           "date": "2019-07",
-          "value": 13596
+          "value": 13589
         },
         {
           "date": "2019-08",
-          "value": 13725
+          "value": 13735
         },
         {
           "date": "2019-09",
-          "value": 14938
+          "value": 14930
         },
         {
           "date": "2019-10",
-          "value": 14067
+          "value": 14076
         },
         {
           "date": "2019-11",
-          "value": 15156
+          "value": 15161
         },
         {
           "date": "2019-12",
-          "value": 15828
+          "value": 15825
         },
         {
           "date": "2020-01",
-          "value": 12759
+          "value": 12762
         },
         {
           "date": "2020-02",
-          "value": 16554
+          "value": 16564
         },
         {
           "date": "2020-03",
-          "value": 15294
+          "value": 15273
         },
         {
           "date": "2020-04",
-          "value": 15270
+          "value": 15271
         },
         {
           "date": "2020-05",
-          "value": 13606
+          "value": 13611
         },
         {
           "date": "2020-06",
-          "value": 12784
+          "value": 12780
         },
         {
           "date": "2020-07",
-          "value": 15219
+          "value": 15218
         },
         {
           "date": "2020-08",
-          "value": 14520
+          "value": 14524
         },
         {
           "date": "2020-09",
-          "value": 16424
+          "value": 16427
         },
         {
           "date": "2020-10",
-          "value": 17500
+          "value": 17514
         },
         {
           "date": "2020-11",
-          "value": 18028
+          "value": 18014
         },
         {
           "date": "2020-12",
-          "value": 18650
+          "value": 18664
         },
         {
           "date": "2021-01",
-          "value": 16446
+          "value": 16456
         },
         {
           "date": "2021-02",
-          "value": 20208
+          "value": 20209
         },
         {
           "date": "2021-03",
-          "value": 22876
+          "value": 22812
         },
         {
           "date": "2021-04",
-          "value": 20856
+          "value": 20874
         },
         {
           "date": "2021-05",
-          "value": 21276
+          "value": 21250
         },
         {
           "date": "2021-06",
@@ -8175,248 +8165,254 @@
         },
         {
           "date": "2021-07",
-          "value": 18794
+          "value": 18810
         },
         {
           "date": "2021-08",
-          "value": 19184
+          "value": 19200
         },
         {
           "date": "2021-09",
-          "value": 19040
+          "value": 19042
         },
         {
           "date": "2021-10",
-          "value": 16401
+          "value": 16404
         },
         {
           "date": "2021-11",
-          "value": 16551
+          "value": 16542
         },
         {
           "date": "2021-12",
-          "value": 16990
+          "value": 17003
         },
         {
           "date": "2022-01",
-          "value": 13576
+          "value": 13575
         },
         {
           "date": "2022-02",
-          "value": 18629
+          "value": 18627
         },
         {
           "date": "2022-03",
-          "value": 14941
+          "value": 14923
         },
         {
           "date": "2022-04",
-          "value": 16132
+          "value": 16128
         },
         {
           "date": "2022-05",
-          "value": 16731
+          "value": 16718
         },
         {
           "date": "2022-06",
-          "value": 16190
+          "value": 16192
         },
         {
           "date": "2022-07",
-          "value": 14282
+          "value": 14298
         },
         {
           "date": "2022-08",
-          "value": 17144
+          "value": 17142
         },
         {
           "date": "2022-09",
-          "value": 17079
+          "value": 17091
         },
         {
           "date": "2022-10",
-          "value": 15655
+          "value": 15628
         },
         {
           "date": "2022-11",
-          "value": 15126
+          "value": 15132
         },
         {
           "date": "2022-12",
-          "value": 16965
+          "value": 16997
         },
         {
           "date": "2023-01",
-          "value": 12344
+          "value": 12337
         },
         {
           "date": "2023-02",
-          "value": 13583
+          "value": 13578
         },
         {
           "date": "2023-03",
-          "value": 13319
+          "value": 13302
         },
         {
           "date": "2023-04",
-          "value": 13285
+          "value": 13279
         },
         {
           "date": "2023-05",
-          "value": 15831
+          "value": 15771
         },
         {
           "date": "2023-06",
-          "value": 13640
+          "value": 13633
         },
         {
           "date": "2023-07",
-          "value": 12911
+          "value": 12931
         },
         {
           "date": "2023-08",
-          "value": 13367
+          "value": 13403
         },
         {
           "date": "2023-09",
-          "value": 14138
+          "value": 14128
         },
         {
           "date": "2023-10",
-          "value": 14548
+          "value": 14517
         },
         {
           "date": "2023-11",
-          "value": 14695
+          "value": 14739
         },
         {
           "date": "2023-12",
-          "value": 13901
+          "value": 13892
         },
         {
           "date": "2024-01",
-          "value": 13152
+          "value": 13155
         },
         {
           "date": "2024-02",
-          "value": 13097
+          "value": 13110
         },
         {
           "date": "2024-03",
-          "value": 13568
+          "value": 13530
         },
         {
           "date": "2024-04",
-          "value": 13844
+          "value": 13789
         },
         {
           "date": "2024-05",
-          "value": 14749
+          "value": 14754
         },
         {
           "date": "2024-06",
-          "value": 13220
+          "value": 13182
         },
         {
           "date": "2024-07",
-          "value": 15079
+          "value": 15134
         },
         {
           "date": "2024-08",
-          "value": 14471
+          "value": 14502
         },
         {
           "date": "2024-09",
-          "value": 15281
+          "value": 15270
         },
         {
           "date": "2024-10",
-          "value": 16271
+          "value": 16288
         },
         {
           "date": "2024-11",
-          "value": 15543
+          "value": 15545
         },
         {
           "date": "2024-12",
-          "value": 15584
+          "value": 15537
         },
         {
           "date": "2025-01",
-          "value": 15535
+          "value": 15581
         },
         {
           "date": "2025-02",
-          "value": 16772
+          "value": 16768
         },
         {
           "date": "2025-03",
-          "value": 15715
+          "value": 15683
         },
         {
           "date": "2025-04",
-          "value": 15499
+          "value": 15445
         },
         {
           "date": "2025-05",
-          "value": 16200
+          "value": 16165
         },
         {
           "date": "2025-06",
-          "value": 16827
+          "value": 16760
         },
         {
           "date": "2025-07",
-          "value": 16065
+          "value": 16226
         },
         {
           "date": "2025-08",
-          "value": 15377
+          "value": 15403
         },
         {
           "date": "2025-09",
-          "value": 18201
+          "value": 18099
         },
         {
           "date": "2025-10",
-          "value": 16339
+          "value": 16374
         },
         {
           "date": "2025-11",
-          "value": 18932
+          "value": 18920
         },
         {
           "date": "2025-12",
-          "value": 15935
+          "value": 15962
         },
         {
           "date": "2026-01",
-          "value": 13809
+          "value": 13813
         },
         {
           "date": "2026-02",
-          "value": 19906
+          "value": 19896
         },
         {
           "date": "2026-03",
-          "value": 17292
+          "value": 17213
         },
         {
           "date": "2026-04",
-          "value": 17375
+          "value": 17425
         },
         {
           "date": "2026-05",
-          "value": 17090
+          "value": 17169
         },
         {
           "date": "2026-06",
-          "value": 18328
+          "value": 18351
+        },
+        {
+          "date": "2026-07",
+          "value": 17687
         }
       ],
-      "last_release_date": "2026-08-06",
-      "next_release_estimate": "2026-09-01",
-      "updated_this_run": false
+      "last_release_date": "2026-09-01",
+      "next_release_estimate": "2026-09-08",
+      "updated_this_run": true,
+      "prev_period": "2026-06",
+      "latest_period": "2026-07"
     },
     {
       "id": "bus_conf",
@@ -9688,9 +9684,7 @@
       ],
       "last_release_date": "2026-08-11",
       "next_release_estimate": "2026-09-08",
-      "updated_this_run": true,
-      "prev_period": "2026-06",
-      "latest_period": "2026-07"
+      "updated_this_run": false
     },
     {
       "id": "goods_exp",
@@ -10985,428 +10979,434 @@
       "series": [
         {
           "date": "2000-03",
-          "value": 13509
+          "value": 13487
         },
         {
           "date": "2000-06",
-          "value": 13938
+          "value": 14019
         },
         {
           "date": "2000-09",
-          "value": 16959
+          "value": 16964
         },
         {
           "date": "2000-12",
-          "value": 14764
+          "value": 14671
         },
         {
           "date": "2001-03",
-          "value": 15041
+          "value": 14993
         },
         {
           "date": "2001-06",
-          "value": 15277
+          "value": 15413
         },
         {
           "date": "2001-09",
-          "value": 15284
+          "value": 15255
         },
         {
           "date": "2001-12",
-          "value": 14268
+          "value": 14225
         },
         {
           "date": "2002-03",
-          "value": 14776
+          "value": 14723
         },
         {
           "date": "2002-06",
-          "value": 15038
+          "value": 15162
         },
         {
           "date": "2002-09",
-          "value": 14975
+          "value": 14944
         },
         {
           "date": "2002-12",
-          "value": 15500
+          "value": 15460
         },
         {
           "date": "2003-03",
-          "value": 15008
+          "value": 14965
         },
         {
           "date": "2003-06",
-          "value": 14433
+          "value": 14548
         },
         {
           "date": "2003-09",
-          "value": 15221
+          "value": 15182
         },
         {
           "date": "2003-12",
-          "value": 15739
+          "value": 15675
         },
         {
           "date": "2004-03",
-          "value": 14963
+          "value": 14931
         },
         {
           "date": "2004-06",
-          "value": 15876
+          "value": 16012
         },
         {
           "date": "2004-09",
-          "value": 15831
+          "value": 15814
         },
         {
           "date": "2004-12",
-          "value": 15577
+          "value": 15539
         },
         {
           "date": "2005-03",
-          "value": 16507
+          "value": 16432
         },
         {
           "date": "2005-06",
-          "value": 15496
+          "value": 15627
         },
         {
           "date": "2005-09",
-          "value": 16247
+          "value": 16274
         },
         {
           "date": "2005-12",
-          "value": 16758
+          "value": 16652
         },
         {
           "date": "2006-03",
-          "value": 17062
+          "value": 17070
         },
         {
           "date": "2006-06",
-          "value": 17130
+          "value": 17201
         },
         {
           "date": "2006-09",
-          "value": 17651
+          "value": 17692
         },
         {
           "date": "2006-12",
-          "value": 18315
+          "value": 18221
         },
         {
           "date": "2007-03",
-          "value": 18865
+          "value": 18932
         },
         {
           "date": "2007-06",
-          "value": 19073
+          "value": 19059
         },
         {
           "date": "2007-09",
-          "value": 19010
+          "value": 19058
         },
         {
           "date": "2007-12",
-          "value": 19291
+          "value": 19225
         },
         {
           "date": "2008-03",
-          "value": 20036
+          "value": 20146
         },
         {
           "date": "2008-06",
-          "value": 20087
+          "value": 19994
         },
         {
           "date": "2008-09",
-          "value": 20361
+          "value": 20356
         },
         {
           "date": "2008-12",
-          "value": 20941
+          "value": 20897
         },
         {
           "date": "2009-03",
-          "value": 20461
+          "value": 20561
         },
         {
           "date": "2009-06",
-          "value": 19605
+          "value": 19554
         },
         {
           "date": "2009-09",
-          "value": 19229
+          "value": 19202
         },
         {
           "date": "2009-12",
-          "value": 19188
+          "value": 19169
         },
         {
           "date": "2010-03",
-          "value": 19048
+          "value": 19187
         },
         {
           "date": "2010-06",
-          "value": 19220
+          "value": 19127
         },
         {
           "date": "2010-09",
-          "value": 19386
+          "value": 19372
         },
         {
           "date": "2010-12",
-          "value": 19133
+          "value": 19059
         },
         {
           "date": "2011-03",
-          "value": 18465
+          "value": 18577
         },
         {
           "date": "2011-06",
-          "value": 19050
+          "value": 19025
         },
         {
           "date": "2011-09",
-          "value": 18623
+          "value": 18610
         },
         {
           "date": "2011-12",
-          "value": 18430
+          "value": 18344
         },
         {
           "date": "2012-03",
-          "value": 18235
+          "value": 18344
         },
         {
           "date": "2012-06",
-          "value": 18544
+          "value": 18535
         },
         {
           "date": "2012-09",
-          "value": 18228
+          "value": 18218
         },
         {
           "date": "2012-12",
-          "value": 18494
+          "value": 18382
         },
         {
           "date": "2013-03",
-          "value": 18648
+          "value": 18741
         },
         {
           "date": "2013-06",
-          "value": 18802
+          "value": 18831
         },
         {
           "date": "2013-09",
-          "value": 19280
+          "value": 19273
         },
         {
           "date": "2013-12",
-          "value": 19595
+          "value": 19472
         },
         {
           "date": "2014-03",
-          "value": 19647
+          "value": 19725
         },
         {
           "date": "2014-06",
-          "value": 20226
+          "value": 20278
         },
         {
           "date": "2014-09",
-          "value": 20634
+          "value": 20616
         },
         {
           "date": "2014-12",
-          "value": 21438
+          "value": 21356
         },
         {
           "date": "2015-03",
-          "value": 22057
+          "value": 22127
         },
         {
           "date": "2015-06",
-          "value": 21790
+          "value": 21820
         },
         {
           "date": "2015-09",
-          "value": 22355
+          "value": 22357
         },
         {
           "date": "2015-12",
-          "value": 23026
+          "value": 22912
         },
         {
           "date": "2016-03",
-          "value": 23056
+          "value": 23129
         },
         {
           "date": "2016-06",
-          "value": 22851
+          "value": 22891
         },
         {
           "date": "2016-09",
-          "value": 23817
+          "value": 23824
         },
         {
           "date": "2016-12",
-          "value": 24155
+          "value": 24042
         },
         {
           "date": "2017-03",
-          "value": 24657
+          "value": 24770
         },
         {
           "date": "2017-06",
-          "value": 25891
+          "value": 25883
         },
         {
           "date": "2017-09",
-          "value": 25350
+          "value": 25333
         },
         {
           "date": "2017-12",
-          "value": 25272
+          "value": 25217
         },
         {
           "date": "2018-03",
-          "value": 26356
+          "value": 26512
         },
         {
           "date": "2018-06",
-          "value": 26966
+          "value": 26881
         },
         {
           "date": "2018-09",
-          "value": 27264
+          "value": 27176
         },
         {
           "date": "2018-12",
-          "value": 27843
+          "value": 27750
         },
         {
           "date": "2019-03",
-          "value": 28221
+          "value": 28483
         },
         {
           "date": "2019-06",
-          "value": 29174
+          "value": 29092
         },
         {
           "date": "2019-09",
-          "value": 29798
+          "value": 29683
         },
         {
           "date": "2019-12",
-          "value": 30331
+          "value": 30448
         },
         {
           "date": "2020-03",
-          "value": 26050
+          "value": 26183
         },
         {
           "date": "2020-06",
-          "value": 19625
+          "value": 19491
         },
         {
           "date": "2020-09",
-          "value": 17856
+          "value": 17371
         },
         {
           "date": "2020-12",
-          "value": 18644
+          "value": 18929
         },
         {
           "date": "2021-03",
-          "value": 17653
+          "value": 18060
         },
         {
           "date": "2021-06",
-          "value": 17671
+          "value": 17464
         },
         {
           "date": "2021-09",
-          "value": 16206
+          "value": 15855
         },
         {
           "date": "2021-12",
-          "value": 15999
+          "value": 16143
         },
         {
           "date": "2022-03",
-          "value": 17064
+          "value": 17431
         },
         {
           "date": "2022-06",
-          "value": 19408
+          "value": 19246
         },
         {
           "date": "2022-09",
-          "value": 21327
+          "value": 20994
         },
         {
           "date": "2022-12",
-          "value": 24076
+          "value": 24017
         },
         {
           "date": "2023-03",
-          "value": 26553
+          "value": 27128
         },
         {
           "date": "2023-06",
-          "value": 29144
+          "value": 28962
         },
         {
           "date": "2023-09",
-          "value": 31061
+          "value": 30602
         },
         {
           "date": "2023-12",
-          "value": 30769
+          "value": 30728
         },
         {
           "date": "2024-03",
-          "value": 30905
+          "value": 31506
         },
         {
           "date": "2024-06",
-          "value": 31699
+          "value": 31597
         },
         {
           "date": "2024-09",
-          "value": 31449
+          "value": 31075
         },
         {
           "date": "2024-12",
-          "value": 31911
+          "value": 31922
         },
         {
           "date": "2025-03",
-          "value": 31713
+          "value": 32204
         },
         {
           "date": "2025-06",
-          "value": 33665
+          "value": 33599
         },
         {
           "date": "2025-09",
-          "value": 33908
+          "value": 33643
         },
         {
           "date": "2025-12",
-          "value": 34110
+          "value": 33951
         },
         {
           "date": "2026-03",
-          "value": 33410
+          "value": 33847
+        },
+        {
+          "date": "2026-06",
+          "value": 33328
         }
       ],
-      "last_release_date": "2026-06-02",
-      "next_release_estimate": "2026-09-01",
-      "updated_this_run": false
+      "last_release_date": "2026-09-01",
+      "next_release_estimate": "2026-12-01",
+      "updated_this_run": true,
+      "prev_period": "2026-03",
+      "latest_period": "2026-06"
     },
     {
       "id": "goods_imp",
@@ -12901,7 +12901,7 @@
         },
         {
           "date": "2012-09",
-          "value": -18206
+          "value": -18205
         },
         {
           "date": "2012-12",
@@ -12993,136 +12993,142 @@
         },
         {
           "date": "2018-06",
-          "value": -26208
+          "value": -26207
         },
         {
           "date": "2018-09",
-          "value": -26777
+          "value": -26778
         },
         {
           "date": "2018-12",
-          "value": -27395
+          "value": -27396
         },
         {
           "date": "2019-03",
-          "value": -26968
+          "value": -26967
         },
         {
           "date": "2019-06",
-          "value": -27642
+          "value": -27640
         },
         {
           "date": "2019-09",
-          "value": -27997
+          "value": -27998
         },
         {
           "date": "2019-12",
-          "value": -28433
+          "value": -28434
         },
         {
           "date": "2020-03",
-          "value": -26511
+          "value": -26510
         },
         {
           "date": "2020-06",
-          "value": -13876
+          "value": -13875
         },
         {
           "date": "2020-09",
-          "value": -13680
+          "value": -13681
         },
         {
           "date": "2020-12",
-          "value": -14906
+          "value": -14907
         },
         {
           "date": "2021-03",
-          "value": -14883
+          "value": -14879
         },
         {
           "date": "2021-06",
-          "value": -15676
+          "value": -15677
         },
         {
           "date": "2021-09",
-          "value": -16863
+          "value": -16864
         },
         {
           "date": "2021-12",
-          "value": -19209
+          "value": -19217
         },
         {
           "date": "2022-03",
-          "value": -22976
+          "value": -22961
         },
         {
           "date": "2022-06",
-          "value": -26182
+          "value": -26185
         },
         {
           "date": "2022-09",
-          "value": -31543
+          "value": -31545
         },
         {
           "date": "2022-12",
-          "value": -33879
+          "value": -33897
         },
         {
           "date": "2023-03",
-          "value": -34194
+          "value": -34165
         },
         {
           "date": "2023-06",
-          "value": -37892
+          "value": -37907
         },
         {
           "date": "2023-09",
-          "value": -40408
+          "value": -40409
         },
         {
           "date": "2023-12",
-          "value": -39423
+          "value": -39433
         },
         {
           "date": "2024-03",
-          "value": -39500
+          "value": -39467
         },
         {
           "date": "2024-06",
-          "value": -40981
+          "value": -40990
         },
         {
           "date": "2024-09",
-          "value": -42138
+          "value": -42137
         },
         {
           "date": "2024-12",
-          "value": -42871
+          "value": -42880
         },
         {
           "date": "2025-03",
-          "value": -43417
+          "value": -43395
         },
         {
           "date": "2025-06",
-          "value": -45113
+          "value": -45129
         },
         {
           "date": "2025-09",
-          "value": -45303
+          "value": -45299
         },
         {
           "date": "2025-12",
-          "value": -45837
+          "value": -45820
         },
         {
           "date": "2026-03",
-          "value": -45426
+          "value": -45602
+        },
+        {
+          "date": "2026-06",
+          "value": -43715
         }
       ],
-      "last_release_date": "2026-06-02",
-      "next_release_estimate": "2026-09-01",
-      "updated_this_run": false
+      "last_release_date": "2026-09-01",
+      "next_release_estimate": "2026-12-01",
+      "updated_this_run": true,
+      "prev_period": "2026-03",
+      "latest_period": "2026-06"
     }
   ]
 }

@@ -195,9 +195,9 @@
   "v1_comparison": {
     "model_name": "v1 (13-series DFM)",
     "target_quarter": "2026 Q2",
-    "qoq_growth_pct": 0.69,
+    "qoq_growth_pct": 0.7,
     "yoy_growth_pct": 2.24,
-    "gdp_chain_volume_millions": 700755,
+    "gdp_chain_volume_millions": 700788,
     "source": "data/latest.json"
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
@@ -206,110 +206,14 @@
     "nowcast_delta_pp": 0.06,
     "series": [
       {
-        "id": "emp",
-        "name": "Employment",
+        "id": "building_app",
+        "name": "Building approvals",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "ft_emp",
-        "name": "Full-time employment",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "pt_emp",
-        "name": "Part-time employment",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "ue",
-        "name": "Unemployment",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "ud",
-        "name": "Underemployment",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "hours",
-        "name": "Hours worked",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "household_spending",
-        "name": "Household spending",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "credit",
-        "name": "Total credit",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "credit_housing",
-        "name": "Housing credit",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "credit_business",
-        "name": "Business credit",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_conf",
-        "name": "Business confidence",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_cond",
-        "name": "Business conditions",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_trade",
-        "name": "Trading conditions",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_profit",
-        "name": "Profitability",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_emp",
-        "name": "Hiring intentions",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_forward",
-        "name": "Forward orders",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "nab_cu",
-        "name": "Capacity use",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "wmi_sent",
-        "name": "Consumer sentiment (Westpac)",
+        "id": "firmmbab90",
+        "name": "Bank bill rate",
         "prev_period": "2026-07",
         "latest_period": "2026-08"
       }

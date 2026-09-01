@@ -34,12 +34,20 @@ export default function V3RbaCompare({ rba }: Props) {
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-center gap-3">
             <span className="w-24 shrink-0 text-xs text-label">{label}</span>
-            <span
-              className="h-3 bg-teal"
-              style={{ width: `${(value / max) * 72}%` }}
-              aria-hidden="true"
-            />
-            <span className="text-xs tabular-nums">{value.toFixed(2)}pp</span>
+            {/* The bar is sized against a track, not against the row. As a
+                flex item it took its width from the row and then let flex
+                shrink it, and below roughly 460px of row the two bars both
+                clamped to the same leftover space -- on a phone the chart
+                showed two equal bars for 0.27 and 0.32. The track absorbs
+                the shrinking; the fill inside it keeps the ratio. */}
+            <span className="min-w-0 flex-1">
+              <span
+                className="block h-3 bg-teal"
+                style={{ width: `${(value / max) * 100}%` }}
+                aria-hidden="true"
+              />
+            </span>
+            <span className="shrink-0 text-xs tabular-nums">{value.toFixed(2)}pp</span>
           </div>
         ))}
       </div>

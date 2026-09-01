@@ -86,6 +86,48 @@ def _fit_latents(sigma: np.ndarray, s: np.ndarray, n_cols: int):
     return sigma, s
 
 
+def pad_to_next_quarter(panel) -> int:
+    """Extend the panel with empty months so the quarter AFTER the current
+    target has a column, and return how many were added.
+
+    `target_periods` steps three months at a time from the quarter after GDP's
+    last observation and stops at the panel's last column, so how many horizons
+    come back is a property of where the panel ENDS. `build_panel` ends it at
+    the as-of date, which through most of a quarter falls short of the next
+    quarter's aligned column -- on 2026-08-31 the panel ended 2026-08 and the
+    only horizon was 2026 Q2, a quarter that had already closed nine weeks
+    earlier. Two months in every three the page led with a quarter nobody could
+    learn anything more about.
+
+    The added columns are all-NaN. The filter treats a missing observation as
+    missing, which is exactly what a quarter that has not happened yet is, so
+    this buys a forecast rather than fabricating an input. It also leaves the
+    NOWCAST untouched: padding moved 2026 Q2 by less than a basis point.
+
+    PADDING HAPPENS HERE, NOT IN `build_panel`. The estimation path and the
+    Plan C backtest both call `build_panel`, and neither wants a panel that
+    runs past its data.
+    """
+    obs = np.flatnonzero(np.isfinite(panel.Y[panel.i_now]))
+    if obs.size == 0:
+        return 0
+    need = int(obs[-1]) + 7          # arange(obs+3, T, 3) has to reach obs+6
+    pad = need - panel.Y.shape[1]
+    if pad <= 0:
+        return 0
+    panel.Y = np.hstack([panel.Y, np.full((panel.Y.shape[0], pad), np.nan)])
+    panel.dates = panel.dates.append(
+        pd.date_range(panel.dates[-1] + pd.DateOffset(months=1),
+                      periods=pad, freq="MS"))
+    return pad
+
+
+def months_with_data(panel, t: int) -> int:
+    """How many of the three months ending at column ``t`` carry any series."""
+    lo = max(0, t - 2)
+    return int(np.isfinite(panel.Y[:, lo:t + 1]).any(axis=0).sum())
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--vintage", action="store_true")
@@ -158,8 +200,10 @@ def main() -> int:
                               detail=str(exc)[:400], generated_at=now, asof=asof))
         return 0
 
+    n_pad = pad_to_next_quarter(panel)
     print(f"panel {panel.Y.shape[0]}x{panel.Y.shape[1]}, "
-          f"{panel.dates[0].date()}..{panel.dates[-1].date()}", flush=True)
+          f"{panel.dates[0].date()}..{panel.dates[-1].date()}"
+          f"{f' (+{n_pad} forecast month(s))' if n_pad else ''}", flush=True)
     if str(panel.dates[0].date()) != meta["panel_first"]:
         print(f"PANEL START MOVED: estimate begins {meta['panel_first']}, this "
               f"panel begins {panel.dates[0].date()}. The saved latents are "
@@ -187,6 +231,7 @@ def main() -> int:
 
     # ---- nowcast ---------------------------------------------------------
     t_now = target_periods(panel)
+    months = [months_with_data(panel, int(t)) for t in t_now]
     loc = float(panel.y_location[panel.i_now, 0])
     scl = float(panel.y_scale[panel.i_now, 0])
     n_draw = N_DENSITY if not args.quick else 200
@@ -214,20 +259,50 @@ def main() -> int:
     # points were never published on the dates they carry.
     tgt = panel.dates[t_now[0]]
     label = _quarter(tgt)
-    q = np.nanpercentile(annualised_to_qoq(draws[:, 0]), [2.5, 16, 84, 97.5])
-    written = [{
-        "run_date": asof, "target_quarter": label,
-        "qoq_growth_pct": round(float(annualised_to_qoq(ann[0])), 4),
-        "ci_95_low": round(q[0], 4), "ci_68_low": round(q[1], 4),
-        "ci_68_high": round(q[2], 4), "ci_95_high": round(q[3], 4),
-        "data_through": str(panel.dates[-1].date())[:7],
-        "estimate_asof": meta["asof"],
-    }]
+    labels = [_quarter(panel.dates[int(t)]) for t in t_now]
+    # The last month CARRYING DATA. `dates[-1]` is now a padded forecast month.
+    seen = np.flatnonzero(np.isfinite(panel.Y).any(axis=0))
+    dthru = str(panel.dates[int(seen[-1])].date())[:7] if seen.size else asof[:7]
+    written = []
+    for k, lab in enumerate(labels):
+        # A FORECAST QUARTER WITH NO DATA IN IT IS NOT A VINTAGE.
+        # `target_periods` will happily reach a quarter that has not started,
+        # and the model answers: it conditions on nothing and returns the trend
+        # anchor. Recorded weekly, that draws a flat line on the evolution chart
+        # that looks like a settled view and is actually the absence of one --
+        # 2026 Q3 sat at +0.60 to +0.67 for the ten weeks before any July
+        # indicator existed, then stepped to +0.76 the week one did.
+        #
+        # The record is meant to show an estimate MOVING AS DATA ARRIVES, so it
+        # starts when data does. The nowcast is exempt: it is the page's primary
+        # number, and a nowcast quarter with no data at all is a fault to
+        # surface, not a row to drop.
+        if k > 0 and months[k] == 0:
+            print(f"  {lab}: no month of data yet, not recorded", flush=True)
+            continue
+        qk = np.nanpercentile(annualised_to_qoq(draws[:, k]),
+                              [2.5, 16, 84, 97.5])
+        written.append({
+            "run_date": asof, "target_quarter": lab,
+            "kind": "nowcast" if k == 0 else "forecast",
+            "qoq_growth_pct": round(float(annualised_to_qoq(ann[k])), 4),
+            "ci_95_low": round(qk[0], 4), "ci_68_low": round(qk[1], 4),
+            "ci_68_high": round(qk[2], 4), "ci_95_high": round(qk[3], 4),
+            "data_through": dthru, "months_with_data": months[k],
+            "estimate_asof": meta["asof"],
+        })
 
     if args.backfill:
         print(f"backfilling earlier weeks of {label}...", flush=True)
-        for d0 in pd.date_range(pd.Timestamp(tgt.year, tgt.month, 1),
-                                pd.Timestamp(asof), freq="W-MON"):
+        # FROM THE QUARTER'S FIRST MONTH, not the target column's. `tgt` is the
+        # aligned column, which is the quarter's LAST month, so starting there
+        # began the record two thirds of the way through the quarter's life:
+        # 2026 Q2's chart started at 93 days to release when its first indicator
+        # had landed at about 118. The zero-data guard below trims whatever
+        # front of the window has no observation in the quarter yet, so widening
+        # it costs nothing but the weeks that turn out to be real.
+        q_start = pd.Timestamp(tgt.year, 3 * ((tgt.month - 1) // 3) + 1, 1)
+        for d0 in pd.date_range(q_start, pd.Timestamp(asof), freq="W-MON"):
             if str(d0.date()) >= asof:
                 continue
             try:
@@ -241,23 +316,42 @@ def main() -> int:
                        dates=panel.dates, series_id=panel.series_id,
                        i_now=panel.i_now)
             pv_pt = point_nowcast(vp.Y, vp.Y, ssm, ssm, vp.i_now, t_now)
-            pv_point = float(annualised_to_qoq(loc + scl * float(pv_pt.nowcast[3, 0])))
-            pv_draws = np.array([
-                loc + scl * density_nowcast(vp.Y, ssm, vp.i_now, t_now, rng)[0]
+            pv_draws = np.vstack([
+                loc + scl * density_nowcast(vp.Y, ssm, vp.i_now, t_now, rng)
                 for _ in range(n_draw)])
-            qb = np.nanpercentile(annualised_to_qoq(pv_draws), [2.5, 16, 84, 97.5])
-            seen = pd.DatetimeIndex(pv.dates)[np.isfinite(pv.Y).any(axis=0)]
-            written.append({
-                "run_date": str(d0.date()), "target_quarter": label,
-                "qoq_growth_pct": round(pv_point, 4),
-                "ci_95_low": round(qb[0], 4), "ci_68_low": round(qb[1], 4),
-                "ci_68_high": round(qb[2], 4), "ci_95_high": round(qb[3], 4),
-                "data_through": str(seen[-1].date())[:7],
-                "estimate_asof": meta["asof"], "backfilled": True,
-            })
-            print(f"  {d0.date()}  {pv_point:+.3f}  (backfilled)", flush=True)
+            pv_seen = pd.DatetimeIndex(pv.dates)[np.isfinite(pv.Y).any(axis=0)]
+            shown = []
+            for k, lab in enumerate(labels):
+                # EVERY horizon, including the nowcast. The live path exempts
+                # the nowcast because a current quarter with no data at all is a
+                # fault worth seeing on the page; a REPLAY of a week before the
+                # quarter had any data is just the anchor, and drawing a flat
+                # line of those is the thing this guard exists to stop.
+                if months_with_data(vp, int(t_now[k])) == 0:
+                    continue
+                pt_k = float(annualised_to_qoq(
+                    loc + scl * float(pv_pt.nowcast[3, k])))
+                qb = np.nanpercentile(annualised_to_qoq(pv_draws[:, k]),
+                                      [2.5, 16, 84, 97.5])
+                written.append({
+                    "run_date": str(d0.date()), "target_quarter": lab,
+                    "kind": "nowcast" if k == 0 else "forecast",
+                    "qoq_growth_pct": round(pt_k, 4),
+                    "ci_95_low": round(qb[0], 4), "ci_68_low": round(qb[1], 4),
+                    "ci_68_high": round(qb[2], 4), "ci_95_high": round(qb[3], 4),
+                    "data_through": str(pv_seen[-1].date())[:7],
+                    "months_with_data": months_with_data(vp, int(t_now[k])),
+                    "estimate_asof": meta["asof"], "backfilled": True,
+                })
+                shown.append(f"{lab} {pt_k:+.3f}")
+            # A week where every horizon was skipped wrote nothing, and saying
+            # "(backfilled)" against an empty list reads as though it did.
+            print(f"  {d0.date()}  "
+                  + ("  ".join(shown) + "  (backfilled)" if shown
+                     else "no quarter has data yet, nothing recorded"),
+                  flush=True)
 
-    vintages = _record(written, label)
+    vintages = _record(written, labels)
 
     release = None
     site_latest = SITE_DATA / "latest.json"
@@ -271,7 +365,8 @@ def main() -> int:
         vintages=vintages, next_gdp_release_date=release,
         generated_at=now, asof=asof, gdp_global_loading=loading,
         collapse_floor=COLLAPSED_GLOBAL_LOADING,
-        n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED)
+        n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED,
+        months_with_data=months)
     payload["estimate"] = {"estimated_at": meta["estimated_at"],
                            "asof": meta["asof"], "age_days": age}
     write(payload)
@@ -285,13 +380,16 @@ def main() -> int:
     return 0
 
 
-def _record(entries: list[dict], label: str) -> list[dict]:
-    """Merge new runs into the standing record and hand back this quarter's.
+def _record(entries: list[dict], labels: list[str]) -> list[dict]:
+    """Merge new runs into the standing record and hand back the live targets'.
 
     The record is the single source for both the evolution chart and, once the
     ABS prints a quarter, this model's LIVE score for it as distinct from the
     backtested rows. Keyed on run date, so re-running a Monday corrects that
-    Monday rather than adding a duplicate.
+    Keyed on (run date, target quarter), NOT run date alone. A run now writes a
+    row per horizon -- the nowcast and the next quarter's forecast share a run
+    date -- so de-duplicating on the date by itself would let each row evict the
+    other and leave whichever happened to be written last.
     """
     hist = {"schema": "v3-history-1", "runs": []}
     if HISTORY.is_file():
@@ -299,14 +397,37 @@ def _record(entries: list[dict], label: str) -> list[dict]:
             hist = json.loads(HISTORY.read_text())
         except json.JSONDecodeError:
             print(f"{HISTORY.name} unreadable; starting a new record", flush=True)
-    keys = {e["run_date"] for e in entries}
-    runs = [r for r in hist["runs"] if r["run_date"] not in keys] + entries
-    hist["runs"] = sorted(runs, key=lambda r: r["run_date"])
+    # Keyed on what was actually WRITTEN, not on `labels`. A run that declines
+    # to record a data-less forecast must leave any existing row for that
+    # quarter alone rather than treating its silence as a deletion.
+    #
+    # AND A BACKFILLED ROW NEVER REPLACES A LIVE ONE. `--backfill` walks every
+    # Monday of the quarter, which includes Mondays the weekly job already ran
+    # for real. Those rows are what this model actually published on the day,
+    # with the data it actually had; a replay reproduces them from TODAY's
+    # revisions and parameters and is a different object that happens to sit
+    # very close. On 2026-09-01 a backfill silently rewrote the 2026-08-31 live
+    # row -- 0.6354 became 0.6362 and the provenance flag flipped -- which is
+    # precisely the "fabricated a tidier version" failure the docstring above
+    # warns about.
+    live = {(r["run_date"], r.get("target_quarter"))
+            for r in hist["runs"] if not r.get("backfilled")}
+    entries = [e for e in entries
+               if not (e.get("backfilled")
+                       and (e["run_date"], e["target_quarter"]) in live)]
+    keys = {(e["run_date"], e["target_quarter"]) for e in entries}
+    runs = [r for r in hist["runs"]
+            if (r["run_date"], r.get("target_quarter")) not in keys] + entries
+    hist["runs"] = sorted(runs, key=lambda r: (r["run_date"],
+                                               r.get("target_quarter", "")))
     HISTORY.parent.mkdir(parents=True, exist_ok=True)
     HISTORY.write_text(json.dumps(hist, indent=2) + "\n")
-    mine = [r for r in hist["runs"] if r["target_quarter"] == label]
-    print(f"recorded {len(entries)} run(s); {HISTORY.name} holds "
-          f"{len(hist['runs'])} ({len(mine)} for {label})", flush=True)
+    mine = [r for r in hist["runs"] if r["target_quarter"] in set(labels)]
+    counts = "; ".join(
+        f"{sum(1 for r in mine if r['target_quarter'] == lab)} for {lab}"
+        for lab in labels)
+    print(f"recorded {len(entries)} row(s); {HISTORY.name} holds "
+          f"{len(hist['runs'])} ({counts})", flush=True)
     return mine
 
 

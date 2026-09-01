@@ -79,6 +79,15 @@ jobs:
       - name: Refresh the track record
         run: python -u tools/emit_backtest_json.py
 
+      # The failure handler below covers a step that THROWS. This covers a run
+      # that succeeds and publishes something incoherent — above all a target
+      # that failed to roll forward after an ABS print, which would headline an
+      # estimate of a quarter already measured. Invariants only, so a failure
+      # here is a bug rather than a judgement call. Runs BEFORE the commit, so a
+      # bad payload is never pushed.
+      - name: Check the payload is coherent
+        run: python -u tools/check_payload.py
+
       # A refusal is a successful run — the runner writes `status: "refused"` and
       # exits 0, and the site renders that rather than last week's number. Say so
       # in the log so a green tick that published nothing is not mistaken for a

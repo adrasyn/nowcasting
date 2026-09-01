@@ -233,6 +233,14 @@ export interface V3Horizon {
   kind: "nowcast" | "forecast";
   qoq_growth_pct: number;
   annualised_growth_pct: number;
+  // How many of this quarter's three months carry an observation. A forecast
+  // quarter with zero is the model's unconditional anchor and nothing else,
+  // which is why the page refuses to headline it.
+  months_with_data?: number;
+  // First Wednesday of the month three months after the quarter ends — the
+  // ABS's scheduling rule. Emitted per horizon so each chart can plot its own
+  // countdown without re-deriving the release calendar in the browser.
+  release_date?: string;
   ci_68_low?: number;
   ci_68_high?: number;
   ci_95_low?: number;
@@ -275,6 +283,8 @@ export interface LatestV3 {
 export interface V3Vintage {
   run_date: string;
   target_quarter: string;
+  kind?: "nowcast" | "forecast";
+  months_with_data?: number;
   qoq_growth_pct: number;
   ci_68_low: number;
   ci_68_high: number;

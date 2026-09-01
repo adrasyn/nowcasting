@@ -8,7 +8,8 @@ import V3RbaCompare from "@/components/V3RbaCompare";
 import V3MethodologyPanel from "@/components/V3MethodologyPanel";
 import ModelSwitch from "@/components/ModelSwitch";
 import V3Headline from "@/components/V3Headline";
-import V3VintageChart from "@/components/V3VintageChart";
+import V3Evolution from "@/components/V3Evolution";
+import V3NextQuarter from "@/components/V3NextQuarter";
 
 // The published nowcast. v3 replaced v2 here in September 2026, on the strength
 // of a 14-quarter backtest (MAE 0.242pp against v2's 0.340) and a calibration
@@ -69,7 +70,6 @@ export default function Home() {
   }
 
   const nowcast = v3.horizons.find((h) => h.kind === "nowcast");
-  const forecasts = v3.horizons.filter((h) => h.kind === "forecast");
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -86,34 +86,13 @@ export default function Home() {
         <V3Headline latest={v3} gdp={data.gdp} />
       )}
 
-      {forecasts.length > 0 && (
-        <section className="mb-8 border border-border p-4">
-          <p className="text-[10px] uppercase tracking-wider text-label">
-            Also forecast, at no extra cost
-          </p>
-          <ul className="mt-2 space-y-1 text-sm">
-            {forecasts.map((f) => (
-              <li key={f.quarter}>
-                <span className="font-semibold">{f.quarter}</span>{" "}
-                {f.qoq_growth_pct > 0 ? "+" : ""}
-                {f.qoq_growth_pct.toFixed(2)}%
-                {f.ci_68_low !== undefined && (
-                  <span className="text-label">
-                    {" "}· 68% band {f.ci_68_low.toFixed(2)}% to{" "}
-                    {f.ci_68_high!.toFixed(2)}%
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <V3NextQuarter latest={v3} gdp={data.gdp} />
 
       {v3.status === "ok" && v3.vintages && v3.vintages.length > 0 && (
-        <V3VintageChart
+        <V3Evolution
           vintages={v3.vintages}
-          targetQuarter={v3.target_quarter ?? ""}
-          releaseDate={v3.next_gdp_release_date ?? ""}
+          horizons={v3.horizons}
+          nowcastReleaseDate={v3.next_gdp_release_date ?? ""}
         />
       )}
 

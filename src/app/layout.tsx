@@ -6,12 +6,10 @@ const SITE_NAME = "James Wilson";
 const PAGE_TITLE = "Australia GDP nowcast";
 // MODEL-NEUTRAL, BECAUSE IT IS SITE-WIDE. This described v2's method — "an
 // RBA-style Monthly Activity Indicator and MIDAS regression" — while `/` now
-// serves v3 and `/v2` serves v2, so it was about to be wrong on the homepage
-// and right only on a secondary route. Search results and link previews would
-// have described the wrong model. Naming the job rather than the method is
-// true of both and survives the next cutover.
-const PAGE_DESCRIPTION =
-  "Weekly nowcast of Australian GDP growth, published before the ABS releases the official figure.";
+// serves v3 and `/v2` serves v2, so it named the wrong model on the homepage
+// in search results and link previews. Saying only what the site does is true
+// of both routes and survives the next cutover.
+const PAGE_DESCRIPTION = "Weekly nowcast of Australian GDP growth.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

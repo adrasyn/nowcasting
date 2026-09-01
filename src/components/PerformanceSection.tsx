@@ -108,21 +108,31 @@ export default function PerformanceSection({
           Each quarter the final nowcast (latest vintage before the release) is compared against the actual GDP value. MAE (mean absolute error) is the average size of the miss, ignoring direction. Bias is the average signed error, so a negative value means we systematically underpredict. The RBA gap compares our year-ended error to the RBA Statement on Monetary Policy forecast closest to quarter-end; a negative gap means our nowcast was closer to the final number.
         </p>
       )}
-      <table className="w-full text-xs border-collapse">
+      {/* Seven number columns need about 560px. A phone gives this table
+          roughly 326px, and a table with no room left distributes none: the
+          cells carry no horizontal padding of their own, so at that width the
+          first three columns ran together into "quarternowcastactual". The
+          min-width keeps the columns readable and the wrapper scrolls the
+          overflow, so a phone loses nothing -- the RBA comparison in the
+          right-hand columns is the most interesting part of this table and
+          should not be desktop-only. Only this box scrolls; the page does not.
+          `pr-4` is the gap the columns never had at any width. */}
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[560px] text-xs border-collapse">
         <thead>
           <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">
-            <th className="py-2">Quarter</th>
+            <th className="py-2 pr-4 last:pr-0">Quarter</th>
             {/* Header widths set the column widths in this table, so they
                 are kept short. "Simulated nowcast" was also becoming untrue:
                 the shaded rows below are live nowcasts, not simulations, and
                 the intro paragraph already says which rows are which. */}
-            <th className="py-2">Nowcast</th>
-            <th className="py-2">Actual</th>
-            <th className="py-2">Error (pp)</th>
-            <th className="py-2">Nowcast (YoY)</th>
-            <th className="py-2">RBA (YoY)</th>
-            <th className="py-2">Actual (YoY)</th>
-            {showGap && <th className="py-2">Gap (pp)</th>}
+            <th className="py-2 pr-4 last:pr-0">Nowcast</th>
+            <th className="py-2 pr-4 last:pr-0">Actual</th>
+            <th className="py-2 pr-4 last:pr-0">Error (pp)</th>
+            <th className="py-2 pr-4 last:pr-0">Nowcast (YoY)</th>
+            <th className="py-2 pr-4 last:pr-0">RBA (YoY)</th>
+            <th className="py-2 pr-4 last:pr-0">Actual (YoY)</th>
+            {showGap && <th className="py-2 pr-4 last:pr-0">Gap (pp)</th>}
           </tr>
         </thead>
         <tbody>
@@ -136,30 +146,30 @@ export default function PerformanceSection({
                 ? `Published ${e.live_run_date} — before the ABS printed this quarter`
                 : undefined}
             >
-              <td className="py-2">{e.target_quarter}</td>
-              <td className="py-2">
+              <td className="py-2 pr-4 last:pr-0">{e.target_quarter}</td>
+              <td className="py-2 pr-4 last:pr-0">
                 {e.qoq_nowcast_pct == null ? formatMillions(e.final_nowcast) : formatPct(e.qoq_nowcast_pct)}
               </td>
-              <td className="py-2">
+              <td className="py-2 pr-4 last:pr-0">
                 {e.qoq_actual_pct == null ? formatMillions(e.actual) : formatPct(e.qoq_actual_pct)}
               </td>
-              <td className={`py-2 ${(e.qoq_error_pp ?? e.error_pct) > 0 ? "text-teal" : "text-[#c0392b]"}`}>
+              <td className={`py-2 pr-4 last:pr-0 ${(e.qoq_error_pp ?? e.error_pct) > 0 ? "text-teal" : "text-[#c0392b]"}`}>
                 {(() => {
                   const v = e.qoq_error_pp ?? e.error_pct;
                   return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
                 })()}
               </td>
-              <td className="py-2 text-label">
+              <td className="py-2 pr-4 last:pr-0 text-label">
                 {e.yoy_nowcast == null ? "—" : `${e.yoy_nowcast.toFixed(2)}%`}
               </td>
-              <td className="py-2 text-label">
+              <td className="py-2 pr-4 last:pr-0 text-label">
                 {e.yoy_rba == null ? "—" : `${e.yoy_rba.toFixed(2)}%`}
               </td>
-              <td className="py-2 text-label">
+              <td className="py-2 pr-4 last:pr-0 text-label">
                 {e.yoy_actual == null ? "—" : `${e.yoy_actual.toFixed(2)}%`}
               </td>
               {showGap && (
-                <td className={`py-2 ${e.edge_pp == null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
+                <td className={`py-2 pr-4 last:pr-0 ${e.edge_pp == null ? "text-label" : e.edge_pp < 0 ? "text-teal" : "text-[#c0392b]"}`}>
                   {e.edge_pp == null ? "—" : `${e.edge_pp > 0 ? "+" : e.edge_pp < 0 ? "−" : ""}${Math.abs(e.edge_pp).toFixed(2)}`}
                 </td>
               )}
@@ -167,6 +177,7 @@ export default function PerformanceSection({
           ))}
         </tbody>
       </table>
+      </div>
       {performance.errors.some((e) => e.is_live) && (
         <p className="mt-2 flex items-center gap-2 text-[10px] text-label">
           <span

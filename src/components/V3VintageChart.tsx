@@ -14,6 +14,11 @@ import {
 } from "recharts";
 import type { V3Vintage } from "@/lib/types";
 import { chartColors, axisTick } from "@/lib/chartTheme";
+import { formatDayMonth } from "@/lib/format";
+
+// How far right of the release line its label sits. Same value the v2 chart
+// uses, so the two pages place the label identically.
+const LABEL_GAP_X = 12;
 
 // Same shape as the v2 chart — weekly nowcasts against days until the ABS
 // release — with the model's probability interval drawn around the path.
@@ -93,6 +98,7 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
 
   const all = data.flatMap((d) => [d.band95[0], d.band95[1]]).concat(0);
   const STEP = 0.25;
+
   const yMin = Math.floor((Math.min(...all) - 0.05) / STEP) * STEP;
   const yMax = Math.ceil((Math.max(...all) + 0.05) / STEP) * STEP;
 
@@ -115,7 +121,7 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
               tick={axisTick}
               tickFormatter={(v: number) => `${v}`}
             >
-              <Label value="Days until ABS release" offset={-12} position="insideBottom"
+              <Label value="Days until next GDP release" offset={-12} position="insideBottom"
                      style={{ fontSize: 10, fill: chartColors.label }} />
             </XAxis>
             <YAxis
@@ -143,17 +149,26 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
             <Area dataKey="band68" stroke="none" fill={chartColors.accent} fillOpacity={0.32} />
             <ReferenceLine y={0} stroke={chartColors.label} strokeWidth={1} />
             <ReferenceLine x={0} stroke={chartColors.label} strokeDasharray="4 4">
-              {/* The label sits to the RIGHT of the line it names; at the
-                  default offset it sits on top of it. A vertical
-                  ReferenceLine gives the label a zero-width viewBox, so
-                  `insideTopRight` anchors at the line and a NEGATIVE offset
-                  pushes right. `insideTopLeft` would push right too, but it
-                  flips the text anchor, and with angle -90 the text then
-                  runs upward off the top of the chart. The x-domain runs to
-                  +5, which is the room this offset uses. */}
-              <Label value="ABS release" angle={-90} position="insideTopRight"
-                     offset={-10}
-                     style={{ fontSize: 10, fill: chartColors.label }} />
+              {/* Recharts derives both coordinates of a positioned label
+                  from the one `offset` scalar, so no value places the text
+                  clear of the line AND clear of the top of the plot: the
+                  negative offset that clears the line horizontally lifts the
+                  text above the plot edge. Drawing it ourselves separates
+                  the two, and centres it the way the v2 chart does. A
+                  vertical ReferenceLine's viewBox is the line -- `x` is the
+                  line, `y` is the top of the plot area. */}
+              <Label content={(props) => {
+                const vb = (props as { viewBox?: { x: number; y: number; height: number } }).viewBox;
+                if (!vb) return null;
+                const [tx, ty] = [vb.x + LABEL_GAP_X, vb.y + vb.height / 2];
+                return (
+                  <text x={tx} y={ty} transform={`rotate(-90, ${tx}, ${ty})`}
+                        textAnchor="middle"
+                        style={{ fontSize: 10, fill: chartColors.label }}>
+                    {`GDP release: ${formatDayMonth(releaseDate)}`}
+                  </text>
+                );
+              }} />
             </ReferenceLine>
             <Line
               type="monotone"

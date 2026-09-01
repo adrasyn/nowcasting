@@ -220,29 +220,39 @@ jobs:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const today = new Date().toISOString().slice(0, 10);
-            // Dedupe: if an open pipeline-failure issue already exists, comment on
-            // it instead of stacking duplicates; otherwise open one and ASSIGN the
-            // owner so GitHub actually notifies (the prior design's bare issue went
-            // unactioned for days).
+            // Dedupe WITHIN THIS PIPELINE, not across the label. Both weekly
+            // jobs use `pipeline-failure`, and this handler used to take
+            // `existing.data[0]` — any open issue with the label. Once v3 began
+            // running weekly that meant a v2 failure could post "Failed again"
+            // into an open V3 thread, naming no pipeline, and never open an
+            // issue of its own. v2 is not on the homepage after #22, so nobody
+            // would be looking at /v2 to notice. The v3 handler already matches
+            // on its own title; this is the same rule from the other side.
             const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: "open",
               labels: "pipeline-failure",
             });
-            if (existing.data.length > 0) {
+            const open = existing.data.find(
+              (i) => !i.title.toLowerCase().includes("v3"));
+            if (open) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: existing.data[0].number,
-                body: `Failed again ${today} (after in-step retries). Logs: ${runUrl}`,
+                issue_number: open.number,
+                body: `The v2 weekly nowcast failed again ${today} (after ` +
+                      `in-step retries). Logs: ${runUrl}`,
               });
             } else {
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: `Weekly nowcast failed ${today}`,
-                body: `The weekly nowcast pipeline failed after in-step retries. See logs: ${runUrl}`,
+                body: `The v2 weekly nowcast pipeline failed after in-step ` +
+                      `retries. See logs: ${runUrl}\n\nThis does not affect ` +
+                      `the published v3 nowcast — the two run in separate ` +
+                      `workflows for that reason.`,
                 labels: ["pipeline-failure"],
                 assignees: [context.repo.owner],
               });

@@ -97,10 +97,42 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
   }
 
   const all = data.flatMap((d) => [d.band95[0], d.band95[1]]).concat(0);
-  const STEP = 0.25;
 
-  const yMin = Math.floor((Math.min(...all) - 0.05) / STEP) * STEP;
-  const yMax = Math.ceil((Math.max(...all) + 0.05) / STEP) * STEP;
+  // Snapping the domain ends to a round number does nothing on its own: with
+  // no `ticks`, Recharts divides the domain into five equal parts and labels
+  // whatever falls there, which is where "0.65%" and "1.10%" came from. The
+  // ticks have to be handed to it.
+  //
+  // Pick the smallest round step that leaves at most six labels, then run the
+  // ticks off that step so every label is a multiple of it. 0 is a multiple of
+  // every step, so the zero line always gets a label when the bands cross it.
+  //
+  // The count is taken from the padded, snapped domain rather than from the
+  // data range: snapping outward adds up to a step at each end, so a range
+  // that divides into five neat intervals can still end up with eight labels
+  // once the axis is rounded off.
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  const PAD = 0.05;
+  const snap = (s: number) => [
+    Math.floor((lo - PAD) / s) * s,
+    Math.ceil((hi + PAD) / s) * s,
+  ];
+  const LADDER = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 50];
+  const STEP =
+    LADDER.find((s) => {
+      const [a, b] = snap(s);
+      return Math.round((b - a) / s) + 1 <= 6;
+    }) ?? LADDER[LADDER.length - 1];
+
+  const [yMin, yMax] = snap(STEP);
+  const yTicks: number[] = [];
+  for (let v = yMin; v <= yMax + STEP / 1000; v += STEP) {
+    yTicks.push(Number(v.toFixed(4)));
+  }
+  // A 0.5 step reads better as "1.5%" than "1.50%"; 0.05 and 0.25 need the
+  // second decimal or half their labels round away.
+  const yDp = Number.isInteger(STEP * 10) ? 1 : 2;
 
   return (
     <section className="mb-10">
@@ -126,9 +158,10 @@ export default function V3VintageChart({ vintages, targetQuarter, releaseDate }:
             </XAxis>
             <YAxis
               domain={[yMin, yMax]}
+              ticks={yTicks}
               tick={axisTick}
               width={52}
-              tickFormatter={(v: number) => `${v.toFixed(2)}%`}
+              tickFormatter={(v: number) => `${v.toFixed(yDp)}%`}
             />
             <Tooltip
               contentStyle={{ fontSize: 12, borderColor: chartColors.border }}

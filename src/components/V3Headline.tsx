@@ -3,7 +3,7 @@
 import { Bar, BarChart, Cell, ResponsiveContainer } from "recharts";
 import type { GdpSeries, LatestV3 } from "@/lib/types";
 import { chartColors } from "@/lib/chartTheme";
-import { formatPct } from "@/lib/format";
+import { formatPct, formatQuarterLabel } from "@/lib/format";
 
 // The homepage headline card, with v3's numbers.
 //
@@ -48,7 +48,7 @@ export default function V3Headline({ latest, gdp }: Props) {
     <section className="mb-8 border border-border-heavy p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] uppercase tracking-wider text-label">
-          {nowcast.quarter} — our GDP estimate
+          {formatQuarterLabel(nowcast.quarter)}: GDP nowcast
         </p>
       </div>
 

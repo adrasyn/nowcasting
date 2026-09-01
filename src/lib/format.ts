@@ -24,6 +24,12 @@ export function formatDate(iso: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/** "2026 Q2" -> "Q2 2026", the way the page's headings name a quarter. */
+export function formatQuarterLabel(quarter: string): string {
+  const m = quarter.match(/^(\d{4})\s*Q([1-4])$/);
+  return m ? `Q${m[2]} ${m[1]}` : quarter;
+}
+
 export function formatDayMonth(iso: string): string {
   const d = new Date(iso);
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];

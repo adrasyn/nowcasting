@@ -44,7 +44,15 @@ export default function V3Evolution({ vintages, horizons, nowcastReleaseDate }: 
   const nowcast = horizons.find((h) => h.kind === "nowcast");
   const forecast = horizons.find((h) => h.kind === "forecast");
 
-  const curRelease = nowcastReleaseDate || nowcast?.release_date;
+  // THE HORIZON'S OWN DATE WINS. `nowcastReleaseDate` reaches this from
+  // `data/latest.json`, an artefact of the R pipeline, which runs before this
+  // model's and can fail on its own; when it does it names the quarter the ABS
+  // has just printed while this model has rolled forward. The runner already
+  // refuses a date from the wrong month, so this is the second of two guards —
+  // but the horizon's `release_date` is derived from the target quarter and
+  // cannot name a different one, so it is the one to trust. The fetched date
+  // remains the fallback for payloads written before that field existed.
+  const curRelease = nowcast?.release_date || nowcastReleaseDate;
   const nxtRelease = forecast?.release_date;
 
   const cur = nowcast

@@ -292,3 +292,27 @@ def test_release_date_rides_along_per_horizon():
     draws = np.column_stack([np.full(50, 2.5), np.full(50, 3.1)])
     p = _payload(_panel(), horizons, draws)
     assert [h["release_date"] for h in p["horizons"]] == ["2026-09-02", "2026-12-02"]
+
+
+def test_the_release_date_rule_and_the_scraped_date_agree_on_the_month():
+    """The runner keeps the scraped date only when it names the target's month.
+
+    `data/latest.json` belongs to the R pipeline, which runs 90 minutes earlier
+    and can fail alone; its `next_gdp_release_date` then stays on the quarter
+    just printed while this model has rolled forward. Agreeing on the month is
+    the test, because an ABS reschedule moves a release within its month and
+    never into another quarter. Mirrors the selection in `run_au_nowcast.py`.
+    """
+    from nyfed.au.emit import gdp_release_date
+
+    def pick(fetched, target):
+        expected = gdp_release_date(target)
+        return fetched if fetched and expected and fetched[:7] == expected[:7] \
+            else expected
+
+    # A reschedule within the month is honoured over the rule.
+    assert pick("2026-09-09", "2026 Q2") == "2026-09-09"
+    # A stale date from the previously printed quarter is refused.
+    assert pick("2026-09-02", "2026 Q3") == "2026-12-02"
+    # No scraped date at all falls back to the rule.
+    assert pick(None, "2026 Q3") == "2026-12-02"

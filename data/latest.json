@@ -1,44 +1,38 @@
 {
-  "generated_at": "2026-09-01T23:26:10Z",
-  "target_quarter": "2026 Q2",
+  "generated_at": "2026-09-07T07:03:25Z",
+  "target_quarter": "2026 Q3",
   "data_through": "2026-09",
-  "next_gdp_release_date": "2026-09-02",
+  "next_gdp_release_date": "2026-12-02",
   "nowcast": {
-    "gdp_chain_volume_millions": 700788,
-    "qoq_growth_pct": 0.7,
-    "yoy_growth_pct": 2.24,
-    "ci_68_low": 697446,
-    "ci_68_high": 701259,
-    "ci_95_low": 695615,
-    "ci_95_high": 703090
+    "gdp_chain_volume_millions": 704515,
+    "qoq_growth_pct": 0.72,
+    "yoy_growth_pct": 2.36,
+    "ci_68_low": 701155,
+    "ci_68_high": 704989,
+    "ci_95_low": 699315,
+    "ci_95_high": 706828
   },
   "latest_actual": {
-    "quarter": "2026 Q1",
-    "gdp_chain_volume_millions": 695945,
-    "qoq_growth_pct": 0.27,
+    "quarter": "2026 Q2",
+    "gdp_chain_volume_millions": 699461,
+    "qoq_growth_pct": 0.42,
     "released_days_before_next": -91
   },
   "data_updates": {
-    "run_date": "2026-09-01",
-    "nowcast_delta_pp": 0.01,
+    "run_date": "2026-09-07",
+    "nowcast_delta_pp": null,
     "series": [
       {
-        "id": "building_approvals",
-        "name": "Building Approvals",
+        "id": "goods_exp",
+        "name": "Goods Exports",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "services_exp",
-        "name": "Services Exports",
-        "prev_period": "2026-03",
-        "latest_period": "2026-06"
-      },
-      {
-        "id": "services_imp",
-        "name": "Services Imports",
-        "prev_period": "2026-03",
-        "latest_period": "2026-06"
+        "id": "goods_imp",
+        "name": "Goods Imports",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
       }
     ]
   }

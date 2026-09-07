@@ -1,37 +1,37 @@
 {
-  "generated_at": "2026-08-31T02:00:00Z",
+  "generated_at": "2026-09-07T02:00:00Z",
   "schema": "v2-staged-2",
-  "as_of": "2026-08-31",
-  "target_quarter": "2026 Q2",
+  "as_of": "2026-09-07",
+  "target_quarter": "2026 Q3",
   "data_through": "2026-08",
   "prev_level": {
-    "value": 695945,
-    "date": "2026 Q1",
+    "value": 699461,
+    "date": "2026 Q2",
     "source": "latest.json latest_actual (realized ABS)"
   },
   "models": {
     "headline": {
       "model_id": "v2_qa_a10",
       "model_name": "MAI to per-stage U-MIDAS",
-      "target_quarter": "2026 Q2",
-      "gdp_chain_volume_millions": 699604,
-      "qoq_growth_pct": 0.53,
-      "qoq_growth_raw_pct": 0.53,
-      "yoy_growth_pct": 2.07,
-      "ci_68_low": 697457,
-      "ci_68_high": 701750,
-      "ci_95_low": 695195,
-      "ci_95_high": 704012,
-      "n_months_in_quarter": 3,
-      "estimator": "QA-UMIDAS",
+      "target_quarter": "2026 Q3",
+      "gdp_chain_volume_millions": 703760,
+      "qoq_growth_pct": 0.61,
+      "qoq_growth_raw_pct": 0.61,
+      "yoy_growth_pct": 2.25,
+      "ci_68_low": 701331,
+      "ci_68_high": 706189,
+      "ci_95_low": 698772,
+      "ci_95_high": 708748,
+      "n_months_in_quarter": 2,
+      "estimator": "UMIDAS-full",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
       "ci_n": 17,
-      "ci_sd_pp": 0.2988,
+      "ci_sd_pp": 0.3364,
       "ci_bias_pp": 0,
-      "err_mae_pp": 0.37,
-      "err_bias_pp": 0.34,
+      "err_mae_pp": 0.45,
+      "err_bias_pp": 0.38,
       "err_n": 17,
-      "ci_stage": "3"
+      "ci_stage": "2"
     }
   },
   "vintages": [
@@ -190,32 +190,80 @@
       "ci_95_low": 695195,
       "ci_95_high": 704012,
       "data_through": "2026-08"
+    },
+    {
+      "run_date": "2026-09-07",
+      "target_quarter": "2026 Q3",
+      "point": 703760,
+      "qoq_growth_pct": 0.61,
+      "days_until_release": -86,
+      "ci_68_low": 701331,
+      "ci_68_high": 706189,
+      "ci_95_low": 698772,
+      "ci_95_high": 708748,
+      "data_through": "2026-08"
     }
   ],
   "v1_comparison": {
     "model_name": "v1 (13-series DFM)",
-    "target_quarter": "2026 Q2",
-    "qoq_growth_pct": 0.7,
-    "yoy_growth_pct": 2.24,
-    "gdp_chain_volume_millions": 700788,
+    "target_quarter": "2026 Q3",
+    "qoq_growth_pct": 0.72,
+    "yoy_growth_pct": 2.36,
+    "gdp_chain_volume_millions": 704515,
     "source": "data/latest.json"
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
   "data_updates": {
-    "run_date": "2026-08-31",
-    "nowcast_delta_pp": 0.06,
+    "run_date": "2026-09-07",
+    "nowcast_delta_pp": null,
     "series": [
       {
-        "id": "building_app",
-        "name": "Building approvals",
+        "id": "export",
+        "name": "Exports",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "firmmbab90",
-        "name": "Bank bill rate",
+        "id": "fcmygbag3",
+        "name": "3yr govt bond yield",
         "prev_period": "2026-07",
         "latest_period": "2026-08"
+      },
+      {
+        "id": "fcmygbag5",
+        "name": "5yr govt bond yield",
+        "prev_period": "2026-07",
+        "latest_period": "2026-08"
+      },
+      {
+        "id": "fcmygbag10",
+        "name": "10yr govt bond yield",
+        "prev_period": "2026-07",
+        "latest_period": "2026-08"
+      },
+      {
+        "id": "scrigbag3",
+        "name": "3yr yield spread",
+        "prev_period": "2026-07",
+        "latest_period": "2026-08"
+      },
+      {
+        "id": "scrigbag5",
+        "name": "5yr yield spread",
+        "prev_period": "2026-07",
+        "latest_period": "2026-08"
+      },
+      {
+        "id": "scrigbag10",
+        "name": "10yr yield spread",
+        "prev_period": "2026-07",
+        "latest_period": "2026-08"
+      },
+      {
+        "id": "credit_card",
+        "name": "Credit card spending",
+        "prev_period": "2026-06",
+        "latest_period": "2026-07"
       }
     ]
   }

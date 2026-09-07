@@ -291,6 +291,19 @@
       "months_with_data": 1,
       "estimate_asof": "2026-08-31",
       "backfilled": true
+    },
+    {
+      "run_date": "2026-09-07",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "qoq_growth_pct": 0.7405,
+      "ci_95_low": 0.1041,
+      "ci_68_low": 0.4046,
+      "ci_68_high": 1.0498,
+      "ci_95_high": 1.33,
+      "data_through": "2026-08",
+      "months_with_data": 2,
+      "estimate_asof": "2026-08-31"
     }
   ]
 }

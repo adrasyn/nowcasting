@@ -72,11 +72,21 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
     if months is not None and months < 1:
         bad.append(f"nowcast {nowcast['quarter']} has {months} months of data")
 
-    # Nothing with zero months may reach the evolution chart. `run_au_nowcast`
-    # declines to record those rows because the model conditioning on nothing
-    # returns the trend anchor, and a flat line of anchors reads as a settled
-    # view rather than the absence of one.
+    # No FORECAST with zero months may reach the evolution chart.
+    # `run_au_nowcast` declines to record those rows because the model
+    # conditioning on nothing returns the trend anchor, and a flat line of
+    # anchors reads as a settled view rather than the absence of one.
+    #
+    # THE NOWCAST'S OWN ROW IS EXEMPT, and the two halves have to agree on that
+    # or the exemption is dead. `run_au_nowcast` records a data-less nowcast on
+    # purpose — "a fault to surface, not a row to drop" — and this loop used to
+    # reject any zero-month vintage, so that row could never be surfaced; it
+    # only blocked the week's publish, with a message about a vintage rather
+    # than about the fault. The check above already names that fault directly,
+    # so this one stays out of its way.
     for v in d.get("vintages") or []:
+        if v.get("target_quarter") == nowcast["quarter"]:
+            continue
         if v.get("months_with_data") == 0:
             bad.append(
                 f"vintage {v['run_date']} for {v['target_quarter']} has no "

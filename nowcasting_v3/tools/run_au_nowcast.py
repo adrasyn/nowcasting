@@ -41,7 +41,8 @@ from nyfed.au.build import (
     load_vintage,
     target_periods,
 )
-from nyfed.au.emit import annualised_to_qoq, nowcast_payload, refusal_payload
+from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
+                           nowcast_payload, refusal_payload)
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
@@ -353,10 +354,29 @@ def main() -> int:
 
     vintages = _record(written, labels)
 
+    # THE FETCHED DATE IS ONLY USED IF IT NAMES THIS TARGET'S QUARTER.
+    # `data/latest.json` belongs to the R pipeline, which runs 90 minutes before
+    # this one and can fail on its own. When it does, its `next_gdp_release_date`
+    # stays on the quarter the ABS has just printed while this model has already
+    # rolled forward, and the page ends up counting down to the wrong release —
+    # every vintage lands outside the chart's domain and it renders empty.
+    #
+    # The scraped date is still preferred where it agrees, because the ABS moves
+    # a release occasionally and `gdp_release_date` only knows the rule. Agreeing
+    # on the MONTH is the test: a reschedule shifts a release by days within its
+    # month, never into another quarter.
     release = None
     site_latest = SITE_DATA / "latest.json"
     if site_latest.is_file():
-        release = json.loads(site_latest.read_text()).get("next_gdp_release_date")
+        fetched = json.loads(site_latest.read_text()).get("next_gdp_release_date")
+        expected = gdp_release_date(labels[0]) if labels else None
+        if fetched and expected and fetched[:7] == expected[:7]:
+            release = fetched
+        else:
+            release = expected
+            if fetched:
+                print(f"  release date {fetched} is not in {labels[0]}'s release "
+                      f"month; using the scheduling rule ({expected})", flush=True)
 
     gdp = vintage.series["gdp"].dropna()
     payload = nowcast_payload(

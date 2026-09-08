@@ -83,3 +83,35 @@ def test_a_missing_nowcast_horizon_fails():
 
 def test_quarter_key_orders_across_a_year_boundary():
     assert quarter_key("2026 Q4") < quarter_key("2027 Q1")
+
+
+def test_a_data_less_nowcast_is_reported_once_not_twice():
+    """The runner records that row on purpose; this check must not fight it.
+
+    `run_au_nowcast` exempts the nowcast from its zero-month skip — "a fault to
+    surface, not a row to drop". The vintage rule used to reject any zero-month
+    row, so the exempted one could never be surfaced: it just blocked the
+    publish, complaining about a vintage instead of about the fault.
+    """
+    d = _ok(
+        horizons=[{"quarter": "2026 Q2", "kind": "nowcast",
+                   "months_with_data": 0}],
+        vintages=[{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
+                   "months_with_data": 0}],
+    )
+    bad = check_payload(d, today="2026-09")
+    assert len(bad) == 1, f"the fault should be named once, got: {bad}"
+    assert "nowcast 2026 Q2 has 0 months of data" in bad[0]
+
+
+def test_a_data_less_forecast_vintage_is_still_rejected():
+    """Narrowing the rule to forecasts must not disarm it."""
+    d = _ok(vintages=[
+        {"run_date": "2026-08-31", "target_quarter": "2026 Q2",
+         "months_with_data": 3},
+        {"run_date": "2026-06-01", "target_quarter": "2026 Q3",
+         "months_with_data": 0},
+    ])
+    bad = check_payload(d, today="2026-09")
+    assert any("2026 Q3" in b and "should not have been recorded" in b
+               for b in bad), bad

@@ -7,7 +7,6 @@ export const metadata = {
   title: "v2 — Australia GDP nowcast",
 };
 
-import ModelSwitch from "@/components/ModelSwitch";
 import { loadDashboardData } from "@/lib/data";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -47,7 +46,6 @@ export default function V2Dashboard() {
         showGap={false}
       />
       <MethodologyPanel />
-      <ModelSwitch here="v2" />
       <Footer />
     </main>
   );

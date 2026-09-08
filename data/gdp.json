@@ -2,633 +2,639 @@
   "series": [
     {
       "quarter": "2000 Q1",
-      "value": 351882,
+      "value": 351872,
       "qoq_pct": null,
       "yoy_pct": null
     },
     {
       "quarter": "2000 Q2",
-      "value": 355304,
-      "qoq_pct": 0.97,
+      "value": 355338,
+      "qoq_pct": 0.99,
       "yoy_pct": null
     },
     {
       "quarter": "2000 Q3",
-      "value": 356301,
-      "qoq_pct": 0.28,
+      "value": 356306,
+      "qoq_pct": 0.27,
       "yoy_pct": null
     },
     {
       "quarter": "2000 Q4",
-      "value": 354898,
-      "qoq_pct": -0.39,
+      "value": 354859,
+      "qoq_pct": -0.41,
       "yoy_pct": null
     },
     {
       "quarter": "2001 Q1",
-      "value": 358245,
-      "qoq_pct": 0.94,
-      "yoy_pct": 1.81
+      "value": 358221,
+      "qoq_pct": 0.95,
+      "yoy_pct": 1.8
     },
     {
       "quarter": "2001 Q2",
-      "value": 361385,
-      "qoq_pct": 0.88,
-      "yoy_pct": 1.71
+      "value": 361444,
+      "qoq_pct": 0.9,
+      "yoy_pct": 1.72
     },
     {
       "quarter": "2001 Q3",
-      "value": 365519,
-      "qoq_pct": 1.14,
-      "yoy_pct": 2.59
+      "value": 365512,
+      "qoq_pct": 1.13,
+      "yoy_pct": 2.58
     },
     {
       "quarter": "2001 Q4",
-      "value": 369880,
+      "value": 369855,
       "qoq_pct": 1.19,
-      "yoy_pct": 4.22
+      "yoy_pct": 4.23
     },
     {
       "quarter": "2002 Q1",
-      "value": 372764,
+      "value": 372745,
       "qoq_pct": 0.78,
       "yoy_pct": 4.05
     },
     {
       "quarter": "2002 Q2",
-      "value": 379182,
-      "qoq_pct": 1.72,
+      "value": 379233,
+      "qoq_pct": 1.74,
       "yoy_pct": 4.92
     },
     {
       "quarter": "2002 Q3",
-      "value": 380118,
-      "qoq_pct": 0.25,
+      "value": 380108,
+      "qoq_pct": 0.23,
       "yoy_pct": 3.99
     },
     {
       "quarter": "2002 Q4",
-      "value": 383312,
-      "qoq_pct": 0.84,
+      "value": 383279,
+      "qoq_pct": 0.83,
       "yoy_pct": 3.63
     },
     {
       "quarter": "2003 Q1",
-      "value": 384195,
-      "qoq_pct": 0.23,
+      "value": 384182,
+      "qoq_pct": 0.24,
       "yoy_pct": 3.07
     },
     {
       "quarter": "2003 Q2",
-      "value": 385697,
-      "qoq_pct": 0.39,
+      "value": 385753,
+      "qoq_pct": 0.41,
       "yoy_pct": 1.72
     },
     {
       "quarter": "2003 Q3",
-      "value": 392275,
-      "qoq_pct": 1.71,
+      "value": 392261,
+      "qoq_pct": 1.69,
       "yoy_pct": 3.2
     },
     {
       "quarter": "2003 Q4",
-      "value": 398941,
-      "qoq_pct": 1.7,
+      "value": 398899,
+      "qoq_pct": 1.69,
       "yoy_pct": 4.08
     },
     {
       "quarter": "2004 Q1",
-      "value": 401918,
+      "value": 401910,
       "qoq_pct": 0.75,
       "yoy_pct": 4.61
     },
     {
       "quarter": "2004 Q2",
-      "value": 404879,
-      "qoq_pct": 0.74,
+      "value": 404944,
+      "qoq_pct": 0.75,
       "yoy_pct": 4.97
     },
     {
       "quarter": "2004 Q3",
-      "value": 407620,
-      "qoq_pct": 0.68,
-      "yoy_pct": 3.91
+      "value": 407624,
+      "qoq_pct": 0.66,
+      "yoy_pct": 3.92
     },
     {
       "quarter": "2004 Q4",
-      "value": 410742,
-      "qoq_pct": 0.77,
+      "value": 410710,
+      "qoq_pct": 0.76,
       "yoy_pct": 2.96
     },
     {
       "quarter": "2005 Q1",
-      "value": 414115,
+      "value": 414089,
       "qoq_pct": 0.82,
       "yoy_pct": 3.03
     },
     {
       "quarter": "2005 Q2",
-      "value": 415961,
-      "qoq_pct": 0.45,
-      "yoy_pct": 2.74
+      "value": 416015,
+      "qoq_pct": 0.47,
+      "yoy_pct": 2.73
     },
     {
       "quarter": "2005 Q3",
-      "value": 420475,
-      "qoq_pct": 1.09,
-      "yoy_pct": 3.15
+      "value": 420512,
+      "qoq_pct": 1.08,
+      "yoy_pct": 3.16
     },
     {
       "quarter": "2005 Q4",
-      "value": 424018,
-      "qoq_pct": 0.84,
-      "yoy_pct": 3.23
+      "value": 423912,
+      "qoq_pct": 0.81,
+      "yoy_pct": 3.21
     },
     {
       "quarter": "2006 Q1",
-      "value": 424302,
-      "qoq_pct": 0.07,
-      "yoy_pct": 2.46
+      "value": 424243,
+      "qoq_pct": 0.08,
+      "yoy_pct": 2.45
     },
     {
       "quarter": "2006 Q2",
-      "value": 425319,
-      "qoq_pct": 0.24,
-      "yoy_pct": 2.25
+      "value": 425448,
+      "qoq_pct": 0.28,
+      "yoy_pct": 2.27
     },
     {
       "quarter": "2006 Q3",
-      "value": 431834,
-      "qoq_pct": 1.53,
-      "yoy_pct": 2.7
+      "value": 431836,
+      "qoq_pct": 1.5,
+      "yoy_pct": 2.69
     },
     {
       "quarter": "2006 Q4",
-      "value": 437260,
-      "qoq_pct": 1.26,
-      "yoy_pct": 3.12
+      "value": 437165,
+      "qoq_pct": 1.23,
+      "yoy_pct": 3.13
     },
     {
       "quarter": "2007 Q1",
-      "value": 443222,
-      "qoq_pct": 1.36,
+      "value": 443184,
+      "qoq_pct": 1.38,
       "yoy_pct": 4.46
     },
     {
       "quarter": "2007 Q2",
-      "value": 445997,
-      "qoq_pct": 0.63,
+      "value": 446128,
+      "qoq_pct": 0.66,
       "yoy_pct": 4.86
     },
     {
       "quarter": "2007 Q3",
-      "value": 451367,
-      "qoq_pct": 1.2,
+      "value": 451354,
+      "qoq_pct": 1.17,
       "yoy_pct": 4.52
     },
     {
       "quarter": "2007 Q4",
-      "value": 453019,
-      "qoq_pct": 0.37,
-      "yoy_pct": 3.6
+      "value": 452939,
+      "qoq_pct": 0.35,
+      "yoy_pct": 3.61
     },
     {
       "quarter": "2008 Q1",
-      "value": 458046,
-      "qoq_pct": 1.11,
-      "yoy_pct": 3.34
+      "value": 458030,
+      "qoq_pct": 1.12,
+      "yoy_pct": 3.35
     },
     {
       "quarter": "2008 Q2",
-      "value": 459602,
-      "qoq_pct": 0.34,
-      "yoy_pct": 3.05
+      "value": 459711,
+      "qoq_pct": 0.37,
+      "yoy_pct": 3.04
     },
     {
       "quarter": "2008 Q3",
-      "value": 462855,
-      "qoq_pct": 0.71,
-      "yoy_pct": 2.55
+      "value": 462813,
+      "qoq_pct": 0.67,
+      "yoy_pct": 2.54
     },
     {
       "quarter": "2008 Q4",
-      "value": 460883,
+      "value": 460801,
       "qoq_pct": -0.43,
       "yoy_pct": 1.74
     },
     {
       "quarter": "2009 Q1",
-      "value": 465520,
-      "qoq_pct": 1.01,
+      "value": 465513,
+      "qoq_pct": 1.02,
       "yoy_pct": 1.63
     },
     {
       "quarter": "2009 Q2",
-      "value": 468393,
-      "qoq_pct": 0.62,
-      "yoy_pct": 1.91
+      "value": 468525,
+      "qoq_pct": 0.65,
+      "yoy_pct": 1.92
     },
     {
       "quarter": "2009 Q3",
-      "value": 470050,
-      "qoq_pct": 0.35,
+      "value": 469982,
+      "qoq_pct": 0.31,
       "yoy_pct": 1.55
     },
     {
       "quarter": "2009 Q4",
-      "value": 473826,
-      "qoq_pct": 0.8,
+      "value": 473770,
+      "qoq_pct": 0.81,
       "yoy_pct": 2.81
     },
     {
       "quarter": "2010 Q1",
-      "value": 475934,
-      "qoq_pct": 0.44,
+      "value": 475949,
+      "qoq_pct": 0.46,
       "yoy_pct": 2.24
     },
     {
       "quarter": "2010 Q2",
-      "value": 478897,
-      "qoq_pct": 0.62,
+      "value": 479006,
+      "qoq_pct": 0.64,
       "yoy_pct": 2.24
     },
     {
       "quarter": "2010 Q3",
-      "value": 482263,
-      "qoq_pct": 0.7,
+      "value": 482198,
+      "qoq_pct": 0.67,
       "yoy_pct": 2.6
     },
     {
       "quarter": "2010 Q4",
-      "value": 486298,
+      "value": 486229,
       "qoq_pct": 0.84,
       "yoy_pct": 2.63
     },
     {
       "quarter": "2011 Q1",
-      "value": 484880,
-      "qoq_pct": -0.29,
+      "value": 484903,
+      "qoq_pct": -0.27,
       "yoy_pct": 1.88
     },
     {
       "quarter": "2011 Q2",
-      "value": 490735,
-      "qoq_pct": 1.21,
+      "value": 490846,
+      "qoq_pct": 1.23,
       "yoy_pct": 2.47
     },
     {
       "quarter": "2011 Q3",
-      "value": 497577,
-      "qoq_pct": 1.39,
+      "value": 497511,
+      "qoq_pct": 1.36,
       "yoy_pct": 3.18
     },
     {
       "quarter": "2011 Q4",
-      "value": 503106,
+      "value": 503039,
       "qoq_pct": 1.11,
       "yoy_pct": 3.46
     },
     {
       "quarter": "2012 Q1",
-      "value": 508343,
-      "qoq_pct": 1.04,
-      "yoy_pct": 4.84
+      "value": 508399,
+      "qoq_pct": 1.07,
+      "yoy_pct": 4.85
     },
     {
       "quarter": "2012 Q2",
-      "value": 511992,
+      "value": 512069,
       "qoq_pct": 0.72,
-      "yoy_pct": 4.33
+      "yoy_pct": 4.32
     },
     {
       "quarter": "2012 Q3",
-      "value": 515130,
-      "qoq_pct": 0.61,
+      "value": 515083,
+      "qoq_pct": 0.59,
       "yoy_pct": 3.53
     },
     {
       "quarter": "2012 Q4",
-      "value": 517406,
+      "value": 517341,
       "qoq_pct": 0.44,
       "yoy_pct": 2.84
     },
     {
       "quarter": "2013 Q1",
-      "value": 520081,
-      "qoq_pct": 0.52,
+      "value": 520159,
+      "qoq_pct": 0.54,
       "yoy_pct": 2.31
     },
     {
       "quarter": "2013 Q2",
-      "value": 522048,
-      "qoq_pct": 0.38,
+      "value": 522083,
+      "qoq_pct": 0.37,
       "yoy_pct": 1.96
     },
     {
       "quarter": "2013 Q3",
-      "value": 526346,
-      "qoq_pct": 0.82,
+      "value": 526314,
+      "qoq_pct": 0.81,
       "yoy_pct": 2.18
     },
     {
       "quarter": "2013 Q4",
-      "value": 530450,
+      "value": 530419,
       "qoq_pct": 0.78,
-      "yoy_pct": 2.52
+      "yoy_pct": 2.53
     },
     {
       "quarter": "2014 Q1",
-      "value": 534586,
-      "qoq_pct": 0.78,
+      "value": 534667,
+      "qoq_pct": 0.8,
       "yoy_pct": 2.79
     },
     {
       "quarter": "2014 Q2",
-      "value": 537250,
-      "qoq_pct": 0.5,
-      "yoy_pct": 2.91
+      "value": 537231,
+      "qoq_pct": 0.48,
+      "yoy_pct": 2.9
     },
     {
       "quarter": "2014 Q3",
-      "value": 539402,
+      "value": 539397,
       "qoq_pct": 0.4,
-      "yoy_pct": 2.48
+      "yoy_pct": 2.49
     },
     {
       "quarter": "2014 Q4",
-      "value": 541385,
+      "value": 541390,
       "qoq_pct": 0.37,
-      "yoy_pct": 2.06
+      "yoy_pct": 2.07
     },
     {
       "quarter": "2015 Q1",
-      "value": 546635,
-      "qoq_pct": 0.97,
+      "value": 546692,
+      "qoq_pct": 0.98,
       "yoy_pct": 2.25
     },
     {
       "quarter": "2015 Q2",
-      "value": 547281,
-      "qoq_pct": 0.12,
-      "yoy_pct": 1.87
+      "value": 547224,
+      "qoq_pct": 0.1,
+      "yoy_pct": 1.86
     },
     {
       "quarter": "2015 Q3",
-      "value": 552613,
-      "qoq_pct": 0.97,
+      "value": 552637,
+      "qoq_pct": 0.99,
       "yoy_pct": 2.45
     },
     {
       "quarter": "2015 Q4",
-      "value": 556043,
-      "qoq_pct": 0.62,
-      "yoy_pct": 2.71
+      "value": 556034,
+      "qoq_pct": 0.61,
+      "yoy_pct": 2.7
     },
     {
       "quarter": "2016 Q1",
-      "value": 561139,
-      "qoq_pct": 0.92,
+      "value": 561181,
+      "qoq_pct": 0.93,
       "yoy_pct": 2.65
     },
     {
       "quarter": "2016 Q2",
-      "value": 564835,
-      "qoq_pct": 0.66,
+      "value": 564778,
+      "qoq_pct": 0.64,
       "yoy_pct": 3.21
     },
     {
       "quarter": "2016 Q3",
-      "value": 564782,
-      "qoq_pct": -0.01,
+      "value": 564810,
+      "qoq_pct": 0.01,
       "yoy_pct": 2.2
     },
     {
       "quarter": "2016 Q4",
-      "value": 571367,
-      "qoq_pct": 1.17,
-      "yoy_pct": 2.76
+      "value": 571330,
+      "qoq_pct": 1.15,
+      "yoy_pct": 2.75
     },
     {
       "quarter": "2017 Q1",
-      "value": 573149,
-      "qoq_pct": 0.31,
-      "yoy_pct": 2.14
+      "value": 573227,
+      "qoq_pct": 0.33,
+      "yoy_pct": 2.15
     },
     {
       "quarter": "2017 Q2",
-      "value": 576579,
-      "qoq_pct": 0.6,
+      "value": 576511,
+      "qoq_pct": 0.57,
       "yoy_pct": 2.08
     },
     {
       "quarter": "2017 Q3",
-      "value": 582043,
-      "qoq_pct": 0.95,
-      "yoy_pct": 3.06
+      "value": 582038,
+      "qoq_pct": 0.96,
+      "yoy_pct": 3.05
     },
     {
       "quarter": "2017 Q4",
-      "value": 584367,
-      "qoq_pct": 0.4,
-      "yoy_pct": 2.28
+      "value": 584318,
+      "qoq_pct": 0.39,
+      "yoy_pct": 2.27
     },
     {
       "quarter": "2018 Q1",
-      "value": 590393,
-      "qoq_pct": 1.03,
-      "yoy_pct": 3.01
+      "value": 590527,
+      "qoq_pct": 1.06,
+      "yoy_pct": 3.02
     },
     {
       "quarter": "2018 Q2",
-      "value": 594775,
-      "qoq_pct": 0.74,
-      "yoy_pct": 3.16
+      "value": 594694,
+      "qoq_pct": 0.71,
+      "yoy_pct": 3.15
     },
     {
       "quarter": "2018 Q3",
-      "value": 597020,
+      "value": 596975,
       "qoq_pct": 0.38,
       "yoy_pct": 2.57
     },
     {
       "quarter": "2018 Q4",
-      "value": 598542,
-      "qoq_pct": 0.25,
-      "yoy_pct": 2.43
+      "value": 598406,
+      "qoq_pct": 0.24,
+      "yoy_pct": 2.41
     },
     {
       "quarter": "2019 Q1",
-      "value": 602883,
-      "qoq_pct": 0.73,
-      "yoy_pct": 2.12
+      "value": 603121,
+      "qoq_pct": 0.79,
+      "yoy_pct": 2.13
     },
     {
       "quarter": "2019 Q2",
-      "value": 604726,
-      "qoq_pct": 0.31,
-      "yoy_pct": 1.67
+      "value": 604669,
+      "qoq_pct": 0.26,
+      "yoy_pct": 1.68
     },
     {
       "quarter": "2019 Q3",
-      "value": 608257,
+      "value": 608155,
       "qoq_pct": 0.58,
-      "yoy_pct": 1.88
+      "yoy_pct": 1.87
     },
     {
       "quarter": "2019 Q4",
-      "value": 611850,
+      "value": 611732,
       "qoq_pct": 0.59,
-      "yoy_pct": 2.22
+      "yoy_pct": 2.23
     },
     {
       "quarter": "2020 Q1",
-      "value": 610510,
-      "qoq_pct": -0.22,
+      "value": 610772,
+      "qoq_pct": -0.16,
       "yoy_pct": 1.27
     },
     {
       "quarter": "2020 Q2",
-      "value": 569344,
-      "qoq_pct": -6.74,
+      "value": 569303,
+      "qoq_pct": -6.79,
       "yoy_pct": -5.85
     },
     {
       "quarter": "2020 Q3",
-      "value": 589128,
-      "qoq_pct": 3.47,
-      "yoy_pct": -3.14
+      "value": 588877,
+      "qoq_pct": 3.44,
+      "yoy_pct": -3.17
     },
     {
       "quarter": "2020 Q4",
-      "value": 609184,
-      "qoq_pct": 3.4,
+      "value": 609061,
+      "qoq_pct": 3.43,
       "yoy_pct": -0.44
     },
     {
       "quarter": "2021 Q1",
-      "value": 622355,
-      "qoq_pct": 2.16,
-      "yoy_pct": 1.94
+      "value": 622761,
+      "qoq_pct": 2.25,
+      "yoy_pct": 1.96
     },
     {
       "quarter": "2021 Q2",
-      "value": 627461,
-      "qoq_pct": 0.82,
+      "value": 627429,
+      "qoq_pct": 0.75,
       "yoy_pct": 10.21
     },
     {
       "quarter": "2021 Q3",
-      "value": 616714,
-      "qoq_pct": -1.71,
-      "yoy_pct": 4.68
+      "value": 616398,
+      "qoq_pct": -1.76,
+      "yoy_pct": 4.67
     },
     {
       "quarter": "2021 Q4",
-      "value": 639091,
-      "qoq_pct": 3.63,
-      "yoy_pct": 4.91
+      "value": 639065,
+      "qoq_pct": 3.68,
+      "yoy_pct": 4.93
     },
     {
       "quarter": "2022 Q1",
-      "value": 645027,
-      "qoq_pct": 0.93,
-      "yoy_pct": 3.64
+      "value": 645474,
+      "qoq_pct": 1,
+      "yoy_pct": 3.65
     },
     {
       "quarter": "2022 Q2",
-      "value": 651417,
-      "qoq_pct": 0.99,
-      "yoy_pct": 3.82
+      "value": 651311,
+      "qoq_pct": 0.9,
+      "yoy_pct": 3.81
     },
     {
       "quarter": "2022 Q3",
-      "value": 654547,
-      "qoq_pct": 0.48,
-      "yoy_pct": 6.13
+      "value": 654278,
+      "qoq_pct": 0.46,
+      "yoy_pct": 6.15
     },
     {
       "quarter": "2022 Q4",
-      "value": 659948,
-      "qoq_pct": 0.83,
+      "value": 659867,
+      "qoq_pct": 0.85,
       "yoy_pct": 3.26
     },
     {
       "quarter": "2023 Q1",
-      "value": 663102,
-      "qoq_pct": 0.48,
-      "yoy_pct": 2.8
+      "value": 663632,
+      "qoq_pct": 0.57,
+      "yoy_pct": 2.81
     },
     {
       "quarter": "2023 Q2",
-      "value": 666120,
-      "qoq_pct": 0.46,
-      "yoy_pct": 2.26
+      "value": 665940,
+      "qoq_pct": 0.35,
+      "yoy_pct": 2.25
     },
     {
       "quarter": "2023 Q3",
-      "value": 668806,
-      "qoq_pct": 0.4,
-      "yoy_pct": 2.18
+      "value": 668408,
+      "qoq_pct": 0.37,
+      "yoy_pct": 2.16
     },
     {
       "quarter": "2023 Q4",
-      "value": 668754,
-      "qoq_pct": -0.01,
+      "value": 668625,
+      "qoq_pct": 0.03,
       "yoy_pct": 1.33
     },
     {
       "quarter": "2024 Q1",
-      "value": 670388,
-      "qoq_pct": 0.24,
+      "value": 670929,
+      "qoq_pct": 0.34,
       "yoy_pct": 1.1
     },
     {
       "quarter": "2024 Q2",
-      "value": 672076,
-      "qoq_pct": 0.25,
-      "yoy_pct": 0.89
+      "value": 672062,
+      "qoq_pct": 0.17,
+      "yoy_pct": 0.92
     },
     {
       "quarter": "2024 Q3",
-      "value": 674130,
-      "qoq_pct": 0.31,
-      "yoy_pct": 0.8
+      "value": 673895,
+      "qoq_pct": 0.27,
+      "yoy_pct": 0.82
     },
     {
       "quarter": "2024 Q4",
-      "value": 677077,
+      "value": 676864,
       "qoq_pct": 0.44,
-      "yoy_pct": 1.24
+      "yoy_pct": 1.23
     },
     {
       "quarter": "2025 Q1",
-      "value": 678840,
-      "qoq_pct": 0.26,
-      "yoy_pct": 1.26
+      "value": 679519,
+      "qoq_pct": 0.39,
+      "yoy_pct": 1.28
     },
     {
       "quarter": "2025 Q2",
-      "value": 685416,
-      "qoq_pct": 0.97,
-      "yoy_pct": 1.98
+      "value": 684822,
+      "qoq_pct": 0.78,
+      "yoy_pct": 1.9
     },
     {
       "quarter": "2025 Q3",
-      "value": 688034,
-      "qoq_pct": 0.38,
-      "yoy_pct": 2.06
+      "value": 688271,
+      "qoq_pct": 0.5,
+      "yoy_pct": 2.13
     },
     {
       "quarter": "2025 Q4",
-      "value": 694041,
-      "qoq_pct": 0.87,
-      "yoy_pct": 2.51
+      "value": 694551,
+      "qoq_pct": 0.91,
+      "yoy_pct": 2.61
     },
     {
       "quarter": "2026 Q1",
-      "value": 695945,
-      "qoq_pct": 0.27,
-      "yoy_pct": 2.52
+      "value": 696539,
+      "qoq_pct": 0.29,
+      "yoy_pct": 2.5
+    },
+    {
+      "quarter": "2026 Q2",
+      "value": 699461,
+      "qoq_pct": 0.42,
+      "yoy_pct": 2.14
     }
   ]
 }

@@ -1,24 +1,36 @@
 {
-  "mae_millions": 3192,
-  "mae_pct": 0.46,
-  "bias_millions": 3192,
-  "bias_pct": 0.46,
+  "mae_millions": 1962,
+  "mae_pct": 0.28,
+  "bias_millions": 1962,
+  "bias_pct": 0.28,
   "rba_comparison": {
-    "n": 0,
-    "avg_edge_pp": null
+    "n": 1,
+    "avg_edge_pp": -0.04
   },
   "errors": [
     {
       "target_quarter": "2026 Q1",
       "final_nowcast": 699137,
-      "actual": 695945,
-      "error_millions": 3192,
-      "error_pct": 0.46,
-      "yoy_nowcast": 2.99,
-      "yoy_actual": 2.52,
+      "actual": 696539,
+      "error_millions": 2598,
+      "error_pct": 0.37,
+      "yoy_nowcast": 2.89,
+      "yoy_actual": 2.5,
       "yoy_rba": null,
       "somp_release": null,
       "edge_pp": null
+    },
+    {
+      "target_quarter": "2026 Q2",
+      "final_nowcast": 700788,
+      "actual": 699461,
+      "error_millions": 1327,
+      "error_pct": 0.19,
+      "yoy_nowcast": 2.33,
+      "yoy_actual": 2.14,
+      "yoy_rba": 1.9,
+      "somp_release": "2026-05",
+      "edge_pp": -0.04
     }
   ]
 }

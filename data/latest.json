@@ -1,60 +1,36 @@
 {
-  "generated_at": "2026-08-31T08:37:53Z",
-  "target_quarter": "2026 Q2",
-  "data_through": "2026-08",
-  "next_gdp_release_date": "2026-09-02",
+  "generated_at": "2026-09-07T07:03:25Z",
+  "target_quarter": "2026 Q3",
+  "data_through": "2026-09",
+  "next_gdp_release_date": "2026-12-02",
   "nowcast": {
-    "gdp_chain_volume_millions": 700755,
-    "qoq_growth_pct": 0.69,
-    "yoy_growth_pct": 2.24,
-    "ci_68_low": 697412,
-    "ci_68_high": 701226,
-    "ci_95_low": 695582,
-    "ci_95_high": 703057
+    "gdp_chain_volume_millions": 704515,
+    "qoq_growth_pct": 0.72,
+    "yoy_growth_pct": 2.36,
+    "ci_68_low": 701155,
+    "ci_68_high": 704989,
+    "ci_95_low": 699315,
+    "ci_95_high": 706828
   },
   "latest_actual": {
-    "quarter": "2026 Q1",
-    "gdp_chain_volume_millions": 695945,
-    "qoq_growth_pct": 0.27,
+    "quarter": "2026 Q2",
+    "gdp_chain_volume_millions": 699461,
+    "qoq_growth_pct": 0.42,
     "released_days_before_next": -91
   },
   "data_updates": {
-    "run_date": "2026-08-31",
-    "nowcast_delta_pp": 0,
+    "run_date": "2026-09-07",
+    "nowcast_delta_pp": null,
     "series": [
       {
-        "id": "employment",
-        "name": "Employment",
+        "id": "goods_exp",
+        "name": "Goods Exports",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       },
       {
-        "id": "unemp_rate",
-        "name": "Unemployment Rate",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "part_rate",
-        "name": "Participation Rate",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "hours_worked",
-        "name": "Hours Worked",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "household_spending",
-        "name": "Household Spending",
-        "prev_period": "2026-06",
-        "latest_period": "2026-07"
-      },
-      {
-        "id": "bus_conf",
-        "name": "Business Confidence",
+        "id": "goods_imp",
+        "name": "Goods Imports",
         "prev_period": "2026-06",
         "latest_period": "2026-07"
       }

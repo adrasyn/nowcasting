@@ -6,7 +6,6 @@ import IndicatorGrid from "@/components/IndicatorGrid";
 import PerformanceSection from "@/components/PerformanceSection";
 import V3RbaCompare from "@/components/V3RbaCompare";
 import V3MethodologyPanel from "@/components/V3MethodologyPanel";
-import ModelSwitch from "@/components/ModelSwitch";
 import V3Headline from "@/components/V3Headline";
 import V3Evolution from "@/components/V3Evolution";
 import V3NextQuarter from "@/components/V3NextQuarter";
@@ -124,7 +123,6 @@ export default function Home() {
 
 
       <V3MethodologyPanel performance={data.performanceV3} />
-      <ModelSwitch here="v3" />
       <Footer />
     </main>
   );

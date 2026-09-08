@@ -146,24 +146,17 @@ export default function V3Evolution({ vintages, horizons, nowcastReleaseDate }: 
         </p>
       )}
       {shownVintages.length === 0 ? (
-        <div className="flex h-[340px] items-center border border-border p-6">
-          <div>
-            <p className="text-sm">
-              No weekly estimates for {shown.quarter} yet.
-              {(() => {
-                const due = firstDataMonth(shown.quarter);
-                return due
-                  ? ` The record starts when the quarter's first indicators arrive, in early ${due}.`
-                  : ` The record starts when the quarter's first indicators arrive.`;
-              })()}
-            </p>
-            <p className="mt-2 text-xs text-label">
-              Nothing is plotted before then. With no observation inside the
-              quarter every point would sit on the model&rsquo;s long-run trend,
-              and a flat line of those reads as a settled view rather than the
-              absence of one.
-            </p>
-          </div>
+        <div className="flex h-[340px] items-center justify-center border border-border p-6">
+          <p className="text-center text-sm">
+            No weekly estimates for {shown.quarter} yet.
+            {(() => {
+              const due = firstDataMonth(shown.quarter);
+              const short = shown.quarter.split(" ")[1] ?? shown.quarter;
+              return due
+                ? ` Estimates begin when the first ${short} data arrives in early ${due}`
+                : ` Estimates begin when the first ${short} data arrives`;
+            })()}
+          </p>
         </div>
       ) : (
         <V3VintageChart

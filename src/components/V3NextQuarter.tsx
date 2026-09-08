@@ -63,12 +63,6 @@ export default function V3NextQuarter({ latest, gdp }: Props) {
             ? `The first indicators covering ${forecast.quarter} arrive in early ${due}.`
             : `Waiting on the quarter's first indicators.`}
         </p>
-        <p className="mt-2 text-xs">
-          The model can put a number on {forecast.quarter} today, but with no
-          observation inside the quarter it would be the long-run trend and
-          nothing else — a figure that has run about 0.25pp per quarter above
-          realised growth since 2023. It is not published for that reason.
-        </p>
       </section>
     );
   }

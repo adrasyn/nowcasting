@@ -1,5 +1,5 @@
 import type { GdpSeries, LatestV3 } from "@/lib/types";
-import { formatPct, formatQuarterLabel } from "@/lib/format";
+import { firstDataMonth, formatPct, formatQuarterLabel } from "@/lib/format";
 
 // The quarter AFTER the one being nowcast.
 //
@@ -20,7 +20,15 @@ import { formatPct, formatQuarterLabel } from "@/lib/format";
 // anchor was measured on 2026-09-01 at +0.658%/qtr against realised 2023–26
 // growth of +0.409% — 2.9 standard errors high (docs/2026-09-01-upside-bias-
 // report.md, §4.2a). Publishing it as a figure would put a known defect on the
-// page dressed as a forecast. With no month of data, this renders nothing.
+// page dressed as a forecast.
+//
+// SO IT SHOWS THE QUARTER, NOT THE NUMBER. The guard first rendered nothing at
+// all, which was correct about the figure and wrong about the page: a quarter
+// prints about nine weeks after it ends, so the next one has no data for two
+// months in every three, and for those two months the box simply vanished. A
+// reader could not tell a feature that was waiting from one that was broken.
+// Naming the quarter and saying when its first data arrives costs nothing and
+// publishes no number.
 
 /** "2026 Q3" -> "Q3", for a note that already names the quarter above it. */
 function shortQuarter(quarter: string): string {
@@ -38,9 +46,32 @@ export default function V3NextQuarter({ latest, gdp }: Props) {
   if (!forecast) return null;
 
   const months = forecast.months_with_data;
-  // `undefined` means an older payload that predates the field — show it, since
-  // the alternative is hiding a figure the model did produce. `0` is the guard.
-  if (months === 0) return null;
+  const label = formatQuarterLabel(forecast.quarter);
+
+  // `undefined` means an older payload that predates the field — treat it as
+  // having data, since the alternative is hiding a figure the model produced.
+  if (months === 0) {
+    const due = firstDataMonth(forecast.quarter);
+    return (
+      <section className="mb-8 border border-border p-4 text-label">
+        <p className="text-[10px] uppercase tracking-wider">
+          {label}: GDP nowcast
+        </p>
+        <p className="mt-2 text-sm">
+          No data yet.{" "}
+          {due
+            ? `The first indicators covering ${forecast.quarter} arrive in early ${due}.`
+            : `Waiting on the quarter's first indicators.`}
+        </p>
+        <p className="mt-2 text-xs">
+          The model can put a number on {forecast.quarter} today, but with no
+          observation inside the quarter it would be the long-run trend and
+          nothing else — a figure that has run about 0.25pp per quarter above
+          realised growth since 2023. It is not published for that reason.
+        </p>
+      </section>
+    );
+  }
 
   // YEAR ON YEAR CHAINS TWO ESTIMATES, AND THAT IS WORTH KNOWING.
   // The headline card's year-ended figure runs the nowcast off the last
@@ -63,9 +94,7 @@ export default function V3NextQuarter({ latest, gdp }: Props) {
 
   return (
     <section className="mb-8 border border-border p-4 text-label">
-      <p className="text-[10px] uppercase tracking-wider">
-        {formatQuarterLabel(forecast.quarter)}: GDP nowcast
-      </p>
+      <p className="text-[10px] uppercase tracking-wider">{label}: GDP nowcast</p>
 
       <div className="mt-2 flex flex-wrap items-baseline gap-x-8 gap-y-2">
         <span className="flex items-baseline gap-x-2">

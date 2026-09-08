@@ -25,6 +25,20 @@ export function formatDate(iso: string): string {
 }
 
 /** "2026 Q2" -> "Q2 2026", the way the page's headings name a quarter. */
+/** When the first indicators covering `quarter` start being published.
+ *
+ * A quarter's opening month is measured through the month after it: 2026 Q3
+ * began in July and its first indicator landed on 10 August. So the answer is
+ * the month after the quarter's first, named rather than dated — nothing here
+ * knows any individual series' release calendar, only the shape of the lag. */
+export function firstDataMonth(quarter: string): string | undefined {
+  const m = quarter.match(/^(\d{4})\s*Q([1-4])$/);
+  if (!m) return undefined;
+  const months = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+  return months[(Number(m[2]) - 1) * 3 + 1];
+}
+
 export function formatQuarterLabel(quarter: string): string {
   const m = quarter.match(/^(\d{4})\s*Q([1-4])$/);
   return m ? `Q${m[2]} ${m[1]}` : quarter;

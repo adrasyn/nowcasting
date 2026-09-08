@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { V3Horizon, V3Vintage } from "@/lib/types";
 import V3VintageChart, { type VintageChartScale } from "@/components/V3VintageChart";
+import { firstDataMonth } from "@/lib/format";
 
 // The two live targets — the quarter about to be printed and the quarter still
 // running — one at a time behind a toggle.
@@ -85,7 +86,7 @@ export default function V3Evolution({ vintages, horizons, nowcastReleaseDate }: 
   // for the quarter's opening month publishes, and which Wednesday the ABS
   // picks. A fixed -115 would silently clip the first point of any quarter that
   // began a week earlier.
-  const xLo = Math.min(-95, ...xs);
+  const xLo = xs.length ? Math.min(-95, ...xs) : -95;
   const xDomain: [number, number] = [Math.floor(xLo / 5) * 5, 5];
   // Ticks run BACK from zero so they stay on 15s whatever the domain edge is,
   // rather than starting at the edge and putting labels on -115, -100, -85.
@@ -94,7 +95,13 @@ export default function V3Evolution({ vintages, horizons, nowcastReleaseDate }: 
   xTicks.reverse();
   const scale: VintageChartScale = { xDomain, xTicks };
 
-  const canToggle = nxt.length > 0 && !!nxtRelease && !!forecast;
+  // THE TOGGLE APPEARS WHENEVER THERE IS A NEXT QUARTER, not only once that
+  // quarter has a recorded week. It used to need `nxt.length > 0`, which meant
+  // it vanished for the two months in three when the next quarter has no data —
+  // the same disappearing act the next-quarter box used to do, and just as
+  // unreadable: a reader cannot tell a control that is waiting from one that
+  // was never built. Selecting an empty quarter says why it is empty.
+  const canToggle = !!forecast && !!nxtRelease;
   const showing = canToggle && showForecast;
   const shown = showing && forecast ? forecast : nowcast;
   const shownVintages = showing ? nxt : cur;
@@ -127,22 +134,46 @@ export default function V3Evolution({ vintages, horizons, nowcastReleaseDate }: 
           </div>
         )}
       </div>
-      <p className="mb-4 text-xs text-label">
-        Each point is a weekly point estimate for {shown.quarter}.
-        {/* The band sentence belongs to the nowcast only. On the forecast the
-            bands are barely legible — five points across twenty-two days — so
-            naming them there described something the reader cannot yet see. */}
-        {!showing && (
-          <> The shaded areas are the model&rsquo;s 68% and 95% probability bands.</>
-        )}
-      </p>
-      <V3VintageChart
-        key={shown.quarter}
-        vintages={shownVintages}
-        targetQuarter={shown.quarter}
-        releaseDate={shownRelease}
-        scale={scale}
-      />
+      {/* Neither sentence survives an empty quarter: "each point" promises
+          points that are not there, and the band sentence describes shading the
+          reader cannot see. The panel below says what is going on instead. */}
+      {shownVintages.length > 0 && (
+        <p className="mb-4 text-xs text-label">
+          Each point is a weekly point estimate for {shown.quarter}.
+          {!showing && (
+            <> The shaded areas are the model&rsquo;s 68% and 95% probability bands.</>
+          )}
+        </p>
+      )}
+      {shownVintages.length === 0 ? (
+        <div className="flex h-[340px] items-center border border-border p-6">
+          <div>
+            <p className="text-sm">
+              No weekly estimates for {shown.quarter} yet.
+              {(() => {
+                const due = firstDataMonth(shown.quarter);
+                return due
+                  ? ` The record starts when the quarter's first indicators arrive, in early ${due}.`
+                  : ` The record starts when the quarter's first indicators arrive.`;
+              })()}
+            </p>
+            <p className="mt-2 text-xs text-label">
+              Nothing is plotted before then. With no observation inside the
+              quarter every point would sit on the model&rsquo;s long-run trend,
+              and a flat line of those reads as a settled view rather than the
+              absence of one.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <V3VintageChart
+          key={shown.quarter}
+          vintages={shownVintages}
+          targetQuarter={shown.quarter}
+          releaseDate={shownRelease}
+          scale={scale}
+        />
+      )}
     </section>
   );
 }

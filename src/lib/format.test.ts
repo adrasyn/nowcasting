@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatMillions, formatPct, formatQuarter, formatMonth, formatDate, formatRawChange } from "./format";
+import { firstDataMonth, formatDate, formatMillions, formatMonth, formatPct, formatQuarter, formatRawChange } from "./format";
 
 describe("formatMillions", () => {
   it("formats with dollar prefix and comma thousands", () => {
@@ -80,5 +80,30 @@ describe("formatRawChange", () => {
 
   it("falls back gracefully for an unknown unit", () => {
     expect(formatRawChange(5.5, "whatever")).toBe("+5.5");
+  });
+});
+
+describe("firstDataMonth", () => {
+  // A quarter's opening month is measured through the month after it: 2026 Q3
+  // began in July and its first indicator landed on 10 August.
+  it("names the month after the quarter's first", () => {
+    expect(firstDataMonth("2026 Q1")).toBe("February");
+    expect(firstDataMonth("2026 Q2")).toBe("May");
+    expect(firstDataMonth("2026 Q3")).toBe("August");
+    expect(firstDataMonth("2026 Q4")).toBe("November");
+  });
+
+  it("accepts the unspaced form too", () => {
+    // The Plan C backtest CSV writes quarters as "2026Q1", and
+    // `formatQuarterLabel` accepts both, so this must not be stricter.
+    expect(firstDataMonth("2026Q4")).toBe("November");
+  });
+
+  it("returns undefined for a label it cannot parse", () => {
+    // The caller falls back to prose without a month rather than printing
+    // "undefined" at a reader.
+    for (const junk of ["", "2026 Q5", "not a quarter", "Q4"]) {
+      expect(firstDataMonth(junk)).toBeUndefined();
+    }
   });
 });

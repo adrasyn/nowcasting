@@ -294,3 +294,35 @@ def test_the_monday_after_a_print():
     assert months_with_data(p, int(t[0])) == 2
     # Q4 has not started. This is the number the recorder and the page key on.
     assert months_with_data(p, int(t[1])) == 0
+
+
+def test_the_track_record_scores_against_published_gdp_not_a_fixture():
+    """The bug that kept the first live quarter out of the table.
+
+    `emit_backtest_json` appends quarters the model called live once the ABS
+    prints them, and decides "has it printed?" by looking the quarter up in a
+    GDP series. That series used to be `tests/fixtures/au/vintage`, a recording
+    for replay tests whose GDP stops at 2026 Q1 — so against a frozen file the
+    answer was permanently no and the append never fired.
+
+    This pins the property the fix restores: the series the emitter scores
+    against must reach past the recording, or a live quarter cannot be scored.
+    """
+    import csv
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    with (root / "tests/fixtures/au/vintage/series.csv").open() as fh:
+        rows = [r for r in csv.reader(fh) if r and r[0] == "gdp"]
+    fixture_last = rows[-1][1]
+
+    perf = json.loads((root.parent / "data/performance_v3.json").read_text())
+    live = [e for e in perf["errors"] if e.get("is_live")]
+    assert live, ("no quarter is scored live — if the emitter is reading the "
+                  f"recording it cannot score past {fixture_last}")
+    scored = max(e["target_quarter"] for e in live)
+    assert scored > "2026 Q1", (
+        f"the newest live-scored quarter is {scored}, at or before the "
+        f"recording's last GDP observation ({fixture_last}) — the emitter is "
+        "almost certainly reading the fixture again")

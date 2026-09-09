@@ -54,6 +54,14 @@ export default function V3RbaCompare({ rba }: Props) {
           </div>
         ))}
       </div>
+      {/* The year-ended figures are on a hybrid basis: the level path is the
+          latest vintage, chained to the quarter's own first print. Said here
+          rather than left implied, because the quarterly table above is on the
+          first print alone and the two would otherwise look like one basis. */}
+      <p className="mt-3 text-[10px] text-label-light">
+        Both are measured against a year-ended figure that ends on the
+        quarter&rsquo;s first print.
+      </p>
     </div>
   );
 }

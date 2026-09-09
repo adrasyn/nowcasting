@@ -34,6 +34,9 @@ test.describe("homepage", () => {
     ).toBeVisible();
     await expect(page.getByText(/growth this quarter/).first()).toBeVisible();
     await expect(page.locator("svg").first()).toBeVisible();
+    // The page says which number it publishes in both places it matters: the
+    // headline eyebrow, and the column the track record scores against.
+    await expect(page.getByText("GDP nowcast, first print")).toBeVisible();
     await expect(page.getByText("First print", { exact: true })).toBeVisible();
   });
 

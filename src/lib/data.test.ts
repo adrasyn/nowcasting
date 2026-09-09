@@ -20,20 +20,32 @@ describe("loadDashboardData", () => {
     expect(typeof data).toBe("object");
   });
 
-  it("v3 performance carries first-print actuals and the revision adjustment", async () => {
-    const data = await loadDashboardData();
+  // ONE NOWCAST, ONE TARGET. v3 publishes the model's figure less the ABS's
+  // average upward revision, and scores it against the ABS's first print. The
+  // model's own figure rides along as provenance; nothing on the page scores
+  // against the latest vintage any more.
+  it("v3 performance is scored against the ABS first print", () => {
+    const data = loadDashboardData();
     const p = data.performanceV3;
     expect(p).toBeDefined();
-    expect(typeof p!.bias_first_print_pct).toBe("number");
-    expect(typeof p!.mae_first_print_pct).toBe("number");
-    expect(typeof p!.revision_adjustment_pp).toBe("number");
+    expect(p!.basis).toBe("abs_first_print");
+    expect(typeof p!.bias_pct).toBe("number");
     for (const e of p!.errors) {
-      expect(typeof e.qoq_first_print_pct).toBe("number");
-      expect(typeof e.qoq_error_first_print_pp).toBe("number");
+      expect(typeof e.qoq_model_nowcast_pct).toBe("number");
+      expect(typeof e.qoq_actual_pct).toBe("number");
     }
-    const nowcast = data.latestV3?.horizons.find((h) => h.kind === "nowcast");
-    if (data.latestV3?.status === "ok" && data.latestV3.revision_adjustment) {
-      expect(typeof nowcast?.expected_first_print_pct).toBe("number");
-    }
+  });
+
+  it("the published nowcast is the model's figure less the adjustment", () => {
+    const data = loadDashboardData();
+    const v3 = data.latestV3;
+    // Payloads emitted before 2026-09-09 carry no adjustment; there is nothing
+    // to check on those, and the site renders them without the clause.
+    if (!v3?.revision_adjustment) return;
+    const nowcast = v3.horizons.find((h) => h.kind === "nowcast");
+    expect(typeof nowcast?.model_qoq_growth_pct).toBe("number");
+    const implied =
+      nowcast!.model_qoq_growth_pct! - v3.revision_adjustment.pp;
+    expect(Math.abs(nowcast!.qoq_growth_pct - implied)).toBeLessThan(1e-3);
   });
 });

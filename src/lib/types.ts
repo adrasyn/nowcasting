@@ -109,12 +109,18 @@ export interface AccuracyError {
   qoq_nowcast_pct?: number;
   qoq_actual_pct?: number;
   qoq_error_pp?: number;
-  // The ABS's FIRST print of the quarter and the miss against it. The latest
-  // vintage above has been revised up by about 0.1pp a quarter on average, so
-  // this is the larger miss and the one a reader saw on the day. Absent on
-  // v1 and v2 payloads.
-  qoq_first_print_pct?: number | null;
-  qoq_error_first_print_pp?: number | null;
+  // v3 scores one number against one target: `qoq_nowcast_pct` is the published
+  // nowcast and `qoq_actual_pct` is the ABS's first print of the quarter, the
+  // number it is built to match. The two fields below are provenance rather
+  // than the score — the model's own figure before the average upward revision
+  // was taken off, and the same quarter as the ABS now reports it after
+  // revisions. Absent on v1 and v2 payloads.
+  qoq_model_nowcast_pct?: number | null;
+  qoq_latest_vintage_pct?: number | null;
+  // TRUE when this row was shifted by TODAY's revision adjustment rather than
+  // by the one that stood on its own day, which was never computed. Honest
+  // approximation, flagged rather than hidden.
+  adjusted_retroactively?: boolean;
   yoy_nowcast: number | null;
   yoy_actual: number | null;
   yoy_rba: number | null;
@@ -147,12 +153,18 @@ export interface Performance {
   mae_pct: number;
   bias_millions: number;
   bias_pct: number;
-  // Against first prints. v3 only.
-  n_first_print?: number;
-  mae_first_print_pct?: number | null;
-  bias_first_print_pct?: number | null;
+  // What the errors above are measured against: "abs_first_print" on v3, where
+  // the published nowcast and the target are both first-print figures. Absent
+  // on v1 and v2, which score against the latest vintage.
+  basis?: string;
+  n?: number;
+  // The average upward revision taken off the model's figure to produce the
+  // published nowcast, and how the model's own figure scores against the
+  // latest revised data. Provenance for the published number, not the number
+  // itself — the tiles and the table above are the score.
   revision_adjustment_pp?: number | null;
-  bias_first_print_adjusted_pct?: number | null;
+  model_mae_vs_latest_pct?: number | null;
+  model_bias_vs_latest_pct?: number | null;
   rba_comparison: RbaComparison;
   errors: AccuracyError[];
 }
@@ -258,13 +270,18 @@ export interface V3Horizon {
   ci_95_low?: number;
   ci_95_high?: number;
   gdp_chain_volume_millions?: number;
-  // The model's figure less the ABS's average upward revision: what to
-  // compare with the first print on release day.
-  expected_first_print_pct?: number;
+  // The model's own estimate, before the ABS's average upward revision is
+  // taken off. `qoq_growth_pct` above is the published figure — this less the
+  // adjustment — and is what the whole page means by "the nowcast". This one
+  // appears once, in the methodology panel, as provenance.
+  model_qoq_growth_pct?: number;
 }
 
 export interface LatestV3 {
   schema: string;
+  // "abs_first_print": the horizons above are nowcasts of the ABS's first
+  // print. Absent on payloads emitted before 2026-09-09.
+  basis?: string;
   status: "ok" | "refused";
   generated_at: string;
   as_of: string;

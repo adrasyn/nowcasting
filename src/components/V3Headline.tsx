@@ -48,7 +48,7 @@ export default function V3Headline({ latest, gdp }: Props) {
     <section className="mb-8 border border-border-heavy p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] uppercase tracking-wider text-label">
-          {formatQuarterLabel(nowcast.quarter)}: GDP nowcast
+          {formatQuarterLabel(nowcast.quarter)}: GDP nowcast, first print
         </p>
       </div>
 
@@ -68,18 +68,6 @@ export default function V3Headline({ latest, gdp }: Props) {
           </div>
         )}
       </div>
-
-      {nowcast.expected_first_print_pct !== undefined && latest.revision_adjustment && (
-        <p className="mt-2 text-xs text-label">
-          Expected ABS first print{" "}
-          <span className="font-headline text-lg text-teal">
-            {formatPct(nowcast.expected_first_print_pct)}
-          </span>
-          {" "}· the ABS revises its first estimate up by{" "}
-          {latest.revision_adjustment.pp.toFixed(2)}pp on average, and this is the
-          model&rsquo;s figure less that.
-        </p>
-      )}
 
       <div className="mt-4 h-20">
         <ResponsiveContainer>

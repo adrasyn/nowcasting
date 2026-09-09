@@ -41,6 +41,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import nyfed.au.build as build_mod
 from nyfed.au.build import (
     COLLAPSED_GLOBAL_LOADING, P_E, P_F, Vintage, build_panel, estimate_short,
     load_vintage, state_space, target_periods,
@@ -63,7 +64,7 @@ N_GS, N_BURN = 200, 100
 FIELDS = ["asof", "target", "target_date", "horizon_months", "seed",
           "target_series", "nowcast_qq", "forecast_next_qq", "actual_qq",
           "first_print_qq", "error_qq", "error_first_print_qq",
-          "gdp_global_loading", "collapsed", "cols", "gdp_obs",
+          "gdp_global_loading", "collapsed", "collapse_floor", "cols", "gdp_obs",
           "deflator_skipped", "seconds"]
 
 
@@ -73,8 +74,21 @@ def main() -> int:
     ap.add_argument("--target", choices=("latest", "first_print"), default="latest",
                     help="which GDP series the model is TRAINED on. Scoring is "
                          "always reported against both.")
+    ap.add_argument("--collapse-floor", type=float, default=COLLAPSED_GLOBAL_LOADING,
+                    help="loading at or below which a chain is treated as "
+                         "collapsed and not nowcast. The shipping floor was "
+                         "calibrated on the latest-vintage target; a first-print "
+                         "target lowers gdp's loading, so the experiment records "
+                         "chains the shipping floor would refuse and cuts "
+                         "afterwards.")
     args = ap.parse_args()
+    # `state_space` is the guarded funnel and it reads build.py's module global
+    # at call time, so the floor has to be set THERE, not on the name this tool
+    # imported. Both are moved together to keep the two tests in agreement.
+    floor = args.collapse_floor
+    build_mod.COLLAPSED_GLOBAL_LOADING = floor
     out = Path(args.out); t0 = time.perf_counter()
+    print(f"collapse floor: {floor}", flush=True)
 
     gdp = VINT.series["gdp"].dropna()
     actual_qq = (gdp / gdp.shift(1) - 1) * 100
@@ -119,7 +133,7 @@ def main() -> int:
             secs = time.perf_counter() - s0
             par = map_parameter(np.median(res.params, axis=1), (n, n_f, P_F, P_E))
             loading = float(par.Lambda[panel.i_now, 0])
-            collapsed = loading <= COLLAPSED_GLOBAL_LOADING
+            collapsed = loading <= floor
             nc = nxt = ""
             if not collapsed:
                 # `state_space` is the guarded funnel; it re-checks the loading.
@@ -142,7 +156,8 @@ def main() -> int:
                     round(nc - act, 4) if nc != "" else "",
                 "error_first_print_qq": round(nc - fp, 4) if nc != "" else "",
                 "gdp_global_loading": round(loading, 4),
-                "collapsed": int(collapsed), "cols": panel.Y.shape[1],
+                "collapsed": int(collapsed), "collapse_floor": floor,
+                "cols": panel.Y.shape[1],
                 "gdp_obs": int(np.isfinite(panel.Y[panel.i_now]).sum()),
                 "deflator_skipped": ";".join(sorted(panel.deflator_skipped)),
                 "seconds": round(secs, 1)})

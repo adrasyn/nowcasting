@@ -34,6 +34,7 @@ test.describe("homepage", () => {
     ).toBeVisible();
     await expect(page.getByText(/growth this quarter/).first()).toBeVisible();
     await expect(page.locator("svg").first()).toBeVisible();
+    await expect(page.getByText("First print", { exact: true })).toBeVisible();
   });
 
   test("serves v3, not v2", async ({ page }) => {

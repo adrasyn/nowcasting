@@ -104,13 +104,17 @@ export default function Home() {
           sourceFile="data/backtest_v3.json"
           title="Track record"
           intro="These are backtested estimates, not live nowcasts."
+          firstPrint
           notes={
-            "MAE (mean absolute error) is the average size of the miss, ignoring " +
-            "direction. Bias is the average signed miss, so a positive value means " +
-            "the model tends to come in a little high. For comparison, the RBA " +
-            "column shows the RBA's forecast published mid-quarter (about two " +
-            "months before our full-quarter estimate) for each June and December " +
-            "quarter."
+            "First print is what the ABS published for the quarter; Latest is " +
+            "the same quarter as the ABS now reports it. The ABS revises growth " +
+            "up by about 0.1pp a quarter on average, so the miss against the " +
+            "first print, which is what a reader saw on the day, is the larger " +
+            "one and the one the tiles show. MAE is the average size of the " +
+            "miss, ignoring direction. Bias is the average signed miss, so a " +
+            "positive value means the model tends to come in high. The RBA " +
+            "column shows the RBA's forecast published mid-quarter for each " +
+            "June and December quarter."
           }
           showGap={false}
           showRbaTile={false}

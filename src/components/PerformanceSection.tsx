@@ -28,6 +28,11 @@ interface Props {
   // basis and a different number of quarters. Without each saying which,
   // 0.26 beside 0.27 reads as one of them being wrong.
   tileBasis?: string;
+  // v3 scores against the ABS's first print as well as the latest vintage.
+  // When true the tiles headline the first-print figures, the table gains a
+  // "First print" column and the error is measured against it. Defaults off
+  // because v1 and v2 payloads carry no first prints.
+  firstPrint?: boolean;
 }
 
 export default function PerformanceSection({
@@ -41,6 +46,7 @@ export default function PerformanceSection({
   showRbaTile = true,
   afterTiles,
   tileBasis,
+  firstPrint = false,
 }: Props) {
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
@@ -71,16 +77,32 @@ export default function PerformanceSection({
           </p>
         ))}
       <div className={`grid gap-3 mb-4 ${showRbaTile ? "grid-cols-3" : "grid-cols-2"}`}>
-        <Tile
-          label="MAE"
-          value={`${performance.mae_pct.toFixed(2)}pp`}
-          sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
-        />
-        <Tile
-          label="Bias"
-          value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}
-          sub={`${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
-        />
+        {firstPrint && performance.mae_first_print_pct != null ? (
+          <Tile
+            label="MAE"
+            value={`${performance.mae_first_print_pct.toFixed(2)}pp`}
+            sub={`vs the ABS first print · ${performance.mae_pct.toFixed(2)}pp vs the latest vintage`}
+          />
+        ) : (
+          <Tile
+            label="MAE"
+            value={`${performance.mae_pct.toFixed(2)}pp`}
+            sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
+          />
+        )}
+        {firstPrint && performance.bias_first_print_pct != null ? (
+          <Tile
+            label="Bias"
+            value={`${performance.bias_first_print_pct > 0 ? "+" : ""}${performance.bias_first_print_pct.toFixed(2)}pp`}
+            sub={`vs the ABS first print · ${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp vs the latest vintage`}
+          />
+        ) : (
+          <Tile
+            label="Bias"
+            value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}
+            sub={`${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
+          />
+        )}
         {showRbaTile &&
           (rba.ours_mae != null && rba.rba_mae != null ? (
             <Tile
@@ -133,9 +155,13 @@ export default function PerformanceSection({
           this table the minimum does not bind, so they stay on one line
           there. The values carry `whitespace-nowrap` for the same reason in
           reverse: at 440px "2025 Q4" broke across two lines and the rows lost
-          a common height. Headers may wrap; figures may not. */}
+          a common height. Headers may wrap; figures may not.
+
+          With the first-print column (v3) there are eight number columns;
+          500px keeps the seventh clipped mid-cell on a phone for the same
+          reason. */}
       <div className="overflow-x-auto">
-      <table className="w-full min-w-[440px] text-xs border-collapse">
+      <table className="w-full min-w-[500px] text-xs border-collapse">
         <thead>
           <tr className="border-b border-border-heavy text-left text-[10px] uppercase text-label">
             <th className="py-2 pr-4">Quarter</th>
@@ -144,8 +170,9 @@ export default function PerformanceSection({
                 the shaded rows below are live nowcasts, not simulations, and
                 the intro paragraph already says which rows are which. */}
             <th className="py-2 pr-4">Nowcast</th>
-            <th className="py-2 pr-4">Actual</th>
-            <th className="py-2 pr-4">Error (pp)</th>
+            {firstPrint && <th className="py-2 pr-4">First print</th>}
+            <th className="py-2 pr-4">{firstPrint ? "Latest" : "Actual"}</th>
+            <th className="py-2 pr-4">{firstPrint ? "Error vs first (pp)" : "Error (pp)"}</th>
             <th className="py-2 pr-4">Nowcast (YoY)</th>
             <th className="py-2 pr-4">RBA (YoY)</th>
             <th className="py-2 pr-4">Actual (YoY)</th>
@@ -167,15 +194,24 @@ export default function PerformanceSection({
               <td className="whitespace-nowrap py-2 pr-4">
                 {e.qoq_nowcast_pct == null ? formatMillions(e.final_nowcast) : formatPct(e.qoq_nowcast_pct)}
               </td>
+              {firstPrint && (
+                <td className="whitespace-nowrap py-2 pr-4">
+                  {e.qoq_first_print_pct == null ? "—" : formatPct(e.qoq_first_print_pct)}
+                </td>
+              )}
               <td className="whitespace-nowrap py-2 pr-4">
                 {e.qoq_actual_pct == null ? formatMillions(e.actual) : formatPct(e.qoq_actual_pct)}
               </td>
-              <td className={`whitespace-nowrap py-2 pr-4 ${(e.qoq_error_pp ?? e.error_pct) > 0 ? "text-teal" : "text-[#c0392b]"}`}>
-                {(() => {
-                  const v = e.qoq_error_pp ?? e.error_pct;
-                  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
-                })()}
-              </td>
+              {(() => {
+                const v = firstPrint && e.qoq_error_first_print_pp != null
+                  ? e.qoq_error_first_print_pp
+                  : (e.qoq_error_pp ?? e.error_pct);
+                return (
+                  <td className={`whitespace-nowrap py-2 pr-4 ${v > 0 ? "text-teal" : "text-[#c0392b]"}`}>
+                    {`${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}`}
+                  </td>
+                );
+              })()}
               <td className="whitespace-nowrap py-2 pr-4 text-label">
                 {e.yoy_nowcast == null ? "—" : `${e.yoy_nowcast.toFixed(2)}%`}
               </td>

@@ -53,13 +53,28 @@ export default function V3MethodologyPanel({ performance }: Props) {
           </p>
           {performance && n > 0 && (
             <p>
-              Over the last {n} backtested quarters this estimate has missed the
-              actual GDP figure by {performance.mae_pct.toFixed(2)}pp on average
-              {performance.bias_pct > 0.05 &&
-                `, and has tended to run ${performance.bias_pct.toFixed(2)}pp high`}
-              {performance.bias_pct < -0.05 &&
-                `, and has tended to run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
-              .
+              {performance.bias_first_print_pct != null && performance.mae_first_print_pct != null ? (
+                <>
+                  Over the last {n} quarters this estimate has missed the ABS&rsquo;s first
+                  print by {performance.mae_first_print_pct.toFixed(2)}pp on average
+                  {performance.bias_first_print_pct > 0.05 &&
+                    `, and has run ${performance.bias_first_print_pct.toFixed(2)}pp high`}
+                  {performance.bias_first_print_pct < -0.05 &&
+                    `, and has run ${Math.abs(performance.bias_first_print_pct).toFixed(2)}pp low`}
+                  . Against the latest revised figures the miss is {performance.mae_pct.toFixed(2)}pp
+                  and the bias {performance.bias_pct > 0 ? "+" : ""}{performance.bias_pct.toFixed(2)}pp.
+                </>
+              ) : (
+                <>
+                  Over the last {n} backtested quarters this estimate has missed the
+                  actual GDP figure by {performance.mae_pct.toFixed(2)}pp on average
+                  {performance.bias_pct > 0.05 &&
+                    `, and has tended to run ${performance.bias_pct.toFixed(2)}pp high`}
+                  {performance.bias_pct < -0.05 &&
+                    `, and has tended to run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
+                  .
+                </>
+              )}
             </p>
           )}
         </div>

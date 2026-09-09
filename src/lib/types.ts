@@ -109,6 +109,12 @@ export interface AccuracyError {
   qoq_nowcast_pct?: number;
   qoq_actual_pct?: number;
   qoq_error_pp?: number;
+  // The ABS's FIRST print of the quarter and the miss against it. The latest
+  // vintage above has been revised up by about 0.1pp a quarter on average, so
+  // this is the larger miss and the one a reader saw on the day. Absent on
+  // v1 and v2 payloads.
+  qoq_first_print_pct?: number | null;
+  qoq_error_first_print_pp?: number | null;
   yoy_nowcast: number | null;
   yoy_actual: number | null;
   yoy_rba: number | null;
@@ -141,6 +147,12 @@ export interface Performance {
   mae_pct: number;
   bias_millions: number;
   bias_pct: number;
+  // Against first prints. v3 only.
+  n_first_print?: number;
+  mae_first_print_pct?: number | null;
+  bias_first_print_pct?: number | null;
+  revision_adjustment_pp?: number | null;
+  bias_first_print_adjusted_pct?: number | null;
   rba_comparison: RbaComparison;
   errors: AccuracyError[];
 }
@@ -246,6 +258,9 @@ export interface V3Horizon {
   ci_95_low?: number;
   ci_95_high?: number;
   gdp_chain_volume_millions?: number;
+  // The model's figure less the ABS's average upward revision: what to
+  // compare with the first print on release day.
+  expected_first_print_pct?: number;
 }
 
 export interface LatestV3 {
@@ -263,6 +278,15 @@ export interface LatestV3 {
   horizons: V3Horizon[];
   vintages?: V3Vintage[];
   next_gdp_release_date?: string;
+  revision_adjustment?: {
+    pp: number;
+    n: number;
+    first_quarter: string;
+    last_quarter: string;
+    window_quarters: number;
+    min_age_quarters: number;
+    basis: string;
+  } | null;
   ci_basis?: string;
   panel?: {
     n_series: number;

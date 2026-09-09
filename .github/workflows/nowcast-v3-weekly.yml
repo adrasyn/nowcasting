@@ -114,6 +114,10 @@ jobs:
           git add data/latest_v3.json data/indicators_v3.json
           git add data/nowcast_history_v3.json
           git add data/performance_v3.json data/backtest_v3.json
+          # The first print of a newly released quarter is recorded by
+          # emit_backtest_json.py on the Monday after the ABS prints. It is an
+          # input to next week's adjustment, so it is committed with the data.
+          git add nowcasting_v3/data/gdp_first_release.csv
           if git diff --staged --quiet; then
             echo "No v3 changes to commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"

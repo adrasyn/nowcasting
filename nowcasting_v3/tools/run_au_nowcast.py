@@ -42,7 +42,8 @@ from nyfed.au.build import (
     target_periods,
 )
 from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
-                           nowcast_payload, refusal_payload)
+                           migrate_history_runs, nowcast_payload,
+                           refusal_payload)
 from nyfed.au.first_release import load_first_release, mean_revision
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.restrict import build_restrict
@@ -207,8 +208,13 @@ def main() -> int:
     # THE ABS REVISES UP. The model predicts the latest vintage, because that is
     # what it was trained on; the page is judged against the first print. The
     # difference has averaged about +0.1pp a quarter for forty years, and the
-    # expected first print takes it off. A missing estimate is not fatal: the
-    # raw figure is still published, without the companion.
+    # published nowcast takes it off.
+    #
+    # A MISSING ESTIMATE IS NOW A REFUSAL, not a degrade. Publishing the model's
+    # raw figure would put a nowcast of the latest vintage on a page that says
+    # it nowcasts the first print — the same number under the wrong name, which
+    # is worse than no number, because nothing on the page would show it had
+    # changed meaning. Refusing is the behaviour v3 exists for.
     try:
         revision = mean_revision(load_first_release(), gdp, asof=asof)
         print(f"revision adjustment {revision.pp:+.3f}pp over {revision.n} quarters "
@@ -219,7 +225,9 @@ def main() -> int:
     # would write no payload at all, not even a refusal.
     except Exception as exc:  # noqa: BLE001
         print(f"no revision adjustment: {exc}", file=sys.stderr)
-        revision = None
+        write(refusal_payload(reason="no revision estimate",
+                              detail=str(exc)[:400], generated_at=now, asof=asof))
+        return 0
     print(f"panel {panel.Y.shape[0]}x{panel.Y.shape[1]}, "
           f"{panel.dates[0].date()}..{panel.dates[-1].date()}"
           f"{f' (+{n_pad} forecast month(s))' if n_pad else ''}", flush=True)
@@ -301,14 +309,20 @@ def main() -> int:
             continue
         qk = np.nanpercentile(annualised_to_qoq(draws[:, k]),
                               [2.5, 16, 84, 97.5])
+        # ON THE FIRST-PRINT BASIS, point and bands alike, so the record can be
+        # scored directly against the ABS's first print and the evolution chart
+        # plots the same quantity the page headlines.
+        model_k = float(annualised_to_qoq(ann[k]))
         written.append({
             "run_date": asof, "target_quarter": lab,
             "kind": "nowcast" if k == 0 else "forecast",
-            "qoq_growth_pct": round(float(annualised_to_qoq(ann[k])), 4),
-            "expected_first_print_pct": (round(float(annualised_to_qoq(ann[k])) - revision.pp, 4)
-                                         if revision else None),
-            "ci_95_low": round(qk[0], 4), "ci_68_low": round(qk[1], 4),
-            "ci_68_high": round(qk[2], 4), "ci_95_high": round(qk[3], 4),
+            "qoq_growth_pct": round(model_k - revision.pp, 4),
+            "model_qoq_growth_pct": round(model_k, 4),
+            "revision_adjustment_pp": round(revision.pp, 4),
+            "ci_95_low": round(qk[0] - revision.pp, 4),
+            "ci_68_low": round(qk[1] - revision.pp, 4),
+            "ci_68_high": round(qk[2] - revision.pp, 4),
+            "ci_95_high": round(qk[3] - revision.pp, 4),
             "data_through": dthru, "months_with_data": months[k],
             "estimate_asof": meta["asof"],
         })
@@ -357,11 +371,13 @@ def main() -> int:
                 written.append({
                     "run_date": str(d0.date()), "target_quarter": lab,
                     "kind": "nowcast" if k == 0 else "forecast",
-                    "qoq_growth_pct": round(pt_k, 4),
-                    "expected_first_print_pct": (round(pt_k - revision.pp, 4)
-                                                 if revision else None),
-                    "ci_95_low": round(qb[0], 4), "ci_68_low": round(qb[1], 4),
-                    "ci_68_high": round(qb[2], 4), "ci_95_high": round(qb[3], 4),
+                    "qoq_growth_pct": round(pt_k - revision.pp, 4),
+                    "model_qoq_growth_pct": round(pt_k, 4),
+                    "revision_adjustment_pp": round(revision.pp, 4),
+                    "ci_95_low": round(qb[0] - revision.pp, 4),
+                    "ci_68_low": round(qb[1] - revision.pp, 4),
+                    "ci_68_high": round(qb[2] - revision.pp, 4),
+                    "ci_95_high": round(qb[3] - revision.pp, 4),
                     "data_through": str(pv_seen[-1].date())[:7],
                     "months_with_data": months_with_data(vp, int(t_now[k])),
                     "estimate_asof": meta["asof"], "backfilled": True,
@@ -374,7 +390,7 @@ def main() -> int:
                      else "no quarter has data yet, nothing recorded"),
                   flush=True)
 
-    vintages = _record(written, labels)
+    vintages = _record(written, labels, revision.pp)
 
     # THE FETCHED DATE IS ONLY USED IF IT NAMES THIS TARGET'S QUARTER.
     # `data/latest.json` belongs to the R pipeline, which runs 90 minutes before
@@ -421,7 +437,7 @@ def main() -> int:
     return 0
 
 
-def _record(entries: list[dict], labels: list[str]) -> list[dict]:
+def _record(entries: list[dict], labels: list[str], pp: float) -> list[dict]:
     """Merge new runs into the standing record and hand back the live targets'.
 
     The record is the single source for both the evolution chart and, once the
@@ -432,12 +448,24 @@ def _record(entries: list[dict], labels: list[str]) -> list[dict]:
     date -- so de-duplicating on the date by itself would let each row evict the
     other and leave whichever happened to be written last.
     """
-    hist = {"schema": "v3-history-1", "runs": []}
+    hist = {"schema": "v3-history-2", "runs": []}
     if HISTORY.is_file():
         try:
             hist = json.loads(HISTORY.read_text())
         except json.JSONDecodeError:
             print(f"{HISTORY.name} unreadable; starting a new record", flush=True)
+    # THE WHOLE RECORD MOVES WITH THE PAYLOAD. Rows written before 2026-09-09
+    # hold the model's own figure in `qoq_growth_pct`; leaving them would put
+    # two different quantities on one evolution chart, and the step between
+    # them would read as news rather than as a change of definition. The
+    # migration is idempotent -- a row that already has `model_qoq_growth_pct`
+    # is returned untouched -- so re-running a Monday costs nothing.
+    if hist.get("schema") != "v3-history-2":
+        before = sum(1 for r in hist["runs"] if "model_qoq_growth_pct" not in r)
+        hist["runs"] = migrate_history_runs(hist["runs"], pp)
+        hist["schema"] = "v3-history-2"
+        print(f"migrated {before} row(s) of {HISTORY.name} to the first-print "
+              f"basis ({pp:+.4f}pp, retroactive)", flush=True)
     # Keyed on what was actually WRITTEN, not on `labels`. A run that declines
     # to record a data-less forecast must leave any existing row for that
     # quarter alone rather than treating its silence as a deletion.

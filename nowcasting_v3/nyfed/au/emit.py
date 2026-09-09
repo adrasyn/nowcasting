@@ -82,8 +82,29 @@ def qoq_to_annualised(qoq):
 # feed, or a chain that left GDP disconnected from the panel. Emitting nothing
 # at all would let the site show the previous week's number as if it were
 # current, which is the exact failure the guards exist to prevent.
+#
+# THERE IS ONE NOWCAST, AND IT IS A NOWCAST OF THE ABS'S FIRST PRINT. `basis`
+# says so, and `qoq_growth_pct` -- the field the page headlines, the bands
+# describe and the chart plots -- carries it. The model itself predicts the
+# LATEST vintage, because that is what it was trained on, and the ABS revises
+# that vintage up by about +0.1pp a quarter; the first-print nowcast is the
+# model's estimate less that mean revision, and a backtest on 2026-09-09 showed
+# it is the better predictor of the number the page is judged against on
+# release day. So the adjustment is not an optional companion: without it there
+# is no figure to publish under this schema, and `nowcast_payload` refuses.
+#
+# The model's own figure still travels, in `model_qoq_growth_pct`, as
+# provenance -- the reader can see what was subtracted and `revision_adjustment`
+# says how it was estimated. `annualised_growth_pct` stays the MODEL's, because
+# it is the model's native unit and no revision study exists for it.
+#
+# This replaced a two-number design (`qoq_growth_pct` raw, plus a companion
+# `expected_first_print_pct`) that shipped earlier the same day. Two figures on
+# a page is a question the reader has to answer -- which one is the nowcast --
+# and the site had already decided the answer. Nothing should carry the old
+# field name any more.
 
-SCHEMA = "v3-preview-1"
+SCHEMA = "v3-preview-2"
 
 
 def _pct(x) -> float:
@@ -162,33 +183,47 @@ def nowcast_payload(
     zero is the model's unconditional anchor and nothing else, so the site is
     given the number rather than left to infer it from ``data_through``.
 
-    ``revision`` is a ``first_release.RevisionEstimate`` or None. When given,
-    every horizon carries ``expected_first_print_pct``: the model's figure
-    less the ABS's average upward revision, which is what a reader should
-    compare with the first print on release day. The raw figure stays the
-    headline: it is what the bands and the evolution chart describe.
+    ``revision`` is a ``first_release.RevisionEstimate``. It is the last
+    keyword for backwards compatibility of the call sites only; it is
+    REQUIRED. Every published figure -- the point, the bands and the level --
+    is the model's less ``revision.pp``, because the page nowcasts the ABS's
+    first print. The model's own quarter-on-quarter figure rides beside it in
+    ``model_qoq_growth_pct``.
 
     This function does no estimation and no fetching. It is pure so that the
-    emitted shape can be tested without a sampler run.
+    emitted shape can be tested without a sampler run. It is also duck-typed on
+    ``revision`` -- ``.pp`` and ``.as_dict()`` -- so that ``first_release``, and
+    the pandas read it drags in, stay out of the presentation layer.
     """
     import numpy as np
+
+    if revision is None:
+        raise ValueError(
+            "no revision estimate: the published figure is the nowcast of the "
+            "ABS first print, which is the model's estimate less the mean "
+            "revision. Without that estimate there is no first-print number to "
+            "publish; refuse rather than print the model's figure under that name.")
+    pp = float(revision.pp)
 
     draws = np.asarray(draws, dtype=float)
     out_h = []
     for k, (label, ann) in enumerate(horizons):
-        qoq = float(annualised_to_qoq(ann))
+        model = float(annualised_to_qoq(ann))
+        qoq = model - pp
         col = draws[:, k] if draws.ndim == 2 and draws.shape[1] > k else None
         band = {}
         if col is not None and np.isfinite(col).sum() >= 20:
+            # The bands shift with the point. They describe the published
+            # figure, so an unshifted interval would sit off-centre from the
+            # number it is drawn around.
             q = np.nanpercentile(annualised_to_qoq(col[np.isfinite(col)]),
-                                 [2.5, 16, 84, 97.5])
+                                 [2.5, 16, 84, 97.5]) - pp
             band = {"ci_68_low": _pct(q[1]), "ci_68_high": _pct(q[2]),
                     "ci_95_low": _pct(q[0]), "ci_95_high": _pct(q[3])}
         entry = {"quarter": label, "kind": "nowcast" if k == 0 else "forecast",
                  "qoq_growth_pct": _pct(qoq),
+                 "model_qoq_growth_pct": _pct(model),
                  "annualised_growth_pct": _pct(ann), **band}
-        if revision is not None:
-            entry["expected_first_print_pct"] = _pct(qoq - revision.pp)
         if months_with_data is not None and k < len(months_with_data):
             entry["months_with_data"] = int(months_with_data[k])
         rel = gdp_release_date(label)
@@ -202,6 +237,7 @@ def nowcast_payload(
     return {
         "schema": SCHEMA,
         "status": "ok",
+        "basis": "abs_first_print",
         "generated_at": generated_at,
         "as_of": asof,
         "target_quarter": out_h[0]["quarter"] if out_h else None,
@@ -220,12 +256,13 @@ def nowcast_payload(
         # is not worth a fabricated point.
         "vintages": vintages or [],
         "next_gdp_release_date": next_gdp_release_date,
-        "revision_adjustment": revision.as_dict() if revision is not None else None,
+        "revision_adjustment": revision.as_dict(),
         "ci_basis": (
             "probability band: the 68%/95% mass of the model's posterior, from "
             f"{int(np.isfinite(draws).all(axis=1).sum())} density_nowcast draws on the same "
-            "chain as the point estimate. Not a confidence interval, and not "
-            "recalibrated from past errors."),
+            "chain as the point estimate, shifted onto the first-print basis "
+            "with the same adjustment as the point. Not a confidence interval, "
+            "and not recalibrated from past errors."),
         "panel": {
             "n_series": int(panel.Y.shape[0]),
             "n_months": int(panel.Y.shape[1]),
@@ -239,6 +276,35 @@ def nowcast_payload(
             "n_gs": n_gs, "n_burn": n_burn, "seed": seed,
         },
     }
+
+
+def migrate_history_runs(runs: list[dict], pp: float) -> list[dict]:
+    """Move v3-history-1 rows onto the first-print basis. Pure; returns new dicts.
+
+    A row written before 2026-09-09 holds the MODEL's figure in `qoq_growth_pct`.
+    Since then `qoq_growth_pct` is the first-print nowcast (model less the mean
+    revision) and the model's figure lives in `model_qoq_growth_pct`. Old rows
+    are shifted by TODAY's adjustment and say so, because the adjustment they
+    would have carried on the day was never computed. Rows already on the new
+    basis pass through untouched.
+    """
+    out = []
+    for r in runs:
+        if "model_qoq_growth_pct" in r:
+            out.append(dict(r))
+            continue
+        n = dict(r)
+        model = float(n["qoq_growth_pct"])
+        n["model_qoq_growth_pct"] = round(model, 4)
+        n["qoq_growth_pct"] = round(model - pp, 4)
+        for k in ("ci_68_low", "ci_68_high", "ci_95_low", "ci_95_high"):
+            if k in n and n[k] is not None:
+                n[k] = round(float(n[k]) - pp, 4)
+        n.pop("expected_first_print_pct", None)
+        n["revision_adjustment_pp"] = round(pp, 4)
+        n["adjusted_retroactively"] = True
+        out.append(n)
+    return out
 
 
 def refusal_payload(*, reason: str, detail: str, generated_at: str,

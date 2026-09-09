@@ -92,27 +92,30 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
                 f"vintage {v['run_date']} for {v['target_quarter']} has no "
                 "month of data and should not have been recorded")
 
-    # THE COMPANION FIGURE IS ARITHMETIC ON THE HEADLINE. If it drifts from
-    # `qoq_growth_pct - revision_adjustment.pp` the page shows two numbers that
-    # cannot both be right. And the adjustment itself is a forty-year average
-    # near +0.1pp; one outside +-0.5 is a broken estimate, not a finding.
+    # THE HEADLINE IS ARITHMETIC ON THE MODEL'S FIGURE. `qoq_growth_pct` is the
+    # nowcast of the ABS's first print: the model's own estimate less the mean
+    # revision. If the two stop agreeing, the page headlines a number nothing on
+    # it explains. An 'ok' payload without an adjustment cannot be on the
+    # first-print basis at all, so its headline is mislabelled rather than
+    # merely unexplained. And the adjustment itself is a forty-year average near
+    # +0.1pp; one outside +-0.5 is a broken estimate, not a finding.
     adj = d.get("revision_adjustment")
-    if adj is not None:
+    if adj is None:
+        bad.append("status is 'ok' but revision_adjustment is absent: the published "
+                   "figure is the first-print nowcast and needs the adjustment that made it")
+    else:
         pp = adj.get("pp")
-        if not isinstance(pp, (int, float)) or abs(pp) > 0.5:
+        if not isinstance(pp, (int, float)) or isinstance(pp, bool) or abs(pp) > 0.5:
             bad.append(f"revision_adjustment.pp is {pp!r}; expected a number within +-0.5")
         else:
             for h in horizons:
-                got = h.get("expected_first_print_pct")
-                want = h["qoq_growth_pct"] - pp
-                if got is None or abs(got - want) > 1e-3:
-                    bad.append(f"{h['quarter']}: expected_first_print_pct {got!r} is not "
-                               f"qoq_growth_pct - revision_adjustment.pp ({want:.4f})")
-    else:
-        for h in horizons:
-            if "expected_first_print_pct" in h:
-                bad.append(f"{h['quarter']} carries expected_first_print_pct with no "
-                           "revision_adjustment to explain it")
+                if "expected_first_print_pct" in h:
+                    bad.append(f"{h['quarter']} carries expected_first_print_pct, a field "
+                               "retired when qoq_growth_pct became the first-print nowcast")
+                model = h.get("model_qoq_growth_pct")
+                if model is None or abs(h["qoq_growth_pct"] - (model - pp)) > 1e-3:
+                    bad.append(f"{h['quarter']}: qoq_growth_pct {h['qoq_growth_pct']!r} is not "
+                               f"model_qoq_growth_pct - revision_adjustment.pp ({model!r} - {pp})")
 
     # `data_through` names the last month carrying an observation. A month in
     # the future means the panel was padded into the payload, which is the bug

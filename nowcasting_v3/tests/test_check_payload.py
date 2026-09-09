@@ -12,6 +12,7 @@ def _ok(**over):
         "status": "ok",
         "data_through": "2026-07",
         "prev_level": {"quarter": "2026 Q1", "value": 695945},
+        "basis": "abs_first_print",
         "revision_adjustment": {"pp": 0.08},
         "horizons": [
             {"quarter": "2026 Q2", "kind": "nowcast", "months_with_data": 3},
@@ -21,15 +22,18 @@ def _ok(**over):
                       "months_with_data": 3}],
     }
     d.update(over)
-    # Every horizon carries a companion figure consistent with the default
-    # revision_adjustment, whether it came from the base dict above or from a
-    # caller's own `horizons=[...]` override, so that tests overriding
-    # `horizons` for an unrelated reason don't also have to restate this.
+    # Every horizon carries the model's own figure and the published one it
+    # implies -- the model less the adjustment -- whether the horizon came from
+    # the base dict above or from a caller's own `horizons=[...]` override, so
+    # that tests overriding `horizons` for an unrelated reason don't also have
+    # to restate the basis.
     pp = (d.get("revision_adjustment") or {}).get("pp")
-    if pp is not None:
-        for h in d.get("horizons") or []:
-            h.setdefault("qoq_growth_pct", 0.5)
-            h.setdefault("expected_first_print_pct", h["qoq_growth_pct"] - pp)
+    for h in d.get("horizons") or []:
+        h.setdefault("model_qoq_growth_pct", 0.5)
+        if pp is not None:
+            h.setdefault("qoq_growth_pct", h["model_qoq_growth_pct"] - pp)
+        else:
+            h.setdefault("qoq_growth_pct", h["model_qoq_growth_pct"])
     return d
 
 
@@ -127,23 +131,27 @@ def test_a_data_less_forecast_vintage_is_still_rejected():
                for b in bad), bad
 
 
-def test_an_expected_first_print_that_disagrees_with_the_adjustment_is_a_bug():
+def test_a_nowcast_that_is_not_the_model_less_the_adjustment_is_a_bug():
     d = _ok()
-    d["horizons"][0]["expected_first_print_pct"] = d["horizons"][0]["qoq_growth_pct"] + 1.0
-    assert any("expected_first_print_pct" in p for p in check_payload(d, today="2026-09-07"))
+    d["horizons"][0]["qoq_growth_pct"] = d["horizons"][0]["model_qoq_growth_pct"] + 1.0
+    assert any("model_qoq_growth_pct" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_an_ok_payload_without_an_adjustment_is_incoherent():
+    d = _ok()
+    d["revision_adjustment"] = None
+    assert any("revision_adjustment" in p for p in check_payload(d, today="2026-09-07"))
 
 
 def test_an_implausible_adjustment_is_refused():
     d = _ok()
     d["revision_adjustment"]["pp"] = 0.9
     for h in d["horizons"]:
-        h["expected_first_print_pct"] = h["qoq_growth_pct"] - 0.9
+        h["qoq_growth_pct"] = h["model_qoq_growth_pct"] - 0.9
     assert any("revision_adjustment" in p for p in check_payload(d, today="2026-09-07"))
 
 
-def test_a_payload_with_no_adjustment_is_still_coherent():
+def test_a_leftover_expected_first_print_field_is_a_bug():
     d = _ok()
-    d["revision_adjustment"] = None
-    for h in d["horizons"]:
-        h.pop("expected_first_print_pct", None)
-    assert check_payload(d, today="2026-09-07") == []
+    d["horizons"][0]["expected_first_print_pct"] = 0.5
+    assert any("expected_first_print_pct" in p for p in check_payload(d, today="2026-09-07"))

@@ -12,6 +12,7 @@ def _ok(**over):
         "status": "ok",
         "data_through": "2026-07",
         "prev_level": {"quarter": "2026 Q1", "value": 695945},
+        "revision_adjustment": {"pp": 0.08},
         "horizons": [
             {"quarter": "2026 Q2", "kind": "nowcast", "months_with_data": 3},
             {"quarter": "2026 Q3", "kind": "forecast", "months_with_data": 1},
@@ -20,6 +21,15 @@ def _ok(**over):
                       "months_with_data": 3}],
     }
     d.update(over)
+    # Every horizon carries a companion figure consistent with the default
+    # revision_adjustment, whether it came from the base dict above or from a
+    # caller's own `horizons=[...]` override, so that tests overriding
+    # `horizons` for an unrelated reason don't also have to restate this.
+    pp = (d.get("revision_adjustment") or {}).get("pp")
+    if pp is not None:
+        for h in d.get("horizons") or []:
+            h.setdefault("qoq_growth_pct", 0.5)
+            h.setdefault("expected_first_print_pct", h["qoq_growth_pct"] - pp)
     return d
 
 
@@ -115,3 +125,25 @@ def test_a_data_less_forecast_vintage_is_still_rejected():
     bad = check_payload(d, today="2026-09")
     assert any("2026 Q3" in b and "should not have been recorded" in b
                for b in bad), bad
+
+
+def test_an_expected_first_print_that_disagrees_with_the_adjustment_is_a_bug():
+    d = _ok()
+    d["horizons"][0]["expected_first_print_pct"] = d["horizons"][0]["qoq_growth_pct"] + 1.0
+    assert any("expected_first_print_pct" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_an_implausible_adjustment_is_refused():
+    d = _ok()
+    d["revision_adjustment"]["pp"] = 0.9
+    for h in d["horizons"]:
+        h["expected_first_print_pct"] = h["qoq_growth_pct"] - 0.9
+    assert any("revision_adjustment" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_payload_with_no_adjustment_is_still_coherent():
+    d = _ok()
+    d["revision_adjustment"] = None
+    for h in d["horizons"]:
+        h.pop("expected_first_print_pct", None)
+    assert check_payload(d, today="2026-09-07") == []

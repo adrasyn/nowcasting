@@ -148,6 +148,7 @@ def nowcast_payload(
     n_burn: int,
     seed: int,
     months_with_data: list[int] | None = None,
+    revision=None,
 ) -> dict:
     """Assemble the emitted object from an already-run, already-guarded fit.
 
@@ -160,6 +161,12 @@ def nowcast_payload(
     three months carry an observation for any series. A forecast quarter with
     zero is the model's unconditional anchor and nothing else, so the site is
     given the number rather than left to infer it from ``data_through``.
+
+    ``revision`` is a ``first_release.RevisionEstimate`` or None. When given,
+    every horizon carries ``expected_first_print_pct``: the model's figure
+    less the ABS's average upward revision, which is what a reader should
+    compare with the first print on release day. The raw figure stays the
+    headline: it is what the bands and the evolution chart describe.
 
     This function does no estimation and no fetching. It is pure so that the
     emitted shape can be tested without a sampler run.
@@ -180,6 +187,8 @@ def nowcast_payload(
         entry = {"quarter": label, "kind": "nowcast" if k == 0 else "forecast",
                  "qoq_growth_pct": _pct(qoq),
                  "annualised_growth_pct": _pct(ann), **band}
+        if revision is not None:
+            entry["expected_first_print_pct"] = _pct(qoq - revision.pp)
         if months_with_data is not None and k < len(months_with_data):
             entry["months_with_data"] = int(months_with_data[k])
         rel = gdp_release_date(label)
@@ -211,6 +220,7 @@ def nowcast_payload(
         # is not worth a fabricated point.
         "vintages": vintages or [],
         "next_gdp_release_date": next_gdp_release_date,
+        "revision_adjustment": revision.as_dict() if revision is not None else None,
         "ci_basis": (
             "probability band: the 68%/95% mass of the model's posterior, from "
             f"{int(np.isfinite(draws).all(axis=1).sum())} density_nowcast draws on the same "

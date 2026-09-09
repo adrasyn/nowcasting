@@ -94,7 +94,8 @@ def test_a_refusal_carries_no_number_at_all():
     assert p["status"] == "refused"
     assert p["horizons"] == []
     assert "AiG PMI" in p["refusal_detail"]
-    for banned in ("qoq_growth_pct", "target_quarter", "prev_level", "panel"):
+    for banned in ("qoq_growth_pct", "target_quarter", "prev_level", "panel",
+                   "revision_adjustment", "expected_first_print_pct"):
         assert banned not in p, f"a refusal must not carry {banned}"
 
 
@@ -316,3 +317,47 @@ def test_the_release_date_rule_and_the_scraped_date_agree_on_the_month():
     assert pick("2026-09-02", "2026 Q3") == "2026-12-02"
     # No scraped date at all falls back to the rule.
     assert pick(None, "2026 Q3") == "2026-12-02"
+
+
+# --------------------------------------------------------------------------- #
+# The expected first print
+# --------------------------------------------------------------------------- #
+
+from nyfed.au.first_release import RevisionEstimate
+
+
+@pytest.fixture
+def panel_stub() -> Panel:
+    """The same panel the schema tests above build."""
+    return _panel()
+
+
+def _revision() -> RevisionEstimate:
+    return RevisionEstimate(pp=0.0834, n=40, first_quarter="2015Q2",
+                            last_quarter="2025Q1", window_quarters=40,
+                            min_age_quarters=4)
+
+
+def test_the_expected_first_print_is_the_nowcast_less_the_mean_revision(panel_stub):
+    """Build the payload exactly as the existing schema test does, plus `revision`."""
+    p = nowcast_payload(panel=panel_stub, horizons=[("2026 Q3", 2.0), ("2026 Q4", 2.4)],
+                        draws=np.full((30, 2), 2.0), prev_level=700000.0,
+                        prev_quarter="2026 Q2", generated_at="t", asof="2026-09-07",
+                        gdp_global_loading=1.4, collapse_floor=0.3,
+                        n_gs=10, n_burn=5, seed=4, revision=_revision())
+    for h in p["horizons"]:
+        assert h["expected_first_print_pct"] == pytest.approx(
+            h["qoq_growth_pct"] - 0.0834, abs=1e-4)
+    assert p["revision_adjustment"]["pp"] == 0.0834
+    assert p["revision_adjustment"]["n"] == 40
+    assert "basis" in p["revision_adjustment"]
+
+
+def test_without_a_revision_estimate_the_payload_carries_neither_field(panel_stub):
+    p = nowcast_payload(panel=panel_stub, horizons=[("2026 Q3", 2.0)],
+                        draws=np.full((30, 1), 2.0), prev_level=700000.0,
+                        prev_quarter="2026 Q2", generated_at="t", asof="2026-09-07",
+                        gdp_global_loading=1.4, collapse_floor=0.3,
+                        n_gs=10, n_burn=5, seed=4)
+    assert "expected_first_print_pct" not in p["horizons"][0]
+    assert p["revision_adjustment"] is None

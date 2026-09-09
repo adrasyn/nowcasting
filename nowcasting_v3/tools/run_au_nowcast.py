@@ -43,6 +43,7 @@ from nyfed.au.build import (
 )
 from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
                            nowcast_payload, refusal_payload)
+from nyfed.au.first_release import load_first_release, mean_revision
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
@@ -202,6 +203,19 @@ def main() -> int:
         return 0
 
     n_pad = pad_to_next_quarter(panel)
+    gdp = vintage.series["gdp"].dropna()
+    # THE ABS REVISES UP. The model predicts the latest vintage, because that is
+    # what it was trained on; the page is judged against the first print. The
+    # difference has averaged about +0.1pp a quarter for forty years, and the
+    # expected first print takes it off. A missing estimate is not fatal: the
+    # raw figure is still published, without the companion.
+    try:
+        revision = mean_revision(load_first_release(), gdp, asof=asof)
+        print(f"revision adjustment {revision.pp:+.3f}pp over {revision.n} quarters "
+              f"{revision.first_quarter}..{revision.last_quarter}", flush=True)
+    except (ValueError, FileNotFoundError) as exc:
+        print(f"no revision adjustment: {exc}", file=sys.stderr)
+        revision = None
     print(f"panel {panel.Y.shape[0]}x{panel.Y.shape[1]}, "
           f"{panel.dates[0].date()}..{panel.dates[-1].date()}"
           f"{f' (+{n_pad} forecast month(s))' if n_pad else ''}", flush=True)
@@ -287,6 +301,8 @@ def main() -> int:
             "run_date": asof, "target_quarter": lab,
             "kind": "nowcast" if k == 0 else "forecast",
             "qoq_growth_pct": round(float(annualised_to_qoq(ann[k])), 4),
+            "expected_first_print_pct": (round(float(annualised_to_qoq(ann[k])) - revision.pp, 4)
+                                         if revision else None),
             "ci_95_low": round(qk[0], 4), "ci_68_low": round(qk[1], 4),
             "ci_68_high": round(qk[2], 4), "ci_95_high": round(qk[3], 4),
             "data_through": dthru, "months_with_data": months[k],
@@ -338,6 +354,8 @@ def main() -> int:
                     "run_date": str(d0.date()), "target_quarter": lab,
                     "kind": "nowcast" if k == 0 else "forecast",
                     "qoq_growth_pct": round(pt_k, 4),
+                    "expected_first_print_pct": (round(pt_k - revision.pp, 4)
+                                                 if revision else None),
                     "ci_95_low": round(qb[0], 4), "ci_68_low": round(qb[1], 4),
                     "ci_68_high": round(qb[2], 4), "ci_95_high": round(qb[3], 4),
                     "data_through": str(pv_seen[-1].date())[:7],
@@ -378,7 +396,6 @@ def main() -> int:
                 print(f"  release date {fetched} is not in {labels[0]}'s release "
                       f"month; using the scheduling rule ({expected})", flush=True)
 
-    gdp = vintage.series["gdp"].dropna()
     payload = nowcast_payload(
         panel=panel, horizons=horizons, draws=draws,
         prev_level=float(gdp.iloc[-1]), prev_quarter=_quarter(gdp.index[-1]),
@@ -386,7 +403,7 @@ def main() -> int:
         generated_at=now, asof=asof, gdp_global_loading=loading,
         collapse_floor=COLLAPSED_GLOBAL_LOADING,
         n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED,
-        months_with_data=months)
+        months_with_data=months, revision=revision)
     payload["estimate"] = {"estimated_at": meta["estimated_at"],
                            "asof": meta["asof"], "age_days": age}
     write(payload)

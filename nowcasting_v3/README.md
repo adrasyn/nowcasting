@@ -868,9 +868,10 @@ follow, both measured in `docs/2026-09-09-unrevised-data-feasibility.md`:
   carries `qoq_first_print_pct` beside `qoq_actual_pct`, and
   `bias_first_print_pct` (+0.20pp at the time of writing) beside `bias_pct`
   (+0.12pp);
-- `latest_v3.json` carries `expected_first_print_pct` on each horizon: the
-  model's figure less `revision_adjustment.pp`, the mean revision over the last
-  40 quarters whose first print is at least four quarters old.
+- `latest_v3.json` publishes ONE nowcast, of the first print: `qoq_growth_pct`
+  on each horizon is the model's figure less `revision_adjustment.pp` (the mean
+  revision over the last 40 quarters whose first print is at least four quarters
+  old), and `model_qoq_growth_pct` carries the model's own figure beside it.
 
 First prints live in `data/gdp_first_release.csv` (1959Q4 onward: the RBA's
 RDP 2024-04 file to 2022Q2, the ABS vintage spreadsheets after). The weekly job

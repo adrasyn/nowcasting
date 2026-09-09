@@ -126,13 +126,18 @@ def test_record_keys_on_run_date_and_target_together(tmp_path, monkeypatch):
         {"run_date": "2026-08-31", "target_quarter": "2026 Q3",
          "kind": "forecast", "qoq_growth_pct": 0.78},
     ]
-    mine = _record(rows, ["2026 Q2", "2026 Q3"])
+    # A ZERO ADJUSTMENT, in this test and the four below it. `_record` now also
+    # migrates a v3-history-1 file onto the first-print basis, and these tests
+    # are about de-duplication and provenance rather than the basis: with pp=0
+    # the migration stamps the schema and shifts nothing, so the stored figures
+    # they assert stay exact. The migration itself is tested on its own below.
+    mine = _record(rows, ["2026 Q2", "2026 Q3"], 0.0)
     assert len(mine) == 2
     assert {r["target_quarter"] for r in mine} == {"2026 Q2", "2026 Q3"}
 
     # Re-running the same Monday corrects both rows rather than duplicating.
     rows[0]["qoq_growth_pct"] = 0.70
-    mine = _record(rows, ["2026 Q2", "2026 Q3"])
+    mine = _record(rows, ["2026 Q2", "2026 Q3"], 0.0)
     assert len(mine) == 2
     q2 = next(r for r in mine if r["target_quarter"] == "2026 Q2")
     assert q2["qoq_growth_pct"] == 0.70
@@ -152,7 +157,7 @@ def test_record_leaves_other_quarters_alone(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "HISTORY", hist)
 
     _record([{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
-              "kind": "nowcast", "qoq_growth_pct": 0.64}], ["2026 Q2"])
+              "kind": "nowcast", "qoq_growth_pct": 0.64}], ["2026 Q2"], 0.0)
     runs = json.loads(hist.read_text())["runs"]
     assert len(runs) == 2
     old = next(r for r in runs if r["target_quarter"] == "2026 Q1")
@@ -180,7 +185,7 @@ def test_a_backfilled_row_never_replaces_a_live_one(tmp_path, monkeypatch):
 
     _record([{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
               "kind": "nowcast", "qoq_growth_pct": 0.6362,
-              "backfilled": True}], ["2026 Q2"])
+              "backfilled": True}], ["2026 Q2"], 0.0)
     runs = json.loads(hist.read_text())["runs"]
     assert len(runs) == 1
     assert runs[0]["qoq_growth_pct"] == 0.6354, "the live figure must survive"
@@ -199,7 +204,7 @@ def test_a_backfilled_row_still_fills_a_gap(tmp_path, monkeypatch):
 
     _record([{"run_date": "2026-06-01", "target_quarter": "2026 Q2",
               "kind": "nowcast", "qoq_growth_pct": 0.63,
-              "backfilled": True}], ["2026 Q2"])
+              "backfilled": True}], ["2026 Q2"], 0.0)
     runs = json.loads(hist.read_text())["runs"]
     assert len(runs) == 1 and runs[0]["backfilled"] is True
 
@@ -221,9 +226,44 @@ def test_a_live_row_may_correct_an_earlier_live_row(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "HISTORY", hist)
 
     _record([{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
-              "kind": "nowcast", "qoq_growth_pct": 0.70}], ["2026 Q2"])
+              "kind": "nowcast", "qoq_growth_pct": 0.70}], ["2026 Q2"], 0.0)
     runs = json.loads(hist.read_text())["runs"]
     assert runs[0]["qoq_growth_pct"] == 0.70
+
+
+def test_record_migrates_an_old_history_file_to_the_first_print_basis(
+        tmp_path, monkeypatch):
+    """The standing record moves with the payload, on the next write.
+
+    Rows written before 2026-09-09 hold the MODEL's figure in `qoq_growth_pct`.
+    Left alone they would put two different quantities on one evolution chart,
+    and the step between them would read as news rather than as a change of
+    definition. They are shifted by TODAY's adjustment and marked
+    `adjusted_retroactively`, because the adjustment they would have carried on
+    the day was never computed.
+    """
+    import json
+
+    import run_au_nowcast as mod
+
+    hist = tmp_path / "history.json"
+    hist.write_text(json.dumps({"schema": "v3-history-1", "runs": [
+        {"run_date": "2026-08-31", "target_quarter": "2026 Q2",
+         "kind": "nowcast", "qoq_growth_pct": 0.6354,
+         "ci_68_low": 0.3, "ci_68_high": 0.9,
+         "ci_95_low": 0.0, "ci_95_high": 1.2}]}))
+    monkeypatch.setattr(mod, "HISTORY", hist)
+
+    _record([], ["2026 Q3"], 0.0989)
+
+    stored = json.loads(hist.read_text())
+    assert stored["schema"] == "v3-history-2"
+    row = stored["runs"][0]
+    assert row["model_qoq_growth_pct"] == 0.6354
+    assert row["qoq_growth_pct"] == pytest.approx(0.5365, abs=1e-4)
+    assert row["ci_68_low"] == pytest.approx(0.3 - 0.0989, abs=1e-4)
+    assert row["revision_adjustment_pp"] == 0.0989
+    assert row["adjusted_retroactively"] is True
 
 
 def test_the_track_record_scores_nowcast_rows_only():

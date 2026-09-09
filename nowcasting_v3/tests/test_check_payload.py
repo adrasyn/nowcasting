@@ -155,3 +155,10 @@ def test_a_leftover_expected_first_print_field_is_a_bug():
     d = _ok()
     d["horizons"][0]["expected_first_print_pct"] = 0.5
     assert any("expected_first_print_pct" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_payload_that_does_not_name_its_basis_is_incoherent():
+    """The arithmetic can be right and the label still missing."""
+    d = _ok()
+    del d["basis"]
+    assert any("basis" in p for p in check_payload(d, today="2026-09-07"))

@@ -128,8 +128,13 @@ def main() -> int:
     # losing the week its publish was the bigger harm. It is the headline now:
     # the whole table, and the nowcast it scores, are the first-print claim.
     # Falling back would publish latest-vintage errors under first-print
-    # labels, and nothing on the page would say so. So: fail, leave yesterday's
-    # file in place, and let the weekly log carry the reason.
+    # labels, and nothing on the page would say so. So: fail, write nothing,
+    # and let the weekly log carry the reason.
+    # FAILING HERE DOES NOT COST THE WEEK'S PUBLISH. The weekly workflow runs
+    # this step with `continue-on-error`, commits and deploys the nowcast, then
+    # fails the job in a step of its own. So a bad first-print file costs the
+    # track record a week — the table keeps the numbers it already had — and
+    # the nowcast still reaches the site.
     today = str(pd.Timestamp.now(tz="UTC").date())
     try:
         append_first_print(FIRST_RELEASE_CSV, gdp, asof=today)

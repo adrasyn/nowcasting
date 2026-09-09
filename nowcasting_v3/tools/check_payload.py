@@ -117,6 +117,14 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
                     bad.append(f"{h['quarter']}: qoq_growth_pct {h['qoq_growth_pct']!r} is not "
                                f"model_qoq_growth_pct - revision_adjustment.pp ({model!r} - {pp})")
 
+    # AND THE PAYLOAD HAS TO SAY WHICH FIGURE IT IS. `basis` is what the site
+    # reads to label the headline and the track record's actual column. An
+    # arithmetically correct first-print nowcast carrying no basis, or another
+    # one, is published under the wrong name.
+    if d.get("basis") != "abs_first_print":
+        bad.append(f"basis is {d.get('basis')!r}; the published figure is the "
+                   "first-print nowcast and must say so")
+
     # `data_through` names the last month carrying an observation. A month in
     # the future means the panel was padded into the payload, which is the bug
     # that had the page claiming August data while August was empty.

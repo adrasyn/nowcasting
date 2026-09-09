@@ -76,7 +76,16 @@ jobs:
       # prints a quarter this model called live, that quarter becomes a row.
       # Without this step the fix in `emit_backtest_json.py` would never run and
       # the table would sit at its backtested quarters forever.
+      #
+      # IT DOES NOT STOP THE JOB. `emit_backtest_json.py` exits 1 on a failed
+      # revision estimate or a missing first print, and a hard failure here would
+      # skip the payload check, the outcome report and the commit — so the week's
+      # nowcast, refusal payload included, would never reach the site and readers
+      # would see last week's number. The job still fails, in the step after the
+      # deploy is triggered.
       - name: Refresh the track record
+        id: track
+        continue-on-error: true
         run: python -u tools/emit_backtest_json.py
 
       # The failure handler below covers a step that THROWS. This covers a run
@@ -135,6 +144,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run deploy.yml --ref main
+
+      # A failed track-record refresh must still alert, but only after the
+      # week's nowcast has been committed and deployed: the publish is the
+      # thing a reader is waiting for, the table can be a week stale.
+      - name: Fail the job if the track record did not refresh
+        if: steps.track.outcome == 'failure'
+        run: |
+          echo "::error::emit_backtest_json.py failed; the nowcast was published, the track record was not refreshed"
+          exit 1
 
       - name: Alert on failure
         if: failure()

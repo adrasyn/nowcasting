@@ -63,6 +63,11 @@ export default function V3MethodologyPanel({ performance }: Props) {
                     `, and has run ${Math.abs(performance.bias_first_print_pct).toFixed(2)}pp low`}
                   . Against the latest revised figures the miss is {performance.mae_pct.toFixed(2)}pp
                   and the bias {performance.bias_pct > 0 ? "+" : ""}{performance.bias_pct.toFixed(2)}pp.
+                  {performance.bias_first_print_adjusted_pct != null && (
+                    Math.abs(performance.bias_first_print_adjusted_pct) <= 0.05
+                      ? ` After taking the average revision off, the remaining bias is within ${Math.abs(performance.bias_first_print_adjusted_pct).toFixed(2)}pp of zero.`
+                      : ` After taking the average revision off, it has still run ${performance.bias_first_print_adjusted_pct > 0 ? "+" : ""}${performance.bias_first_print_adjusted_pct.toFixed(2)}pp high.`
+                  )}
                 </>
               ) : (
                 <>

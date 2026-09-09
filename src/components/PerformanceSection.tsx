@@ -205,8 +205,14 @@ export default function PerformanceSection({
                 {e.qoq_actual_pct == null ? formatMillions(e.actual) : formatPct(e.qoq_actual_pct)}
               </td>
               {(() => {
-                const v = firstPrint && e.qoq_error_first_print_pp != null
-                  ? e.qoq_error_first_print_pp
+                // Under an "Error vs first (pp)" header, a latest-vintage error
+                // would be a different number wearing the same label. A quarter
+                // with no first print recorded shows an em dash instead.
+                if (firstPrint && e.qoq_error_first_print_pp == null) {
+                  return <td className="whitespace-nowrap py-2 pr-4 text-label">—</td>;
+                }
+                const v = firstPrint
+                  ? e.qoq_error_first_print_pp!
                   : (e.qoq_error_pp ?? e.error_pct);
                 return (
                   <td className={`whitespace-nowrap py-2 pr-4 ${v > 0 ? "text-teal" : "text-[#c0392b]"}`}>

@@ -142,24 +142,26 @@ export default function PerformanceSection({
           every column including the last -- exempting the last one left the
           rightmost value butting against the edge of the scroll box.
 
-          The min-width is 440px, not the 560px that first fitted the columns,
-          so that the sixth column is cut off mid-cell on a phone rather than
-          landing just past the edge. A clipped column is the only thing
-          telling a reader there is more to scroll to. Padding cannot do this
-          job: the table holds its minimum width regardless, so freed padding
-          is redistributed straight back into the columns -- dropping `pr-4`
-          to `pr-2` moves the sixth column six pixels. Measured at the three
-          common iPhone widths (343/361/398px of table box), 440px leaves
-          12/30/58px of that column showing. The cost is that four headers
-          wrap to two lines below 500px; at the width any real desktop gives
-          this table the minimum does not bind, so they stay on one line
-          there. The values carry `whitespace-nowrap` for the same reason in
-          reverse: at 440px "2025 Q4" broke across two lines and the rows lost
-          a common height. Headers may wrap; figures may not.
+          The min-width is 500px, deliberately below the width that fits every
+          column, so that the last column a phone can reach is cut off
+          mid-cell rather than landing just past the edge. A clipped column is
+          the only thing telling a reader there is more to scroll to. Padding
+          cannot do this job: the table holds its minimum width regardless, so
+          freed padding is redistributed straight back into the columns --
+          dropping `pr-4` to `pr-2` moved that column six pixels.
 
-          With the first-print column (v3) there are eight number columns;
-          500px keeps the seventh clipped mid-cell on a phone for the same
-          reason. */}
+          The minimum was 440px when the table had seven number columns:
+          measured at the three common iPhone widths (343/361/398px of table
+          box), 440px left 12/30/58px of the sixth column showing, at the cost
+          of four headers wrapping to two lines below 500px. The first-print
+          column (v3) made it eight columns, and 500px keeps the same rule --
+          the same clipped-column effect one column further along, and no
+          header wrapping at the minimum. That 500px position is the rule
+          applied, not a fresh measurement. At the width any real desktop
+          gives this table the minimum does not bind. The values carry
+          `whitespace-nowrap` for the same reason in reverse: at 440px "2025
+          Q4" broke across two lines and the rows lost a common height.
+          Headers may wrap; figures may not. */}
       <div className="overflow-x-auto">
       <table className="w-full min-w-[500px] text-xs border-collapse">
         <thead>

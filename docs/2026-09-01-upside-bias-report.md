@@ -277,6 +277,15 @@ is exactly what labour has been doing. The fix is applied to the target but not 
 
 ### Mechanism 4 — Data revisions *(small, and runs the other way)*
 
+> **Correction, 9 September 2026.** This mechanism was dismissed without being
+> measured, and the measurement disagrees. Scored against first prints, v3's
+> bias is **+0.20pp (t = 3.9)**, not +0.12 (t = 1.8); the ABS's mean revision
+> is +0.107pp/qtr over 1980-2022 and again over 2019-2026, positive in every
+> decade. The sign argument below is right (scoring against revised data makes
+> the measured error smaller) but "small" was wrong: revisions are about 40% of
+> the live bias. The productivity story covers the rest. See
+> `docs/2026-09-09-unrevised-data-feasibility.md`.
+
 Worth ruling out explicitly. Both backtests score against the **latest published** GDP, not the
 first print (`pipeline/04_emit_json.R:544`). ABS revisions are typically small and modestly
 upward — the 2024–25 annual figure was revised up 0.1pp.

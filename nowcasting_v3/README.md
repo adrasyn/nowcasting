@@ -857,6 +857,29 @@ payloads that were verified against published ABS and RBA releases, and
 caffeinate -i .venv/bin/python tools/record_au_vintage.py    # needs network
 ```
 
+### First prints and the revision adjustment
+
+The ABS revises quarterly GDP growth up by about 0.1pp on average, in every
+decade since 1980. The model is trained on the latest vintage, so it predicts
+the latest vintage; the site is judged against the first print. Two things
+follow, both measured in `docs/2026-09-09-unrevised-data-feasibility.md`:
+
+- the track record scores every quarter against both. `performance_v3.json`
+  carries `qoq_first_print_pct` beside `qoq_actual_pct`, and
+  `bias_first_print_pct` (+0.20pp at the time of writing) beside `bias_pct`
+  (+0.12pp);
+- `latest_v3.json` carries `expected_first_print_pct` on each horizon: the
+  model's figure less `revision_adjustment.pp`, the mean revision over the last
+  40 quarters whose first print is at least four quarters old.
+
+First prints live in `data/gdp_first_release.csv` (1959Q4 onward: the RBA's
+RDP 2024-04 file to 2022Q2, the ABS vintage spreadsheets after). The weekly job
+appends the newest quarter on the Monday after each print
+(`nyfed/au/first_release.append_first_print`), and refuses to once the print is
+80 days old, so a quarter the job missed must be filled by hand from that
+release's Key Aggregates spreadsheet at
+`https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product/<mon-yyyy>/5206001_Key_Aggregates.xlsx`.
+
 ## Measured timings
 
 Measured on this project's development machine: Apple Silicon macOS (arm64),

@@ -20,6 +20,10 @@ import pandas as pd
 
 from nyfed.au.build import fetch_vintage, load_vintage
 from nyfed.au.sources import AU_SERIES
+from nyfed.au.first_release import (
+    FIRST_RELEASE_CSV, append_first_print, load_first_release, mean_revision,
+    quarter_end_month,
+)
 
 def _published_gdp() -> pd.Series:
     """Every quarter of real GDP the ABS has actually printed.
@@ -79,6 +83,20 @@ def main() -> int:
     # means to a reader. Averaging a quarter's three vintages would flatter the
     # model by cancelling revisions within the quarter.
     gdp = _published_gdp()
+
+    # THE FIRST PRINT IS RECORDED HERE, ON THE MONDAY AFTER THE PRINT. This is
+    # the one step in the weekly job that already holds live GDP, and the
+    # newest quarter in a live fetch is its first print until the next
+    # quarterly release. Refused once the print is old enough to have been
+    # revised; see `first_release.append_first_print`.
+    today = str(pd.Timestamp.now(tz="UTC").date())
+    append_first_print(FIRST_RELEASE_CSV, gdp, asof=today)
+    first = load_first_release()
+    try:
+        revision = mean_revision(first, gdp, asof=today)
+    except ValueError as exc:
+        print(f"::warning::no revision estimate: {exc}", flush=True)
+        revision = None
 
     # WHAT THE MODEL ACTUALLY SAID AT THE TIME, where it was running. Every row
     # in the backtest is a re-run over data that was already known, which is the
@@ -158,6 +176,8 @@ def main() -> int:
         nowcast_qq = (published["qoq_growth_pct"] if published
                       else float(r.nowcast_qq))
         nowcast_lvl = lvl * (1 + nowcast_qq / 100)
+        fp = first.get(quarter_end_month(r.target))
+        fp = None if fp is None or not np.isfinite(fp) else round(float(fp), 4)
 
         # Year-ended: this quarter's level against the level four quarters back.
         back = gdp[gdp.index < r.target_date]
@@ -180,6 +200,12 @@ def main() -> int:
             "qoq_nowcast_pct": round(nowcast_qq, 2),
             "qoq_actual_pct": round(float(r.actual_qq), 2),
             "qoq_error_pp": round(nowcast_qq - float(r.actual_qq), 2),
+            # THE NUMBER THE MODEL WAS TRYING TO BEAT ON THE DAY. `qoq_actual_pct`
+            # is the latest vintage, which the ABS has revised up by ~0.1pp per
+            # quarter on average, so an error against it understates what a
+            # reader saw on print day.
+            "qoq_first_print_pct": fp,
+            "qoq_error_first_print_pp": (round(nowcast_qq - fp, 2) if fp is not None else None),
             "is_live": bool(published),
             "live_run_date": published["run_date"] if published else None,
             "yoy_nowcast": yoy_nc, "yoy_actual": yoy_ac, "yoy_rba": yoy_rba,
@@ -193,11 +219,26 @@ def main() -> int:
          "rba_err": abs(x["yoy_rba"] - x["yoy_actual"]),
          "edge": x["edge_pp"]}
         for x in errors if x["edge_pp"] is not None])
+    fp_rows = e.dropna(subset=["qoq_first_print_pct"])
+    fp_err = fp_rows["qoq_nowcast_pct"].astype(float) - fp_rows["qoq_first_print_pct"].astype(float)
+    adj = revision.pp if revision else None
     perf = {
         "mae_millions": round(float(e.error_millions.abs().mean())),
         "mae_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
         "bias_millions": round(float(e.error_millions.mean())),
         "bias_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).mean()), 2),
+        # Against the ABS's FIRST print of each quarter. This is the honest
+        # number for a live product and it is larger than `bias_pct`: the
+        # feasibility note measured +0.20pp against +0.12pp.
+        "n_first_print": int(len(fp_rows)),
+        "mae_first_print_pct": round(float(fp_err.abs().mean()), 2) if len(fp_rows) else None,
+        "bias_first_print_pct": round(float(fp_err.mean()), 2) if len(fp_rows) else None,
+        # The adjustment the headline subtracts today, and the bias that would
+        # have remained had it been subtracted from every row. TODAY's
+        # adjustment, not each vintage's: an honest approximation, labelled.
+        "revision_adjustment_pp": adj,
+        "bias_first_print_adjusted_pct": (round(float(fp_err.mean()) - adj, 2)
+                                          if len(fp_rows) and adj is not None else None),
         # A MEAN SIGNED GAP IS NOT A LEGIBLE ACCURACY CLAIM. "-0.05pp average
         # edge" tells a reader almost nothing: it hides how big either
         # forecaster's misses were, and one large error in each direction
@@ -221,6 +262,9 @@ def main() -> int:
     perf_path.write_text(json.dumps(perf, indent=2) + "\n")
     print(f"wrote {perf_path}  ({len(errors)} quarters, "
           f"MAE {perf['mae_pct']}pp, bias {perf['bias_pct']}pp)")
+    print(f"  against first prints: MAE {perf['mae_first_print_pct']}pp, bias "
+          f"{perf['bias_first_print_pct']}pp; adjustment {adj}pp -> "
+          f"{perf['bias_first_print_adjusted_pct']}pp", flush=True)
     # THE v2 HEAD-TO-HEAD IS OPTIONAL, AND IT HAS TO BE. v2's backtest lives in
     # `nowcasting_v2/cache/`, which is GITIGNORED — a cache regenerated by v2's
     # own R pipeline, absent on a CI runner. The first weekly run carrying this
@@ -243,6 +287,8 @@ def main() -> int:
         rows.append({
             "asof": str(r["asof"].date()), "target": r["target"],
             "actual": round(float(r["actual_qq"]), 4),
+            "first_print": (round(float(first.get(quarter_end_month(r["target"]), np.nan)), 4)
+                            if quarter_end_month(r["target"]) in first.index else None),
             "v3": round(float(r["nowcast_qq"]), 4),
             "v2": round(float(c.iloc[-1]["qoq_growth_forecast"]), 4) if len(c) else None,
         })
@@ -251,10 +297,14 @@ def main() -> int:
     def score(col: str) -> dict:
         e = p[col] - p["actual"]
         r2 = float(np.corrcoef(p[col], p["actual"])[0, 1] ** 2)
+        fp = p.dropna(subset=["first_print"])
+        e_fp = fp[col] - fp["first_print"]
         return {
             "mae": round(float(e.abs().mean()), 4),
             "rmse": round(float(np.sqrt((e ** 2).mean())), 4),
             "bias": round(float(e.mean()), 4),
+            "mae_first_print": round(float(e_fp.abs().mean()), 4) if len(fp) else None,
+            "bias_first_print": round(float(e_fp.mean()), 4) if len(fp) else None,
             "r_squared": round(r2, 4),
             # An honest conditional mean varies at sqrt(R^2) of the outcome's
             # spread. More than that is confidence the model has not earned.
@@ -263,7 +313,8 @@ def main() -> int:
         }
 
     gdp_q = p.groupby("target").agg(
-        actual=("actual", "first"), v3=("v3", "mean"), v2=("v2", "mean"),
+        actual=("actual", "first"), first_print=("first_print", "first"),
+        v3=("v3", "mean"), v2=("v2", "mean"),
         n=("v3", "size")).reset_index()
 
     payload = {
@@ -275,13 +326,20 @@ def main() -> int:
         "scores": {"v3": score("v3"), "v2": score("v2")},
         "by_quarter": [
             {"target": r.target, "actual": round(r.actual, 4),
+             "first_print": (round(r.first_print, 4) if pd.notna(r.first_print) else None),
              "v3": round(r.v3, 4), "v2": round(r.v2, 4), "n_vintages": int(r.n)}
             for r in gdp_q.itertuples()],
         "notes": {
             "pseudo_real_time": (
-                "Both models see REVISED data and are scored against revised "
-                "outcomes. That flatters both, comparably. A first-print "
-                "backtest does not exist for either."),
+                "Both models see REVISED panel data. `actual` is the latest "
+                "vintage; `first_print` is what the ABS printed first, which "
+                "is the number a reader saw on the day. The ABS revises "
+                "quarterly growth up by about 0.1pp on average, so the "
+                "first-print bias is the larger and the honest one. Panel "
+                "revisions are not replayed (employment first prints run "
+                "~0.07pp/qtr stronger than the revised series, which adds to "
+                "the live bias by a few hundredths). See "
+                "docs/2026-09-09-unrevised-data-feasibility.md."),
             "window_start": (
                 "Starts 2023. The COVID factor runs to December 2021, so a 2022 "
                 "vintage sits on its edge and v3 runs a quarter behind through "

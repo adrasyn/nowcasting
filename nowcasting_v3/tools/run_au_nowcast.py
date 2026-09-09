@@ -213,7 +213,11 @@ def main() -> int:
         revision = mean_revision(load_first_release(), gdp, asof=asof)
         print(f"revision adjustment {revision.pp:+.3f}pp over {revision.n} quarters "
               f"{revision.first_quarter}..{revision.last_quarter}", flush=True)
-    except (ValueError, FileNotFoundError) as exc:
+    # ANY failure, not just the two anticipated ones. The file is hand-edited
+    # when a quarter is missed, so a bad edit surfaces as a KeyError or a
+    # ParserError just as easily as a ValueError — and killing the runner here
+    # would write no payload at all, not even a refusal.
+    except Exception as exc:  # noqa: BLE001
         print(f"no revision adjustment: {exc}", file=sys.stderr)
         revision = None
     print(f"panel {panel.Y.shape[0]}x{panel.Y.shape[1]}, "

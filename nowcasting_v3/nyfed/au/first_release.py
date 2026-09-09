@@ -67,6 +67,17 @@ def load_first_release(path: str | Path = FIRST_RELEASE_CSV) -> pd.Series:
                   name="first_release_qoq")
     if not s.index.is_monotonic_increasing:
         raise ValueError(f"{path}: quarters are not in order")
+    # A GAP MUST DEGRADE VISIBLY, NOT KILL THE JOB. A missed quarter is filled
+    # by hand and until it is, the revision mean is computed over fewer
+    # quarters than the window says. That is a degraded figure, not a wrong
+    # one, so this warns rather than raises: the weekly log is where anyone
+    # would notice, and refusing to load would cost the publish.
+    if len(s) > 1:
+        expected = pd.date_range(s.index[0], s.index[-1], freq="3MS")
+        gaps = expected.difference(s.index)
+        if len(gaps):
+            print(f"::warning::{path}: missing quarters "
+                  f"{[quarter_label(g) for g in gaps]}", flush=True)
     return s
 
 

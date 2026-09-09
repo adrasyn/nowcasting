@@ -45,6 +45,16 @@ def test_load_first_release_refuses_duplicates(tmp_path):
         load_first_release(p)
 
 
+def test_load_first_release_warns_about_a_gap_but_still_loads(tmp_path, capsys):
+    p = tmp_path / "f.csv"
+    p.write_text("quarter,qoq_pct,release_date,source\n"
+                 "2020Q1,0.1,,x\n2020Q3,0.3,,x\n2020Q4,0.4,,x\n")
+    s = load_first_release(p)
+    assert len(s) == 3
+    out = capsys.readouterr().out
+    assert "::warning::" in out and "2020Q2" in out
+
+
 def test_latest_qoq_is_percent_growth():
     lv = _levels("2020Q1", [1.0, -0.5])
     g = latest_qoq(lv)

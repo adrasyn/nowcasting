@@ -9,6 +9,31 @@ it. Re-run it when either CSV changes.
 
 The v2 file is the shipping configuration, not the `_leaky` diagnostic beside
 it -- see `tools/compare_v3_v2.py`.
+
+THE BASIS: `abs_first_print`. The site publishes ONE nowcast, of the number the
+ABS will print FIRST -- the model's estimate less the mean revision
+(`revision_adjustment_pp`, about 0.10pp; see `nyfed.au.first_release`). A track
+record has to score that same claim against that same target, so every row here
+is the first-print nowcast against the ABS's first print:
+
+  qoq_nowcast_pct        what was (or would have been) published
+                         backtest rows: the backtest median less today's
+                         adjustment; live rows: the history row's figure, which
+                         is already on this basis
+  qoq_model_nowcast_pct  the model's own figure, before the adjustment
+  qoq_actual_pct         the ABS's FIRST print of the quarter
+  qoq_error_pp           nowcast minus first print -- the only error shown
+  qoq_latest_vintage_pct the revised figure, reference only
+
+The model-against-latest-vintage pair (`model_bias_vs_latest_pct`,
+`model_mae_vs_latest_pct`) survives at the top level for the methodology fine
+print, because that is the number the backtest was originally measured on and
+the one an earlier version of this page reported. It is not the headline.
+
+The first print is therefore REQUIRED. If the first-release file or the
+revision estimate is unusable this returns 1 without writing: a track record on
+the wrong basis is worse than a stale one, because nothing on the page would
+say which basis it is on.
 """
 from __future__ import annotations
 
@@ -19,6 +44,7 @@ import numpy as np
 import pandas as pd
 
 from nyfed.au.build import fetch_vintage, load_vintage
+from nyfed.au.emit import migrate_history_runs
 from nyfed.au.sources import AU_SERIES
 from nyfed.au.first_release import (
     FIRST_RELEASE_CSV, append_first_print, load_first_release, mean_revision,
@@ -91,25 +117,37 @@ def main() -> int:
     # revised; see `first_release.append_first_print`.
     # THE FILE IS HAND-EDITABLE, so it can be hand-broken: a missed quarter is
     # filled in by hand from the Key Aggregates spreadsheet, and a bad edit
-    # would otherwise raise out of the weekly "Refresh the track record" step
-    # and cost the week its publish. First-print scoring is the companion
-    # figure, not the headline — losing it degrades the page, losing the
-    # publish loses everything. So: warn loudly, score against the latest
-    # vintage alone, and carry on.
+    # would otherwise raise out of the weekly "Refresh the track record" step.
+    # A BAD EDIT NOW STOPS THIS SCRIPT. It used to warn and fall back to the
+    # latest vintage, because first-print scoring was a companion figure and
+    # losing the week its publish was the bigger harm. It is the headline now:
+    # the whole table, and the nowcast it scores, are the first-print claim.
+    # Falling back would publish latest-vintage errors under first-print
+    # labels, and nothing on the page would say so. So: fail, leave yesterday's
+    # file in place, and let the weekly log carry the reason.
     today = str(pd.Timestamp.now(tz="UTC").date())
     try:
         append_first_print(FIRST_RELEASE_CSV, gdp, asof=today)
         first = load_first_release()
-        try:
-            revision = mean_revision(first, gdp, asof=today)
-        except ValueError as exc:
-            print(f"::warning::no revision estimate: {exc}", flush=True)
-            revision = None
     except Exception as exc:  # noqa: BLE001
-        print(f"::warning::first-print file unusable ({type(exc).__name__}: "
-              f"{exc}); scoring against the latest vintage only", flush=True)
-        first = pd.Series(dtype=float)
-        revision = None
+        print(f"::error::first-print file unusable ({type(exc).__name__}: "
+              f"{exc}); the track record cannot be built on the published "
+              "basis, nothing written", flush=True)
+        return 1
+    try:
+        revision = mean_revision(first, gdp, asof=today)
+    except ValueError as exc:
+        print(f"::error::no revision estimate ({exc}); the track record cannot "
+              "be built on the published basis, nothing written", flush=True)
+        return 1
+    # The adjustment the published nowcast subtracts TODAY. Backtest rows, and
+    # history rows written before the basis changed, are shifted by this one
+    # number rather than by the adjustment that stood on their own day, which
+    # was never computed. An honest approximation, and every row it touches
+    # says so through `adjusted_retroactively`.
+    pp = revision.pp
+    print(f"  revision adjustment: {pp:+.4f}pp over {revision.n} quarters "
+          f"({revision.first_quarter}..{revision.last_quarter})", flush=True)
 
     # WHAT THE MODEL ACTUALLY SAID AT THE TIME, where it was running. Every row
     # in the backtest is a re-run over data that was already known, which is the
@@ -117,10 +155,20 @@ def main() -> int:
     # because the author chose the window. A live call can. As quarters complete
     # with `nowcast_history_v3.json` behind them, their rows are replaced by what
     # was published before the ABS printed, and flagged so the table can say so.
+    #
+    # A HISTORY ROW MAY PREDATE THE BASIS CHANGE. Rows written from 2026-09-09
+    # carry the first-print nowcast in `qoq_growth_pct` and the model's figure
+    # in `model_qoq_growth_pct`; older rows hold the model's figure in
+    # `qoq_growth_pct` and nothing else. `migrate_history_runs` is that exact
+    # rule -- subtract today's adjustment, flag `adjusted_retroactively` -- and
+    # is the same function the weekly job uses on the file itself, so the table
+    # cannot disagree with the file about what was published. Reading, not
+    # writing: the committed file is migrated in place by the weekly job.
     live: dict[str, dict] = {}
     hist_path = ROOT / "data" / "nowcast_history_v3.json"
     if hist_path.is_file():
-        for r in json.loads(hist_path.read_text())["runs"]:
+        for r in migrate_history_runs(
+                json.loads(hist_path.read_text())["runs"], pp):
             # The LAST run before the print is the model's final word on that
             # quarter and the only one worth scoring. A backfilled row was never
             # published, so it cannot stand as a live call.
@@ -168,13 +216,16 @@ def main() -> int:
         if prev.empty:
             continue
         actual_qq = 100 * (float(gdp[tgt]) / float(prev.iloc[-1]) - 1)
+        # `nowcast_qq` is the MODEL's figure in every row of `last`, backtest
+        # and live alike; the adjustment is applied once, in the loop below.
         last = pd.concat([last, pd.DataFrame([{
             "asof": r["run_date"], "target": key, "target_date": tgt,
             "actual_qq": round(actual_qq, 4),
-            "nowcast_qq": r["qoq_growth_pct"],
+            "nowcast_qq": r["model_qoq_growth_pct"],
         }])], ignore_index=True)
         print(f"  + {q}: live nowcast {r['qoq_growth_pct']:+.2f}% "
-              f"against actual {actual_qq:+.2f}%")
+              f"(model {r['model_qoq_growth_pct']:+.2f}%) "
+              f"against latest vintage {actual_qq:+.2f}%")
     last = last.sort_values("target_date")
 
     errors = []
@@ -182,15 +233,31 @@ def main() -> int:
         label = r.target.replace("Q", " Q")
         published = live.get(label)
         lvl = float(gdp[gdp.index < r.target_date].iloc[-1])
-        actual_lvl = lvl * (1 + r.actual_qq / 100)
         # A live figure supersedes the backtest for its quarter. Reporting a
         # backtested number for a quarter the model actually called would be
         # quietly flattering: the backtest sees the whole sample.
-        nowcast_qq = (published["qoq_growth_pct"] if published
-                      else float(r.nowcast_qq))
+        #
+        # A live row is already on the published basis (migrated above, so this
+        # holds for old rows too). A backtest row is the model's median and has
+        # to have today's adjustment taken off it, which is what a reader would
+        # have seen had the site existed then.
+        model_qq = (published["model_qoq_growth_pct"] if published
+                    else float(r.nowcast_qq))
+        nowcast_qq = published["qoq_growth_pct"] if published else model_qq - pp
         nowcast_lvl = lvl * (1 + nowcast_qq / 100)
+        # THE TARGET. Every scored quarter must have a first print: the table
+        # claims one basis and a row without one could only be on the other.
+        # A gap is a data problem to fix in `data/gdp_first_release.csv`, not
+        # a row to quietly score differently.
         fp = first.get(quarter_end_month(r.target))
-        fp = None if fp is None or not np.isfinite(fp) else round(float(fp), 4)
+        if fp is None or not np.isfinite(fp):
+            raise ValueError(
+                f"{label} has no ABS first print in {FIRST_RELEASE_CSV.name}; "
+                "fill it from that release's Key Aggregates spreadsheet")
+        fp = round(float(fp), 4)
+        actual_qq = fp
+        latest_qq = float(r.actual_qq)
+        actual_lvl = lvl * (1 + fp / 100)
 
         # Year-ended: this quarter's level against the level four quarters back.
         back = gdp[gdp.index < r.target_date]
@@ -211,14 +278,19 @@ def main() -> int:
             "error_millions": round(nowcast_lvl - actual_lvl),
             "error_pct": round(100 * (nowcast_lvl - actual_lvl) / actual_lvl, 3),
             "qoq_nowcast_pct": round(nowcast_qq, 2),
-            "qoq_actual_pct": round(float(r.actual_qq), 2),
-            "qoq_error_pp": round(nowcast_qq - float(r.actual_qq), 2),
-            # THE NUMBER THE MODEL WAS TRYING TO BEAT ON THE DAY. `qoq_actual_pct`
-            # is the latest vintage, which the ABS has revised up by ~0.1pp per
-            # quarter on average, so an error against it understates what a
-            # reader saw on print day.
-            "qoq_first_print_pct": fp,
-            "qoq_error_first_print_pp": (round(nowcast_qq - fp, 2) if fp is not None else None),
+            "qoq_model_nowcast_pct": round(model_qq, 2),
+            "qoq_actual_pct": round(actual_qq, 2),
+            "qoq_error_pp": round(nowcast_qq - actual_qq, 2),
+            # REFERENCE ONLY, and it is the smaller error. The ABS has revised
+            # quarterly growth UP by about 0.1pp on average, so a model that
+            # runs high looks better against the revised figure than against
+            # the one a reader saw on print day. The page is scored on the
+            # latter; this column is here so the two can be compared.
+            "qoq_latest_vintage_pct": round(latest_qq, 2),
+            # True where the figure was published on the old basis and shifted
+            # afterwards, rather than published as it now stands.
+            "adjusted_retroactively": bool(
+                published and published.get("adjusted_retroactively")),
             "is_live": bool(published),
             "live_run_date": published["run_date"] if published else None,
             "yoy_nowcast": yoy_nc, "yoy_actual": yoy_ac, "yoy_rba": yoy_rba,
@@ -232,26 +304,28 @@ def main() -> int:
          "rba_err": abs(x["yoy_rba"] - x["yoy_actual"]),
          "edge": x["edge_pp"]}
         for x in errors if x["edge_pp"] is not None])
-    fp_rows = e.dropna(subset=["qoq_first_print_pct"])
-    fp_err = fp_rows["qoq_nowcast_pct"].astype(float) - fp_rows["qoq_first_print_pct"].astype(float)
-    adj = revision.pp if revision else None
+    err = e.qoq_nowcast_pct - e.qoq_actual_pct
+    model_err = e.qoq_model_nowcast_pct - e.qoq_latest_vintage_pct
     perf = {
+        # WHAT THESE NUMBERS SCORE, in one string the page can quote. Every
+        # aggregate below without `model_` in its name is the published
+        # first-print nowcast against the ABS's first print.
+        "basis": "abs_first_print",
+        "n": int(len(errors)),
         "mae_millions": round(float(e.error_millions.abs().mean())),
-        "mae_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
+        "mae_pct": round(float(err.abs().mean()), 2),
         "bias_millions": round(float(e.error_millions.mean())),
-        "bias_pct": round(float((e.qoq_nowcast_pct - e.qoq_actual_pct).mean()), 2),
-        # Against the ABS's FIRST print of each quarter. This is the honest
-        # number for a live product and it is larger than `bias_pct`: the
-        # feasibility note measured +0.20pp against +0.12pp.
-        "n_first_print": int(len(fp_rows)),
-        "mae_first_print_pct": round(float(fp_err.abs().mean()), 2) if len(fp_rows) else None,
-        "bias_first_print_pct": round(float(fp_err.mean()), 2) if len(fp_rows) else None,
-        # The adjustment the headline subtracts today, and the bias that would
-        # have remained had it been subtracted from every row. TODAY's
-        # adjustment, not each vintage's: an honest approximation, labelled.
-        "revision_adjustment_pp": adj,
-        "bias_first_print_adjusted_pct": (round(float(fp_err.mean()) - adj, 2)
-                                          if len(fp_rows) and adj is not None else None),
+        "bias_pct": round(float(err.mean()), 2),
+        # The adjustment the published nowcast subtracts, and applied here to
+        # every backtest row. TODAY's adjustment, not each vintage's.
+        "revision_adjustment_pp": pp,
+        # THE FINE PRINT, not the headline: the model's own figure against the
+        # latest vintage, which is what the backtest measured and what this
+        # page used to report. It is the flattering pair -- the ABS revises up
+        # and the model runs high -- and it is kept so the methodology note can
+        # show the gap the adjustment closes.
+        "model_bias_vs_latest_pct": round(float(model_err.mean()), 2),
+        "model_mae_vs_latest_pct": round(float(model_err.abs().mean()), 2),
         # A MEAN SIGNED GAP IS NOT A LEGIBLE ACCURACY CLAIM. "-0.05pp average
         # edge" tells a reader almost nothing: it hides how big either
         # forecaster's misses were, and one large error in each direction
@@ -273,12 +347,13 @@ def main() -> int:
     }
     perf_path = ROOT / "data" / "performance_v3.json"
     perf_path.write_text(json.dumps(perf, indent=2) + "\n")
-    print(f"wrote {perf_path}  ({len(errors)} quarters, "
-          f"MAE {perf['mae_pct']}pp, bias {perf['bias_pct']}pp)")
-    print(f"  against first prints: MAE {perf['mae_first_print_pct']}pp, bias "
-          f"{perf['bias_first_print_pct']}pp; "
-          + (f"adjustment {adj}pp -> {perf['bias_first_print_adjusted_pct']}pp"
-             if adj is not None else "adjustment unavailable"), flush=True)
+    print(f"wrote {perf_path}  ({len(errors)} quarters on the "
+          f"{perf['basis']} basis, MAE {perf['mae_pct']}pp, bias "
+          f"{perf['bias_pct']}pp)")
+    print(f"  fine print: the model vs the latest vintage, MAE "
+          f"{perf['model_mae_vs_latest_pct']}pp, bias "
+          f"{perf['model_bias_vs_latest_pct']}pp; adjustment {pp}pp",
+          flush=True)
     # THE v2 HEAD-TO-HEAD IS OPTIONAL, AND IT HAS TO BE. v2's backtest lives in
     # `nowcasting_v2/cache/`, which is GITIGNORED — a cache regenerated by v2's
     # own R pipeline, absent on a CI runner. The first weekly run carrying this
@@ -303,32 +378,43 @@ def main() -> int:
             "actual": round(float(r["actual_qq"]), 4),
             "first_print": (round(float(first.get(quarter_end_month(r["target"]), np.nan)), 4)
                             if quarter_end_month(r["target"]) in first.index else None),
-            "v3": round(float(r["nowcast_qq"]), 4),
+            # `v3` is the published claim, the model less the adjustment;
+            # `v3_model` is the raw median, which is what v2's column is.
+            "v3": round(float(r["nowcast_qq"]) - pp, 4),
+            "v3_model": round(float(r["nowcast_qq"]), 4),
             "v2": round(float(c.iloc[-1]["qoq_growth_forecast"]), 4) if len(c) else None,
         })
     p = pd.DataFrame(rows).dropna(subset=["v2"])
 
-    def score(col: str) -> dict:
-        e = p[col] - p["actual"]
-        r2 = float(np.corrcoef(p[col], p["actual"])[0, 1] ** 2)
-        fp = p.dropna(subset=["first_print"])
-        e_fp = fp[col] - fp["first_print"]
+    def score(col: str, target: str) -> dict:
+        """One model column against one target column.
+
+        SCORED AGAINST WHAT IT CLAIMS TO PREDICT. `v3` is the first-print
+        nowcast, so it gets `first_print` and nothing else -- its error against
+        the latest vintage would be measuring a figure it never claimed. The
+        two latest-vintage estimates, `v3_model` and `v2`, get both targets, so
+        the adjustment's effect is legible as a difference between blocks
+        rather than hidden inside one.
+        """
+        q = p.dropna(subset=[col, target])
+        e = q[col] - q[target]
+        r2 = float(np.corrcoef(q[col], q[target])[0, 1] ** 2)
         return {
+            "target": target,
+            "n_vintages": int(len(q)),
             "mae": round(float(e.abs().mean()), 4),
             "rmse": round(float(np.sqrt((e ** 2).mean())), 4),
             "bias": round(float(e.mean()), 4),
-            "mae_first_print": round(float(e_fp.abs().mean()), 4) if len(fp) else None,
-            "bias_first_print": round(float(e_fp.mean()), 4) if len(fp) else None,
             "r_squared": round(r2, 4),
             # An honest conditional mean varies at sqrt(R^2) of the outcome's
             # spread. More than that is confidence the model has not earned.
-            "dispersion_ratio": round(float(p[col].std() / p["actual"].std()), 4),
+            "dispersion_ratio": round(float(q[col].std() / q[target].std()), 4),
             "calibrated_ratio": round(float(np.sqrt(r2)), 4),
         }
 
     gdp_q = p.groupby("target").agg(
         actual=("actual", "first"), first_print=("first_print", "first"),
-        v3=("v3", "mean"), v2=("v2", "mean"),
+        v3=("v3", "mean"), v3_model=("v3_model", "mean"), v2=("v2", "mean"),
         n=("v3", "size")).reset_index()
 
     payload = {
@@ -337,13 +423,28 @@ def main() -> int:
                    "last_target": p["target"].iloc[-1],
                    "n_vintages": int(len(p)),
                    "n_quarters": int(p["target"].nunique())},
-        "scores": {"v3": score("v3"), "v2": score("v2")},
+        "scores": {
+            "v3": score("v3", "first_print"),
+            "v3_model": score("v3_model", "actual"),
+            "v3_model_vs_first_print": score("v3_model", "first_print"),
+            "v2": score("v2", "actual"),
+            "v2_vs_first_print": score("v2", "first_print"),
+        },
         "by_quarter": [
             {"target": r.target, "actual": round(r.actual, 4),
              "first_print": (round(r.first_print, 4) if pd.notna(r.first_print) else None),
-             "v3": round(r.v3, 4), "v2": round(r.v2, 4), "n_vintages": int(r.n)}
+             "v3": round(r.v3, 4), "v3_model": round(r.v3_model, 4),
+             "v2": round(r.v2, 4), "n_vintages": int(r.n)}
             for r in gdp_q.itertuples()],
         "notes": {
+            "basis": (
+                "`v3` is the PUBLISHED nowcast: the model's median less the "
+                f"mean revision ({pp:+.4f}pp today), which is the site's "
+                "estimate of the number the ABS will print FIRST. It is "
+                "scored against `first_print` alone. `v3_model` is the same "
+                "median before the adjustment and `v2` is v2's estimate; both "
+                "target the latest vintage, so both are scored against "
+                "`actual` and against `first_print`."),
             "pseudo_real_time": (
                 "Both models see REVISED panel data. `actual` is the latest "
                 "vintage; `first_print` is what the ABS printed first, which "
@@ -368,9 +469,9 @@ def main() -> int:
     OUT.write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {OUT}")
     for k, v in payload["scores"].items():
-        print(f"  {k}: MAE {v['mae']}  R2 {v['r_squared']:.1%}  "
-              f"varies at {v['dispersion_ratio']} vs calibrated "
-              f"{v['calibrated_ratio']}")
+        print(f"  {k} vs {v['target']}: MAE {v['mae']}  bias {v['bias']}  "
+              f"R2 {v['r_squared']:.1%}  varies at {v['dispersion_ratio']} vs "
+              f"calibrated {v['calibrated_ratio']}")
 
     return 0
 

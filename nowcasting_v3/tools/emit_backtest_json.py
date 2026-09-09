@@ -25,6 +25,11 @@ is the first-print nowcast against the ABS's first print:
   qoq_error_pp           nowcast minus first print -- the only error shown
   qoq_latest_vintage_pct the revised figure, reference only
 
+`yoy_actual` and `yoy_nowcast` are year-ended growth on the latest-vintage level
+path chained to this quarter's first print (a first-print level four quarters
+back does not exist within one vintage), so the RBA comparison is on that hybrid
+basis too.
+
 The model-against-latest-vintage pair (`model_bias_vs_latest_pct`,
 `model_mae_vs_latest_pct`) survives at the top level for the methodology fine
 print, because that is the number the backtest was originally measured on and
@@ -260,6 +265,11 @@ def main() -> int:
         actual_lvl = lvl * (1 + fp / 100)
 
         # Year-ended: this quarter's level against the level four quarters back.
+        # A HYBRID BASIS, and it has to be: `base` is three quarters of the
+        # LATEST vintage's level path, chained to this quarter's first print
+        # through `actual_lvl`, because a first-print level four quarters back
+        # does not exist within one vintage. `edge_pp` and the RBA comparison
+        # below inherit it.
         back = gdp[gdp.index < r.target_date]
         yoy_nc = yoy_ac = yoy_rba = edge = release = None
         if len(back) >= 4:

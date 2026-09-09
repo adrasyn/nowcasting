@@ -84,7 +84,9 @@ export default function PerformanceSection({
         <Tile
           label="Bias"
           value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}
-          sub={`${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
+          sub={tileBasis
+            ? `${tileBasis} · ${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`
+            : `${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
         />
         {showRbaTile &&
           (rba.ours_mae != null && rba.rba_mae != null ? (

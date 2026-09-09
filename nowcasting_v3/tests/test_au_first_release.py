@@ -91,6 +91,37 @@ def test_mean_revision_refuses_a_thin_sample():
         mean_revision(first, lv, asof="2030-01-01")
 
 
+def test_mean_revision_refuses_a_non_positive_window():
+    first = _first("2020Q2", [0.0] * 12)
+    lv = _levels("2020Q1", [0.0] * 12)
+    with pytest.raises(ValueError, match="window"):
+        mean_revision(first, lv, asof="2024-09-09", window=0)
+
+
+def test_mean_revision_refuses_a_negative_min_age():
+    first = _first("2020Q2", [0.0] * 12)
+    lv = _levels("2020Q1", [0.0] * 12)
+    with pytest.raises(ValueError, match="min_age"):
+        mean_revision(first, lv, asof="2024-09-09", min_age=-1)
+
+
+def test_revision_estimate_as_dict_has_the_expected_keys_and_values():
+    est = RevisionEstimate(pp=0.0903, n=40, first_quarter="2015Q2",
+                            last_quarter="2025Q1", window_quarters=40,
+                            min_age_quarters=4)
+    d = est.as_dict()
+    assert set(d) == {"pp", "n", "first_quarter", "last_quarter",
+                       "window_quarters", "min_age_quarters", "basis"}
+    assert d["pp"] == 0.0903
+    assert d["n"] == 40
+    assert d["first_quarter"] == "2015Q2"
+    assert d["last_quarter"] == "2025Q1"
+    assert d["window_quarters"] == 40
+    assert d["min_age_quarters"] == 4
+    assert isinstance(d["basis"], str) and d["basis"]
+    assert "40" in d["basis"] and "4" in d["basis"]
+
+
 def test_append_first_print_adds_the_newest_quarter_once(tmp_path):
     p = tmp_path / "f.csv"
     p.write_text("quarter,qoq_pct,release_date,source\n2026Q1,0.2743,2026-06-03,abs\n")

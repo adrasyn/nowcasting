@@ -104,6 +104,10 @@ def mean_revision(
     window: int = REVISION_WINDOW_QUARTERS,
     min_age: int = REVISION_MIN_AGE_QUARTERS,
 ) -> RevisionEstimate:
+    if window < 1:
+        raise ValueError(f"window must be at least 1, got {window}")
+    if min_age < 0:
+        raise ValueError(f"min_age must not be negative, got {min_age}")
     asof = pd.Timestamp(asof)
     cur = latest_qoq(latest_levels).dropna()
     both = first.index.intersection(cur.index)

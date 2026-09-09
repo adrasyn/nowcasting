@@ -861,17 +861,35 @@ caffeinate -i .venv/bin/python tools/record_au_vintage.py    # needs network
 
 The ABS revises quarterly GDP growth up by about 0.1pp on average, in every
 decade since 1980. The model is trained on the latest vintage, so it predicts
-the latest vintage; the site is judged against the first print. Two things
-follow, both measured in `docs/2026-09-09-unrevised-data-feasibility.md`:
+the latest vintage; a reader is judged by the first print. So the site publishes
+ONE nowcast, and it is the first-print nowcast. Measured in
+`docs/2026-09-09-unrevised-data-feasibility.md`:
 
-- the track record scores every quarter against both. `performance_v3.json`
-  carries `qoq_first_print_pct` beside `qoq_actual_pct`, and
-  `bias_first_print_pct` (+0.20pp at the time of writing) beside `bias_pct`
-  (+0.12pp);
-- `latest_v3.json` publishes ONE nowcast, of the first print: `qoq_growth_pct`
-  on each horizon is the model's figure less `revision_adjustment.pp` (the mean
-  revision over the last 40 quarters whose first print is at least four quarters
-  old), and `model_qoq_growth_pct` carries the model's own figure beside it.
+- **the published figure.** In `latest_v3.json` (`basis: "abs_first_print"`),
+  `qoq_growth_pct` on every horizon is the model's estimate less
+  `revision_adjustment.pp` — the mean revision over the last 40 quarters whose
+  first print is at least four quarters old. That is the number the headline,
+  the chart and the track record all carry;
+- **the model's own figure** rides beside it in `model_qoq_growth_pct`, and the
+  site shows it once, in the methodology panel, so the gap the adjustment closes
+  is visible without competing with the headline;
+- **a missing adjustment is a refusal, not a fallback.** If `mean_revision`
+  cannot be computed the run writes a refusal payload
+  (`refusal_reason: "no revision estimate"`) and `emit_backtest_json.py` exits 1
+  without writing. Publishing the model's figure unlabelled would put a number
+  on the page on a basis nothing states;
+- **history is `v3-history-2`.** `nowcast_history_v3.json` stores both figures
+  per run. Rows written before 2026-09-09 were published on the old basis, so
+  the migration shifted them by the adjustment of the day they were migrated and
+  flagged them `adjusted_retroactively: true`;
+- **the track record scores that same claim.** `performance_v3.json` is
+  `basis: "abs_first_print"`: `qoq_nowcast_pct` against `qoq_actual_pct` (the
+  first print), with `qoq_model_nowcast_pct` and `qoq_latest_vintage_pct` kept
+  as reference columns and `model_bias_vs_latest_pct` / `model_mae_vs_latest_pct`
+  as the methodology fine print. Its year-ended figures are latest-vintage
+  levels chained to the quarter's first print — a first-print level four
+  quarters back does not exist inside one vintage — so the RBA comparison sits
+  on that hybrid basis.
 
 First prints live in `data/gdp_first_release.csv` (1959Q4 onward: the RBA's
 RDP 2024-04 file to 2022Q2, the ABS vintage spreadsheets after). The weekly job

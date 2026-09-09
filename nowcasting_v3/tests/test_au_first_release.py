@@ -153,3 +153,33 @@ def test_append_first_print_refuses_a_stale_print(tmp_path, capsys):
     assert append_first_print(p, lv, asof=late) is None
     assert "2026Q2" in capsys.readouterr().out
     assert len(p.read_text().splitlines()) == 2
+
+
+from nyfed.au.first_release import first_release_index
+
+
+def test_first_release_index_has_first_print_growth_and_the_anchor_level():
+    first = _first("2020Q2", [1.0, 2.0, -1.0, 0.5])            # 2020Q2..2021Q1
+    anchor = _levels("2020Q1", [0.9, 2.2, -0.8, 0.4], start=500.0)   # 2020Q1..2021Q1
+    idx = first_release_index(first, anchor)
+    assert idx.name == "gdp"
+    assert list(idx.index) == list(anchor.index)
+    g = latest_qoq(idx).dropna()
+    assert g.to_numpy() == pytest.approx([1.0, 2.0, -1.0, 0.5])
+    assert idx.iloc[-1] == pytest.approx(anchor.iloc[-1])
+
+
+def test_first_release_index_starts_where_both_series_do():
+    first = _first("2010Q1", [0.3] * 8)                        # 2010Q1..2011Q4
+    anchor = _levels("2011Q1", [0.5] * 3, start=100.0)         # 2011Q1..2011Q4
+    idx = first_release_index(first, anchor)
+    assert idx.index[0] == anchor.index[0]
+    assert len(idx) == 4
+
+
+def test_first_release_index_refuses_a_gap():
+    first = _first("2020Q2", [1.0, 2.0, 0.5])
+    first = first.drop(first.index[1])
+    anchor = _levels("2020Q1", [1.0, 2.0, 0.5])
+    with pytest.raises(ValueError, match="gap"):
+        first_release_index(first, anchor)

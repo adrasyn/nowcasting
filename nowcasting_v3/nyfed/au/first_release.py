@@ -175,3 +175,44 @@ def append_first_print(path: str | Path, latest_levels: pd.Series, *, asof) -> s
     path.write_text(text + ("" if text.endswith("\n") else "\n") + line)
     print(f"  first print: recorded {label} at {qoq:+.4f}% (released {release})", flush=True)
     return label
+
+
+def first_release_index(first: pd.Series, anchor: pd.Series) -> pd.Series:
+    """A level series with first-print growth, on ``anchor``'s dates and scale.
+
+    THE MODEL TAKES LEVELS. `gdp` enters the panel as chain-volume millions and
+    is transformed to annualised growth there, so a first-print TARGET has to
+    be handed over as a level series too. There is no such thing as a
+    first-print level series (every release rebases), so this cumulates the
+    first-print growth rates into an index and pins it to the latest vintage's
+    level at the last quarter the two share. Growth is preserved exactly; the
+    level is a scale factor the transformation removes.
+
+    The index starts at the quarter BEFORE the first first-print (its base
+    level, growth zero by construction) when ``anchor`` has it. Earlier
+    quarters of ``anchor`` are dropped, because a level with no first-print
+    growth behind it would be latest-vintage growth in disguise. Quarters after
+    the last first-print are carried from ``anchor`` as they are.
+    """
+    a = anchor.dropna().sort_index()
+    f = first.dropna().sort_index()
+    if len(f) > 1:
+        steps = {(b - a_).n for a_, b in zip(f.index.to_period("Q")[:-1],
+                                            f.index.to_period("Q")[1:])}
+        if steps != {1}:
+            raise ValueError("first-release series has a gap; fill it before building an index")
+    start = max(a.index[0], f.index[0] - pd.DateOffset(months=3))
+    a = a[a.index >= start]
+    common = a.index.intersection(f.index)
+    if len(common) == 0:
+        raise ValueError("no quarter is in both the first-release series and the anchor")
+    last = common[-1]
+    # Cumulate forward from 1.0, then rescale so the index equals the anchor at `last`.
+    growth = f.reindex(a.index[a.index <= last])
+    growth.iloc[0] = 0.0                           # the first level is the base
+    idx = (1 + growth / 100).cumprod()
+    idx = idx * (float(a[last]) / float(idx[last]))
+    tail = a[a.index > last]
+    out = pd.concat([idx, tail]).sort_index()
+    out.name = "gdp"
+    return out

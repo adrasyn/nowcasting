@@ -40,3 +40,49 @@ GDP global loading, treatment: min 0.589, p25 0.828, median
 Run log: scratchpad fp_run.log (not committed), 65 min. Data:
 `docs/measurements/2026-09-09-plan-c-first-print-target.csv`. Write-up published as an artifact
 the same day.
+
+
+## Addendum, same day: a bias correction on either target
+
+Recursive correction (the September report's section 4.1): mean of the model's final-nowcast misses against the first print over quarters printed by the vintage date, subtracted from the nowcast. Scored per vintage against the first print.
+
+### Expanding window, minimum four printed quarters: 29 vintages from 2024-01-01, targets 2023Q4..2026Q1
+
+| arm | bias | MAE | RMSE | paired dAE vs adjusted baseline | corr with print |
+|---|---|---|---|---|---|
+| existing model, raw | +0.148 | 0.205 | 0.247 | +0.037 | 0.35 |
+| existing model less 0.0989pp | +0.049 | 0.167 | 0.204 | +0.000 | 0.35 |
+| existing model less the adjustment as known at the time | +0.065 | 0.173 | 0.211 | +0.006 | 0.32 |
+| existing model less its own rolling miss | -0.099 | 0.195 | 0.225 | +0.027 | 0.36 |
+| retrained on first prints, raw | +0.109 | 0.188 | 0.220 | +0.020 | 0.39 |
+| retrained less its own rolling miss | -0.062 | 0.171 | 0.205 | +0.003 | 0.38 |
+
+Mean correction applied: existing +0.247, retrained +0.171; recursive revision adjustment +0.083.
+
+### Rolling eight quarters: 17 vintages from 2025-01-01, targets 2024Q4..2026Q1
+
+| arm | bias | MAE | RMSE | paired dAE vs adjusted baseline | corr with print |
+|---|---|---|---|---|---|
+| existing model, raw | +0.106 | 0.201 | 0.233 | +0.013 | 0.07 |
+| existing model less 0.0989pp | +0.008 | 0.188 | 0.208 | +0.000 | 0.07 |
+| existing model less the adjustment as known at the time | +0.019 | 0.188 | 0.210 | -0.000 | 0.05 |
+| existing model less its own rolling miss | -0.111 | 0.206 | 0.240 | +0.018 | 0.08 |
+| retrained on first prints, raw | +0.071 | 0.201 | 0.231 | +0.013 | -0.04 |
+| retrained less its own rolling miss | -0.080 | 0.213 | 0.243 | +0.025 | -0.08 |
+
+Mean correction applied: existing +0.218, retrained +0.151; recursive revision adjustment +0.088.
+
+### Rolling four quarters: 29 vintages from 2024-01-01, targets 2023Q4..2026Q1
+
+| arm | bias | MAE | RMSE | paired dAE vs adjusted baseline | corr with print |
+|---|---|---|---|---|---|
+| existing model, raw | +0.148 | 0.205 | 0.247 | +0.037 | 0.35 |
+| existing model less 0.0989pp | +0.049 | 0.167 | 0.204 | +0.000 | 0.35 |
+| existing model less the adjustment as known at the time | +0.065 | 0.173 | 0.211 | +0.006 | 0.32 |
+| existing model less its own rolling miss | -0.069 | 0.193 | 0.209 | +0.026 | 0.46 |
+| retrained on first prints, raw | +0.109 | 0.188 | 0.220 | +0.020 | 0.39 |
+| retrained less its own rolling miss | -0.041 | 0.179 | 0.205 | +0.011 | 0.40 |
+
+Mean correction applied: existing +0.217, retrained +0.149; recursive revision adjustment +0.083.
+
+Finding: the correction over-corrects on both targets (misses were largest in 2023 and early 2024 and have shrunk since, so a mean of past misses lags the drift); the corrected arms sit 0.04 to 0.11pp below the print with worse error than the adjusted baseline. The existing model's raw bias is falling (+0.19 whole window, +0.15 from 2024, +0.11 from 2025); the adjusted baseline is +0.01 on the six most recent quarters. Recommendation unchanged. Script: scratchpad four_arms.py (not committed); inputs are the two committed backtest CSVs.

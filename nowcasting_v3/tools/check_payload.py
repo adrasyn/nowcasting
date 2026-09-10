@@ -93,29 +93,46 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
                 "month of data and should not have been recorded")
 
     # THE HEADLINE IS ARITHMETIC ON THE MODEL'S FIGURE. `qoq_growth_pct` is the
-    # nowcast of the ABS's first print: the model's own estimate less the mean
-    # revision. If the two stop agreeing, the page headlines a number nothing on
-    # it explains. An 'ok' payload without an adjustment cannot be on the
-    # first-print basis at all, so its headline is mislabelled rather than
-    # merely unexplained. And the adjustment itself is a forty-year average near
-    # +0.1pp; one outside +-0.5 is a broken estimate, not a finding.
-    adj = d.get("revision_adjustment")
+    # published nowcast of the ABS's first print: the model's own estimate less
+    # the model's rolling miss against past first prints. If the two stop
+    # agreeing, the page headlines a number nothing on it explains. An 'ok'
+    # payload without a correction has not had the bias taken off at all, so its
+    # headline is mislabelled rather than merely unexplained. And the correction
+    # itself is a mean of eight quarterly errors, historically inside +-0.35pp
+    # each; one outside +-0.6 is a broken estimate, not a finding.
+    adj = d.get("bias_correction")
     if adj is None:
-        bad.append("status is 'ok' but revision_adjustment is absent: the published "
-                   "figure is the first-print nowcast and needs the adjustment that made it")
+        bad.append("status is 'ok' but bias_correction is absent: the published "
+                   "figure is the model less its rolling miss and needs the correction "
+                   "that made it")
     else:
         pp = adj.get("pp")
-        if not isinstance(pp, (int, float)) or isinstance(pp, bool) or abs(pp) > 0.5:
-            bad.append(f"revision_adjustment.pp is {pp!r}; expected a number within +-0.5")
+        if not isinstance(pp, (int, float)) or isinstance(pp, bool) or abs(pp) > 0.6:
+            bad.append(f"bias_correction.pp is {pp!r}; expected a number within +-0.6")
         else:
             for h in horizons:
-                if "expected_first_print_pct" in h:
-                    bad.append(f"{h['quarter']} carries expected_first_print_pct, a field "
-                               "retired when qoq_growth_pct became the first-print nowcast")
                 model = h.get("model_qoq_growth_pct")
                 if model is None or abs(h["qoq_growth_pct"] - (model - pp)) > 1e-3:
                     bad.append(f"{h['quarter']}: qoq_growth_pct {h['qoq_growth_pct']!r} is not "
-                               f"model_qoq_growth_pct - revision_adjustment.pp ({model!r} - {pp})")
+                               f"model_qoq_growth_pct - bias_correction.pp ({model!r} - {pp})")
+
+    # NO FIELD FROM A RETIRED DESIGN, anywhere. `revision_adjustment` (the mean
+    # ABS revision, subtracted from a model trained on the revised vintage) and
+    # `expected_first_print_pct` (a second headline figure beside the raw one)
+    # each named the published quantity at some point. A payload carrying one of
+    # them alongside `bias_correction` has been through half a migration, and
+    # nothing downstream could say which field made its figures.
+    retired = ("revision_adjustment", "expected_first_print_pct")
+    for key in retired:
+        if key in d:
+            bad.append(f"the payload carries {key}, a field retired when the published "
+                       "figure became the first-print model less its rolling miss")
+    for h in horizons:
+        for key in retired:
+            if key in h:
+                bad.append(f"{h['quarter']} carries {key}, a field retired when the "
+                           "published figure became the first-print model less its "
+                           "rolling miss")
 
     # AND THE PAYLOAD HAS TO SAY WHICH FIGURE IT IS. `basis` is what the site
     # reads to label the headline and the track record's actual column. An
@@ -124,6 +141,15 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
     if d.get("basis") != "abs_first_print":
         bad.append(f"basis is {d.get('basis')!r}; the published figure is the "
                    "first-print nowcast and must say so")
+
+    # AND WHICH TARGET THE MODEL BEHIND IT WAS FITTED ON. The rolling miss is
+    # measured on a model trained on first prints; subtracting it from a model
+    # trained on the revised vintage would double-count the ABS's average
+    # revision. `run_au_nowcast.py` refuses that pairing outright, and this is
+    # the last place it could still reach the site.
+    if d.get("target") != "first_print":
+        bad.append(f"target is {d.get('target')!r}; the model behind a published "
+                   "figure must have been fitted on 'first_print' GDP")
 
     # `data_through` names the last month carrying an observation. A month in
     # the future means the panel was padded into the payload, which is the bug

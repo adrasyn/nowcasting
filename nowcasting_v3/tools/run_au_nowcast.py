@@ -41,10 +41,11 @@ from nyfed.au.build import (
     load_vintage,
     target_periods,
 )
+from nyfed.au.bias_correction import load_misses, rolling_miss
 from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
-                           migrate_history_runs, nowcast_payload,
+                           migrate_history_runs_v3, nowcast_payload,
                            refusal_payload)
-from nyfed.au.first_release import load_first_release, mean_revision
+from nyfed.au.first_release import load_first_release
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
@@ -205,39 +206,6 @@ def main() -> int:
 
     n_pad = pad_to_next_quarter(panel)
     gdp = vintage.series["gdp"].dropna()
-    # THE ABS REVISES UP. The model predicted the latest vintage, because that
-    # is what it was trained on; the page is judged against the first print. The
-    # difference has averaged about +0.1pp a quarter for forty years, and the
-    # published nowcast takes it off.
-    #
-    # THAT PREMISE EXPIRED ON 2026-09-10 and this correction has not caught up
-    # yet. `build_panel` now defaults to the first-print target, so a model
-    # fitted on it already predicts the first print and subtracting a mean
-    # revision on top would double-count. Nothing publishes wrongly in the
-    # meantime: the target check above refuses any estimate fitted on the other
-    # target, and `state/au_estimate.npz` is still the latest-vintage fit, so
-    # this path cannot run until the quarterly estimate is re-run. The
-    # replacement is the model's own rolling miss against the first print
-    # (`nyfed/au/bias_correction.py`), wired in next.
-    #
-    # A MISSING ESTIMATE IS NOW A REFUSAL, not a degrade. Publishing the model's
-    # raw figure would put a nowcast of the latest vintage on a page that says
-    # it nowcasts the first print — the same number under the wrong name, which
-    # is worse than no number, because nothing on the page would show it had
-    # changed meaning. Refusing is the behaviour v3 exists for.
-    try:
-        revision = mean_revision(load_first_release(), gdp, asof=asof)
-        print(f"revision adjustment {revision.pp:+.3f}pp over {revision.n} quarters "
-              f"{revision.first_quarter}..{revision.last_quarter}", flush=True)
-    # ANY failure, not just the two anticipated ones. The file is hand-edited
-    # when a quarter is missed, so a bad edit surfaces as a KeyError or a
-    # ParserError just as easily as a ValueError — and killing the runner here
-    # would write no payload at all, not even a refusal.
-    except Exception as exc:  # noqa: BLE001
-        print(f"no revision adjustment: {exc}", file=sys.stderr)
-        write(refusal_payload(reason="no revision estimate",
-                              detail=str(exc)[:400], generated_at=now, asof=asof))
-        return 0
     print(f"panel {panel.Y.shape[0]}x{panel.Y.shape[1]}, "
           f"{panel.dates[0].date()}..{panel.dates[-1].date()}"
           f"{f' (+{n_pad} forecast month(s))' if n_pad else ''}", flush=True)
@@ -273,6 +241,36 @@ def main() -> int:
               "tools/estimate_au.py to fit the quarterly estimate on "
               f"{panel.target!r}.", file=sys.stderr)
         return 1
+
+    # ---- the bias correction (may refuse) --------------------------------
+    # THE MODEL STILL RUNS HIGH. It is trained on first prints now, so no mean
+    # revision is subtracted any more -- that would double-count. What is left
+    # is the model's own bias against the quantity it predicts: +0.20pp with
+    # t = 3.9 over the first-print backtest. The published figure takes off the
+    # mean of the last eight printed quarters' misses, rolling, from
+    # `data/first_print_misses.csv`.
+    #
+    # A MISSING ESTIMATE IS A REFUSAL, not a degrade. Publishing the raw model
+    # would put an uncorrected figure on a page whose `basis` says the bias has
+    # been taken off — the wrong number under the right name, which is worse
+    # than no number, because nothing on the page would show it had changed
+    # meaning. Refusing is the behaviour v3 exists for.
+    #
+    # ANY failure, not just the anticipated ones. The misses file is appended by
+    # the weekly job and hand-edited when a quarter is missed, so a bad edit
+    # surfaces as a KeyError or a ParserError just as easily as the ValueError
+    # `rolling_miss` raises on a thin sample — and letting it kill the runner
+    # here would write no payload at all, not even a refusal.
+    try:
+        correction = rolling_miss(load_misses(), asof=asof)
+        print(f"bias correction {correction.pp:+.4f}pp over {correction.n} printed "
+              f"quarters {correction.first_quarter}..{correction.last_quarter}",
+              flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"no bias correction: {exc}", file=sys.stderr)
+        write(refusal_payload(reason="no bias estimate",
+                              detail=str(exc)[:400], generated_at=now, asof=asof))
+        return 0
 
     # ---- the state space, from the saved fit -----------------------------
     spec = load_spec(SPEC_PATH)
@@ -348,20 +346,24 @@ def main() -> int:
             continue
         qk = np.nanpercentile(annualised_to_qoq(draws[:, k]),
                               [2.5, 16, 84, 97.5])
-        # ON THE FIRST-PRINT BASIS, point and bands alike, so the record can be
+        # THE PUBLISHED FIGURE, point and bands alike, so the record can be
         # scored directly against the ABS's first print and the evolution chart
-        # plots the same quantity the page headlines.
+        # plots the same quantity the page headlines. `target` travels with the
+        # row because the migration keys on printed quarters, not on schema
+        # stamps, and a row has to be able to say for itself which model wrote
+        # it.
         model_k = float(annualised_to_qoq(ann[k]))
         written.append({
             "run_date": asof, "target_quarter": lab,
             "kind": "nowcast" if k == 0 else "forecast",
-            "qoq_growth_pct": round(model_k - revision.pp, 4),
+            "qoq_growth_pct": round(model_k - correction.pp, 4),
             "model_qoq_growth_pct": round(model_k, 4),
-            "revision_adjustment_pp": round(revision.pp, 4),
-            "ci_95_low": round(qk[0] - revision.pp, 4),
-            "ci_68_low": round(qk[1] - revision.pp, 4),
-            "ci_68_high": round(qk[2] - revision.pp, 4),
-            "ci_95_high": round(qk[3] - revision.pp, 4),
+            "bias_correction_pp": round(correction.pp, 4),
+            "target": "first_print",
+            "ci_95_low": round(qk[0] - correction.pp, 4),
+            "ci_68_low": round(qk[1] - correction.pp, 4),
+            "ci_68_high": round(qk[2] - correction.pp, 4),
+            "ci_95_high": round(qk[3] - correction.pp, 4),
             "data_through": dthru, "months_with_data": months[k],
             "estimate_asof": meta["asof"],
         })
@@ -410,13 +412,14 @@ def main() -> int:
                 written.append({
                     "run_date": str(d0.date()), "target_quarter": lab,
                     "kind": "nowcast" if k == 0 else "forecast",
-                    "qoq_growth_pct": round(pt_k - revision.pp, 4),
+                    "qoq_growth_pct": round(pt_k - correction.pp, 4),
                     "model_qoq_growth_pct": round(pt_k, 4),
-                    "revision_adjustment_pp": round(revision.pp, 4),
-                    "ci_95_low": round(qb[0] - revision.pp, 4),
-                    "ci_68_low": round(qb[1] - revision.pp, 4),
-                    "ci_68_high": round(qb[2] - revision.pp, 4),
-                    "ci_95_high": round(qb[3] - revision.pp, 4),
+                    "bias_correction_pp": round(correction.pp, 4),
+                    "target": "first_print",
+                    "ci_95_low": round(qb[0] - correction.pp, 4),
+                    "ci_68_low": round(qb[1] - correction.pp, 4),
+                    "ci_68_high": round(qb[2] - correction.pp, 4),
+                    "ci_95_high": round(qb[3] - correction.pp, 4),
                     "data_through": str(pv_seen[-1].date())[:7],
                     "months_with_data": months_with_data(vp, int(t_now[k])),
                     "estimate_asof": meta["asof"], "backfilled": True,
@@ -429,7 +432,7 @@ def main() -> int:
                      else "no quarter has data yet, nothing recorded"),
                   flush=True)
 
-    vintages = _record(written, labels, revision.pp)
+    vintages = _record(written, labels, asof)
 
     # THE FETCHED DATE IS ONLY USED IF IT NAMES THIS TARGET'S QUARTER.
     # `data/latest.json` belongs to the R pipeline, which runs 90 minutes before
@@ -462,7 +465,7 @@ def main() -> int:
         generated_at=now, asof=asof, gdp_global_loading=loading,
         collapse_floor=floor,
         n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED,
-        months_with_data=months, revision=revision)
+        months_with_data=months, correction=correction)
     payload["estimate"] = {"estimated_at": meta["estimated_at"],
                            "asof": meta["asof"], "age_days": age}
     write(payload)
@@ -476,7 +479,7 @@ def main() -> int:
     return 0
 
 
-def _record(entries: list[dict], labels: list[str], pp: float) -> list[dict]:
+def _record(entries: list[dict], labels: list[str], asof: str) -> list[dict]:
     """Merge new runs into the standing record and hand back the live targets'.
 
     The record is the single source for both the evolution chart and, once the
@@ -487,24 +490,39 @@ def _record(entries: list[dict], labels: list[str], pp: float) -> list[dict]:
     date -- so de-duplicating on the date by itself would let each row evict the
     other and leave whichever happened to be written last.
     """
-    hist = {"schema": "v3-history-2", "runs": []}
+    hist = {"schema": "v3-history-3", "runs": []}
     if HISTORY.is_file():
         try:
             hist = json.loads(HISTORY.read_text())
         except json.JSONDecodeError:
             print(f"{HISTORY.name} unreadable; starting a new record", flush=True)
-    # THE WHOLE RECORD MOVES WITH THE PAYLOAD. Rows written before 2026-09-09
-    # hold the model's own figure in `qoq_growth_pct`; leaving them would put
-    # two different quantities on one evolution chart, and the step between
-    # them would read as news rather than as a change of definition. The
-    # migration is idempotent -- a row that already has `model_qoq_growth_pct`
-    # is returned untouched -- so re-running a Monday costs nothing.
-    if hist.get("schema") != "v3-history-2":
-        before = sum(1 for r in hist["runs"] if "model_qoq_growth_pct" not in r)
-        hist["runs"] = migrate_history_runs(hist["runs"], pp)
-        hist["schema"] = "v3-history-2"
-        print(f"migrated {before} row(s) of {HISTORY.name} to the first-print "
-              f"basis ({pp:+.4f}pp, retroactive)", flush=True)
+    # THE WHOLE RECORD MOVES WITH THE MODEL. Rows written before 2026-09-10 came
+    # from a model fitted on the REVISED vintage and corrected by a forty-year
+    # mean ABS revision. A printed quarter's rows are kept exactly as they are:
+    # they record what the site published on the mornings before each release,
+    # and the track record scores them. A quarter the ABS has not printed yet is
+    # still live on the evolution chart, so its old rows are dropped rather than
+    # left to share a line with the new model's -- the step between two
+    # different quantities reads as news rather than as a change of definition.
+    # `--backfill` rebuilds those weeks from the new model.
+    #
+    # PRINTED MEANS THE ABS HAS RELEASED IT. `load_first_release` holds a row
+    # per printed quarter, and `gdp_release_date` says when each went out, so a
+    # quarter counts only once its release date has passed on this run's date.
+    # Stamping the new schema makes the migration one-way: a `v3-history-3` file
+    # is left alone, or every Monday would drop the quarter in flight.
+    was = hist.get("schema")
+    if was != "v3-history-3":
+        labels_out = [_quarter(ts) for ts in load_first_release().dropna().index]
+        printed = {lab for lab in labels_out
+                   if (gdp_release_date(lab) or "9999-99-99") <= asof}
+        before = len(hist["runs"])
+        hist["runs"] = migrate_history_runs_v3(hist["runs"], printed)
+        hist["schema"] = "v3-history-3"
+        print(f"migrated {HISTORY.name} from {was!r}: kept "
+              f"{len(hist['runs'])} row(s) for quarters the ABS has printed, "
+              f"dropped {before - len(hist['runs'])} belonging to the superseded "
+              "model (--backfill rebuilds them)", flush=True)
     # Keyed on what was actually WRITTEN, not on `labels`. A run that declines
     # to record a data-less forecast must leave any existing row for that
     # quarter alone rather than treating its silence as a deletion.

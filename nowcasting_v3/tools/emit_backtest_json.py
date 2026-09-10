@@ -48,6 +48,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from nyfed.au.bias_correction import MISSES_CSV, append_miss
 from nyfed.au.build import fetch_vintage, load_vintage
 from nyfed.au.emit import migrate_history_runs
 from nyfed.au.sources import AU_SERIES
@@ -144,6 +145,34 @@ def main() -> int:
               f"{exc}); the track record cannot be built on the published "
               "basis, nothing written", flush=True)
         return 1
+
+    # AND THE MISS AGAINST IT, on the same Monday and for the same reason. The
+    # published nowcast is the model less the mean of its last eight misses
+    # (`nyfed/au/bias_correction.py`), so a quarter's miss has to be recorded
+    # the week its first print is, or next week's correction is measured over a
+    # window that has quietly slid out of date. `append_miss` needs the history
+    # log to find what the model last said before the print; the scoring below
+    # reads the same file, so it is read once here.
+    #
+    # SAME FAILURE RULE AS THE FIRST-PRINT FILE ABOVE, and for the same reason:
+    # the misses file is hand-editable, it feeds the PUBLISHED figure rather
+    # than only this table, and a bad edit that is merely warned about would
+    # surface a week later as a refused nowcast with no obvious cause. The
+    # weekly workflow runs this step with `continue-on-error`, so failing here
+    # costs the track record a week and alerts, and the nowcast still ships.
+    hist_path = ROOT / "data" / "nowcast_history_v3.json"
+    hist_runs = (json.loads(hist_path.read_text())["runs"]
+                 if hist_path.is_file() else [])
+    try:
+        added = append_miss(MISSES_CSV, hist_runs, first, asof=today)
+    except Exception as exc:  # noqa: BLE001
+        print(f"::error::first-print miss file unusable ({type(exc).__name__}: "
+              f"{exc}); the published nowcast's bias correction is measured "
+              "from it, nothing written", flush=True)
+        return 1
+    print(f"  first-print misses: appended {len(added)} "
+          f"({', '.join(added) if added else 'none due'})", flush=True)
+
     try:
         revision = mean_revision(first, gdp, asof=today)
     except ValueError as exc:
@@ -175,10 +204,8 @@ def main() -> int:
     # cannot disagree with the file about what was published. Reading, not
     # writing: the committed file is migrated in place by the weekly job.
     live: dict[str, dict] = {}
-    hist_path = ROOT / "data" / "nowcast_history_v3.json"
-    if hist_path.is_file():
-        for r in migrate_history_runs(
-                json.loads(hist_path.read_text())["runs"], pp):
+    if hist_runs:
+        for r in migrate_history_runs(hist_runs, pp):
             # The LAST run before the print is the model's final word on that
             # quarter and the only one worth scoring. A backfilled row was never
             # published, so it cannot stand as a live call.

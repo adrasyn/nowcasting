@@ -1370,9 +1370,9 @@ def test_the_floor_sits_in_the_gap_measured_on_both_panels():
 
 # --- the first-print target, and its own floor ------------------------------
 
-# THE FIRST-PRINT TARGET, MEASURED 2026-08-26 on the shipping panel (the
-# recording's last buildable month), thirty cold-start seeds, 200+100 sweeps,
-# sorted:
+# THE FIRST-PRINT TARGET, MEASURED 2026-09-10 on the shipping panel at asof
+# 2026-08-26 (the recording's last buildable month), thirty cold-start seeds,
+# 200+100 sweeps, sorted:
 #
 #   0.1824 0.2146 | 0.7925 0.7936 0.7962 0.8051 0.8486 0.8568 0.8575 0.8607
 #                   0.8700 0.8752 0.8785 0.8825 0.8834 0.9076 0.9089 0.9094

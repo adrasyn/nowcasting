@@ -189,7 +189,12 @@ def main() -> int:
         panels = {}
         for asof in asofs:
             try:
-                panels[asof] = build_panel(asof=asof, vintage=vintage)
+                # `target="latest"` EXPLICITLY: Phase 0's warm-start and
+                # collapse measurements were all made on the REVISED target.
+                # The production default is the first print (see
+                # nyfed/au/build.py).
+                panels[asof] = build_panel(asof=asof, vintage=vintage,
+                                           target="latest")
             except Exception as exc:                       # noqa: BLE001
                 print(f"  {asof}  UNBUILDABLE: {type(exc).__name__}: "
                       f"{str(exc)[:90]}", flush=True)

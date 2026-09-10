@@ -60,7 +60,10 @@ w.writerow(["arm","asof","seed","rows","cols","obs_job_ads","obs_nab",
 
 for arm, (vint, start) in ARMS.items():
     for asof in VINTAGES:
-        panel = build_panel(asof=asof, start=start, vintage=vint)
+        # `target="latest"` EXPLICITLY: this tool measures the REVISED target,
+        # and its floor and its `collapsed` column are calibrated on it. The
+        # production default is the first print (see nyfed/au/build.py).
+        panel = build_panel(asof=asof, start=start, vintage=vint, target="latest")
         restrict = build_restrict(panel, SPEC, p_f=P_F)
         t_now = target_periods(panel)
         n, n_f = SPEC.blocks.shape

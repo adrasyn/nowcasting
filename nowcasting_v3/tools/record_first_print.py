@@ -24,8 +24,15 @@ EXIT CODES. 0 whenever the files are usable, including the ordinary case where
 nothing is due to be appended -- three weeks in four there is no new print.
 1 only when the first-print or misses file cannot be read or written: those two
 files feed the PUBLISHED figure, and a nowcast computed from a half-written or
-hand-broken misses file would be the wrong number under the right name. Failing
-here stops the week's nowcast on purpose.
+hand-broken misses file would be the wrong number under the right name.
+
+THIS DOES NOT STOP THE WEEK'S NOWCAST. The weekly workflow runs this step with
+`continue-on-error: true` and lets the nowcast proceed on the misses file as it
+stood: `tools/run_au_nowcast.py` wraps its read of that file in `except
+Exception` and publishes a refusal payload rather than a wrong number under the
+right name, so the job does not need to stop here to avoid that outcome. The
+workflow still fails itself afterward, once the week's payload is out, so a
+bad file gets someone's attention instead of silently repeating next week.
 
 A FAILED LIVE FETCH IS NOT THAT CASE. `published_gdp` falls back to the recorded
 vintage and says so; if even that fails, this records nothing, says so, and

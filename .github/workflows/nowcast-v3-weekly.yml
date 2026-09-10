@@ -74,11 +74,15 @@ jobs:
       # a window one quarter out of date. These appends used to run in
       # "Refresh the track record", after the nowcast had already read the file.
       #
-      # IT STOPS THE JOB IF THE FILE IS BAD, unlike the track-record step below.
-      # A hand-broken misses file would otherwise give the nowcast the wrong
-      # correction under the right name, which is the one failure v3 exists to
-      # refuse. Nothing new to append is a normal week and exits 0.
+      # IT DOES NOT STOP THE JOB, like the track-record step below. The runner
+      # already wraps `rolling_miss(load_misses())` in `except Exception` and
+      # writes a refusal payload the site renders when the misses file is bad,
+      # so a stale page — last week's number presented as current — is the
+      # failure the guards exist to prevent, not a hard stop here. Nothing new
+      # to append is a normal week and exits 0.
       - name: Record the first print and the model's miss
+        id: record
+        continue-on-error: true
         run: python -u tools/record_first_print.py
 
       - name: Nowcast
@@ -170,6 +174,12 @@ jobs:
         if: steps.track.outcome == 'failure'
         run: |
           echo "::error::emit_backtest_json.py failed; the nowcast was published, the track record was not refreshed"
+          exit 1
+
+      - name: Fail the job if the first print or the miss was not recorded
+        if: steps.record.outcome == 'failure'
+        run: |
+          echo "::error::record_first_print.py failed; the nowcast ran on the misses file as it stood and the job is failed so someone looks"
           exit 1
 
       - name: Alert on failure

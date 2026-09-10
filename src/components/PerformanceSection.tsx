@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Performance } from "@/lib/types";
 import { formatMillions, formatPct, formatQuarterLabel } from "@/lib/format";
 
-/** "Q2 2026", "Q1 and Q2 2026", "Q4 2025, Q1 and Q2 2026". */
+/** "Q2 2026", "Q1 2026 and Q2 2026", "Q4 2025, Q1 2026 and Q2 2026". */
 function listQuarters(quarters: string[]): string {
   if (quarters.length <= 1) return quarters[0] ?? "";
   return `${quarters.slice(0, -1).join(", ")} and ${quarters[quarters.length - 1]}`;

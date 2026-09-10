@@ -60,8 +60,13 @@ test.describe("homepage", () => {
     ).toBeVisible();
     // The panel is the one place that explains what the published number is:
     // the model's estimate less its own rolling miss against the first print.
-    // The panel is closed by default, so this assertion lives here.
-    await expect(page.getByText(/rolling miss/).first()).toBeVisible();
+    // The panel is closed by default, so this assertion lives here — and it is
+    // SCOPED TO #methodology because the track-record notes above also say
+    // "rolling miss", so an unscoped match passes with the panel closed and
+    // would survive the panel's copy being deleted.
+    await expect(
+      page.locator("#methodology").getByText(/rolling miss/)
+    ).toBeVisible();
   });
 });
 

@@ -46,6 +46,8 @@ jobs:
       - name: Install
         run: pip install -e .
 
+      # fetch retries live in nyfed/au/build.py:fetch_vintage; the 2026-09-10
+      # failure was one transient ABS download
       - name: Estimate
         run: python -u tools/estimate_au.py
 

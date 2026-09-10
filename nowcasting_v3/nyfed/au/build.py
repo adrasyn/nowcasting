@@ -114,6 +114,7 @@ locators no longer match the registry.
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -352,11 +353,51 @@ class Vintage:
         )
 
 
+# On 10 September 2026 the quarterly re-estimate workflow died at this exact
+# step: `fetch_abs_series` raised `HttpError: Could not download
+# .../6202_all_spreadsheets.zip ... no cached copy is available`. The URL was
+# healthy -- 30 MB, 3 s to fetch from here -- and the weekly job had pulled the
+# same file three days earlier without incident. It cost a skipped quarterly
+# estimate and a filed issue, for one transient ABS download with nothing
+# around it to try again. Three attempts, waiting 30 s then 90 s, covers that:
+# a 30 MB zip is not worth backing off aggressively over, the ABS site's
+# transient errors have historically cleared within a minute, and the weekly
+# job has a 60-minute budget, so even the full two-wait sequence (120 s) on
+# every one of the fifteen series and the deflator tiers is nowhere near it.
+_SLEEP = time.sleep
+
+
+def _with_retries(label: str, call, *, attempts: int = 3, waits: tuple[int, ...] = (30, 90)):
+    """Call ``call()``, retrying on any exception up to ``attempts`` times.
+
+    Prints a line before each retry and sleeps (via the injectable ``_SLEEP``)
+    for the matching entry of ``waits``. Re-raises the last exception if every
+    attempt fails.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 - re-raised below if exhausted
+            last_exc = exc
+            if attempt < attempts:
+                wait = waits[attempt - 1]
+                print(
+                    f"  retry {attempt}/{attempts - 1} for {label} after "
+                    f"{type(exc).__name__}: {str(exc)[:120]}; waiting {wait}s"
+                )
+                _SLEEP(wait)
+    assert last_exc is not None
+    raise last_exc
+
+
 def fetch_vintage(sources: tuple[SeriesSource, ...] = AU_SERIES) -> Vintage:
     """Retrieve every registered series and every deflator tier. Networked."""
     return Vintage(
-        series={s.key: _fetch_one(s) for s in sources},
-        deflator_sources=fetch_deflator_sources(),
+        series={
+            s.key: _with_retries(s.key, lambda s=s: _fetch_one(s)) for s in sources
+        },
+        deflator_sources=_with_retries("deflator tiers", fetch_deflator_sources),
         recorded_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )
 

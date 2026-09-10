@@ -34,15 +34,14 @@ test.describe("homepage", () => {
     ).toBeVisible();
     await expect(page.getByText(/growth this quarter/).first()).toBeVisible();
     await expect(page.locator("svg").first()).toBeVisible();
-    // The page says which number it publishes in both places it matters: the
-    // headline eyebrow, and the column the track record scores against.
+    // The page names the quarter it publishes in both places it matters: the
+    // headline eyebrow, and the column the track record scores against. Both
+    // the headline and the next-quarter card carry the same eyebrow form, so
+    // `.first()` keeps the locator out of strict mode.
     await expect(
-      page.getByText(/Q\d 20\d\d: GDP nowcast, first print/)
+      page.getByText(/Q\d 20\d\d: GDP nowcast$/).first()
     ).toBeVisible();
-    await expect(
-      page.getByText(/Q\d 20\d\d: GDP forecast, first-print basis/)
-    ).toBeVisible();
-    await expect(page.getByText("First print", { exact: true })).toBeVisible();
+    await expect(page.getByText("Actual", { exact: true }).first()).toBeVisible();
   });
 
   test("serves v3, not v2", async ({ page }) => {
@@ -59,13 +58,14 @@ test.describe("homepage", () => {
       page.getByText(/New York Fed Staff Nowcast 2\.0/).first()
     ).toBeVisible();
     // The panel is the one place that explains what the published number is:
-    // the model's estimate less its own rolling miss against the first print.
-    // The panel is closed by default, so this assertion lives here — and it is
-    // SCOPED TO #methodology because the track-record notes above also say
-    // "rolling miss", so an unscoped match passes with the panel closed and
-    // would survive the panel's copy being deleted.
+    // a nowcast of the ABS's initial estimate, less a correction for the
+    // model's recent average error. The panel is closed by default, so this
+    // assertion lives here — and it is SCOPED TO #methodology because the
+    // track-record notes above also say "initial estimate", so an unscoped
+    // match passes with the panel closed and would survive the panel's copy
+    // being deleted.
     await expect(
-      page.locator("#methodology").getByText(/rolling miss/)
+      page.locator("#methodology").getByText(/initial estimate/)
     ).toBeVisible();
   });
 });

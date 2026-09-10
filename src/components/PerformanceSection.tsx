@@ -34,9 +34,9 @@ interface Props {
   // basis and a different number of quarters. Without each saying which,
   // 0.26 beside 0.27 reads as one of them being wrong.
   tileBasis?: string;
-  // The header over the actual column. v3 scores against the ABS's first print
-  // of the quarter rather than the latest vintage, and the column has to say
-  // which. Default keeps v1 and v2 as they are.
+  // The header over the actual column. v3 scores against the ABS's initial
+  // estimate of the quarter rather than the latest vintage, so the page can
+  // override this. Default keeps v1 and v2 as they are.
   actualLabel?: string;
 }
 
@@ -67,7 +67,7 @@ export default function PerformanceSection({
     // written that way anywhere on the page.
     .sort((a, b) => a.localeCompare(b));
   const previousModelNote = previousModelQuarters.length > 0
-    ? `The ${listQuarters(previousModelQuarters)} row${previousModelQuarters.length === 1 ? " is" : "s are"} the previous model's published call${previousModelQuarters.length === 1 ? "" : "s"}, kept as ${previousModelQuarters.length === 1 ? "it" : "they"} stood.`
+    ? `The ${listQuarters(previousModelQuarters)} row${previousModelQuarters.length === 1 ? " is" : "s are"} the previous version of the model's published call${previousModelQuarters.length === 1 ? "" : "s"}, kept as ${previousModelQuarters.length === 1 ? "it" : "they"} stood.`
     : "";
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
@@ -197,7 +197,7 @@ export default function PerformanceSection({
                   ? `Published ${e.live_run_date} — before the ABS printed this quarter`
                   : null,
                 e.model === "revised_target"
-                  ? "Published by the previous model, trained on revised GDP, less the revision adjustment"
+                  ? "Published by the previous version of the model"
                   : null,
               ]
                 .filter(Boolean)

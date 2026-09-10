@@ -48,7 +48,7 @@ export default function V3Headline({ latest, gdp }: Props) {
     <section className="mb-8 border border-border-heavy p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] uppercase tracking-wider text-label">
-          {formatQuarterLabel(nowcast.quarter)}: GDP nowcast, first print
+          {formatQuarterLabel(nowcast.quarter)}: GDP nowcast
         </p>
       </div>
 

@@ -10,8 +10,8 @@ import { formatPct } from "@/lib/format";
 // table below it no longer shows.
 //
 // THIS IS THE ONE PLACE THE MODEL'S OWN FIGURE APPEARS. Everywhere else on the
-// page "the nowcast" means the published number: the model's estimate less its
-// own rolling miss against the first print. Printed beside the headline it read
+// page "the nowcast" means the published number: the model's estimate less a
+// correction for its recent average error. Printed beside the headline it read
 // as a second forecast; here it is provenance, which is what a reader opening
 // Methodology came for.
 
@@ -70,21 +70,25 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
           </p>
           {windowQuarters != null && (
             <p>
-              This is a nowcast of the figure the ABS will print first. The
-              model is trained on first-print GDP rather than the later revised
-              series, and the published number is the model&rsquo;s estimate
-              less its own rolling miss: the average gap between its final
-              nowcast and the first print over the last {windowQuarters} printed
-              quarters
+              The number published here is a nowcast of the ABS&rsquo;s initial
+              estimate of quarterly GDP growth, the figure in the first national
+              accounts release for the quarter. The ABS revises that figure in
+              later releases, on average upward by about 0.1 percentage points,
+              so a model fitted to the revised history tends to sit above the
+              number the ABS actually publishes. To avoid that, the model is
+              estimated on the initial estimates rather than the revised series.
+              The published nowcast is then the model&rsquo;s estimate less a
+              correction for its recent average error: the mean gap between the
+              model&rsquo;s final nowcast and the ABS figure over the last{" "}
+              {windowQuarters} quarters for which an ABS figure exists
               {bc != null &&
                 `, currently ${bc.pp.toFixed(2)}pp over ${bc.n} quarters`}
-              . The correction is re-estimated each week from quarters that have
-              already printed, so it uses no information from the quarter being
-              nowcast.
+              . The correction is re-estimated each week from quarters already
+              published, so it uses nothing from the quarter being nowcast.
               {model != null && (
                 <>
-                  {" "}The model&rsquo;s own estimate for this quarter is{" "}
-                  {formatPct(model)}.
+                  {" "}The model&rsquo;s own estimate for this quarter, before
+                  the correction, is {formatPct(model)}.
                 </>
               )}
             </p>
@@ -92,7 +96,7 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
           {performance && n > 0 && (
             <p>
               Over the last {n} quarters the published nowcast has missed the
-              first print by {performance.mae_pct.toFixed(2)}pp on average
+              ABS figure by {performance.mae_pct.toFixed(2)}pp on average
               {performance.bias_pct > 0.05 &&
                 `, and has run ${performance.bias_pct.toFixed(2)}pp high`}
               {performance.bias_pct < -0.05 &&

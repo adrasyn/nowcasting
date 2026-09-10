@@ -20,11 +20,11 @@ describe("loadDashboardData", () => {
     expect(typeof data).toBe("object");
   });
 
-  // ONE NOWCAST, ONE TARGET. v3 is trained on first-print GDP and publishes
-  // the model's figure less its own rolling miss against that first print. The
-  // model's own figure rides along as provenance; nothing on the page scores
-  // against the latest vintage any more.
-  it("v3 performance is scored against the ABS first print", () => {
+  // ONE NOWCAST, ONE TARGET. v3 is estimated on the ABS's initial estimates
+  // and publishes the model's figure less its recent average error against
+  // them. The model's own figure rides along as provenance; nothing on the
+  // page scores against the latest vintage any more.
+  it("v3 performance is scored against the ABS's initial estimate", () => {
     const data = loadDashboardData();
     const p = data.performanceV3;
     expect(p).toBeDefined();
@@ -35,13 +35,13 @@ describe("loadDashboardData", () => {
     for (const e of p!.errors) {
       expect(typeof e.qoq_model_nowcast_pct).toBe("number");
       expect(typeof e.qoq_actual_pct).toBe("number");
-      // Every row says which model produced it — the current first-print model,
-      // or the previous revised-target one for a quarter it published live.
+      // Every row says which model produced it — the current one, or the
+      // previous revised-target version for a quarter it published live.
       expect(["first_print", "revised_target"]).toContain(e.model);
     }
   });
 
-  it("the published nowcast is the model's figure less its rolling miss", () => {
+  it("the published nowcast is the model's figure less its recent average error", () => {
     const data = loadDashboardData();
     const v3 = data.latestV3;
     // Payloads emitted before 2026-09-10 carry no correction; there is nothing

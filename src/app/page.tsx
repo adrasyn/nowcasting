@@ -104,23 +104,24 @@ export default function Home() {
           sourceFile="data/backtest_v3.json"
           title="Track record"
           intro="These are backtested estimates, not live nowcasts."
-          actualLabel="First print"
+          actualLabel="Actual"
           notes={
-            "Actual is the ABS's first print of the quarter, the number this " +
-            "nowcast is built to match. The nowcast is the model's estimate " +
-            "less its rolling miss against recent first prints. " +
-            "MAE (mean absolute error) is the " +
-            "average size of the miss, ignoring direction. Bias is the average " +
-            "signed miss, so a positive value means the nowcast tends to come " +
-            "in high. The RBA column shows the RBA's forecast published " +
-            "mid-quarter for each June and December quarter. " +
-            "From 10 September 2026 the model is trained on first-print GDP " +
-            "and corrected by its own rolling miss; earlier figures for this " +
-            "quarter have been rebuilt on that basis."
+            "Actual is the ABS's initial estimate of quarterly GDP growth, the " +
+            "figure the nowcast is built to match. The nowcast is the model's " +
+            "estimate less its average error over recent quarters. MAE (mean " +
+            "absolute error) is the average size of the miss, ignoring " +
+            "direction. Bias is the average signed miss, so a positive value " +
+            "means the nowcast tends to come in high. For comparison, the RBA " +
+            "column shows the RBA's forecast published mid-quarter (about two " +
+            "months before our full-quarter estimate) for each June and " +
+            "December quarter. From 10 September 2026 the model is estimated " +
+            "on the ABS's initial estimates and corrected for its recent " +
+            "average error; earlier figures for this quarter have been rebuilt " +
+            "on that basis."
           }
           showGap={false}
           showRbaTile={false}
-          tileBasis="vs the ABS first print"
+          tileBasis="quarterly growth"
           afterTiles={
             <V3RbaCompare rba={data.performanceV3.rba_comparison} />
           }

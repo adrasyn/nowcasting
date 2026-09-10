@@ -26,11 +26,11 @@ export default function V3RbaCompare({ rba }: Props) {
   ];
 
   return (
-    <div className="mb-4 border border-border p-4">
+    <div className="border border-border p-4">
       <p className="mb-3 text-[10px] uppercase tracking-wider text-label">
         {/* The parenthetical is kept whole: left to wrap it breaks on the
             hyphens and a phone reads "(year-on-" / "year)". */}
-        MAE comparison over last 3 years{" "}
+        MAE vs the RBA, last 3 years{" "}
         <span className="whitespace-nowrap">(year-on-year)</span>
       </p>
       <div className="space-y-2">

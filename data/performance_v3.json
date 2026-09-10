@@ -10,11 +10,11 @@
   "model_bias_vs_first_print_pct": 0.14,
   "model_mae_vs_first_print_pct": 0.18,
   "rba_comparison": {
-    "n": 6,
+    "n": 7,
     "avg_edge_pp": -0.08,
-    "ours_mae": 0.17,
+    "ours_mae": 0.16,
     "rba_mae": 0.24,
-    "we_were_closer": 4
+    "we_were_closer": 5
   },
   "errors": [
     {
@@ -328,9 +328,9 @@
       "live_run_date": "2026-08-31",
       "yoy_nowcast": 2.26,
       "yoy_actual": 2.14,
-      "yoy_rba": null,
-      "somp_release": null,
-      "edge_pp": null,
+      "yoy_rba": 1.9,
+      "somp_release": "2026-05",
+      "edge_pp": -0.12,
       "adjusted_retroactively": true
     }
   ]

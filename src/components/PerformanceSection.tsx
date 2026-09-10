@@ -38,6 +38,10 @@ interface Props {
   // estimate of the quarter rather than the latest vintage, so the page can
   // override this. Default keeps v1 and v2 as they are.
   actualLabel?: string;
+  // What sits in the first tile slot. Default: the MAE tile. `false` drops
+  // it; a node replaces it (v3 puts the RBA comparison there, because the
+  // owner would rather see the miss against a benchmark than the miss alone).
+  maeTile?: ReactNode | false;
 }
 
 export default function PerformanceSection({
@@ -52,6 +56,7 @@ export default function PerformanceSection({
   afterTiles,
   tileBasis,
   actualLabel = "Actual",
+  maeTile,
 }: Props) {
   const hasLive = performance.errors.some((e) => e.is_live);
   // A quarter the CURRENT model never published: it was called live by the
@@ -98,11 +103,13 @@ export default function PerformanceSection({
           </p>
         ))}
       <div className={`grid gap-3 mb-4 ${showRbaTile ? "grid-cols-3" : "grid-cols-2"}`}>
-        <Tile
-          label="MAE"
-          value={`${performance.mae_pct.toFixed(2)}pp`}
-          sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
-        />
+        {maeTile === undefined ? (
+          <Tile
+            label="MAE"
+            value={`${performance.mae_pct.toFixed(2)}pp`}
+            sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
+          />
+        ) : maeTile}
         <Tile
           label="Bias"
           value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}

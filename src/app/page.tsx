@@ -122,7 +122,7 @@ export default function Home() {
           showGap={false}
           showRbaTile={false}
           tileBasis="quarterly growth"
-          afterTiles={
+          maeTile={
             <V3RbaCompare rba={data.performanceV3.rba_comparison} />
           }
         />

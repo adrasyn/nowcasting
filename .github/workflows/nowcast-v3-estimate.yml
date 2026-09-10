@@ -60,6 +60,10 @@ jobs:
           import json, numpy as np
           m = json.loads(str(np.load("state/au_estimate.npz")["meta"]))
           print(f"estimated {m['asof']} in {m['minutes']} min")
+          # WHICH GDP THE FIT WAS TRAINED ON. `first_print` since 2026-09-10;
+          # the weekly nowcast refuses a state fitted on any other target, so
+          # the log should say it here rather than at the refusal.
+          print(f"  target {m['target']}")
           print(f"  panel {m['panel_rows']}x{m['panel_cols']} "
                 f"({m['panel_first']}..{m['panel_last']})")
           print(f"  GDP Global loading {m['gdp_global_loading']} "

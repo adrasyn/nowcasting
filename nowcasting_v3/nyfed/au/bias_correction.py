@@ -86,6 +86,18 @@ def load_misses(path: str | Path = MISSES_CSV) -> pd.DataFrame:
     frame["release_date"] = pd.to_datetime(frame["release_date"])
     for c in ("model_qoq_pct", "first_print_qoq_pct", "miss_pp"):
         frame[c] = frame[c].astype(float)
+    # THE THREE NUMBER COLUMNS MUST AGREE. `miss_pp` is what the correction is
+    # a mean of, and the other two are what a reader would check it against, so
+    # a row where they disagree is a hand edit that changed one field and not
+    # the others. Silently trusting `miss_pp` would publish a correction that no
+    # pair of figures in the file supports. 1e-4 is the file's own precision.
+    bad = (frame["miss_pp"]
+           - (frame["model_qoq_pct"] - frame["first_print_qoq_pct"])).abs() > 1e-4
+    if bad.any():
+        q = sorted(frame["quarter"][bad])
+        raise ValueError(
+            f"{path}: miss_pp is not model_qoq_pct - first_print_qoq_pct for "
+            f"{q}; fix the row rather than the miss")
     return frame[COLUMNS].sort_values("release_date").reset_index(drop=True)
 
 

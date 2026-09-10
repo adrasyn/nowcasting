@@ -81,6 +81,47 @@ def load_first_release(path: str | Path = FIRST_RELEASE_CSV) -> pd.Series:
     return s
 
 
+def published_gdp(fallback_vintage_dir: str | Path) -> pd.Series:
+    """Every quarter of real GDP the ABS has actually printed.
+
+    THIS USED TO READ A TEST FIXTURE. `tests/fixtures/au/vintage` is a recording
+    made for replay tests, and its GDP stops at 2026 Q1. The callers append
+    quarters the model called live once the ABS prints them — and decide "has it
+    printed?" by looking the quarter up in this series. Against a frozen
+    recording the answer was permanently no, so the append never fired: 2026 Q2,
+    the first quarter this model nowcast in public, sat in
+    `nowcast_history_v3.json` and never reached the table. The commit that added
+    that block is called "a quarter the model called live would never reach the
+    track record". It was right about the problem and fed the fix a fixture.
+
+    Fetches GDP alone, not the whole panel — one ABS call. Falls back to the
+    recording at `fallback_vintage_dir` if the fetch fails, because a track
+    record that is one quarter stale beats a weekly job that dies, and says
+    which it used either way.
+
+    LIVES HERE, NOT IN A TOOL. `tools/record_first_print.py` records the first
+    print and the miss before the nowcast runs, and `tools/emit_backtest_json.py`
+    keeps the same appends as a safety net; both need the same live series, and
+    two copies of this could drift into scoring against two different vintages.
+    The build imports are local because `nyfed.au.build` imports this module.
+    """
+    from nyfed.au.build import fetch_vintage, load_vintage
+    from nyfed.au.sources import AU_SERIES
+
+    src = tuple(s for s in AU_SERIES if s.key == "gdp")
+    try:
+        g = fetch_vintage(src).series["gdp"].dropna()
+        print(f"  actuals: live ABS, through {g.index[-1].date()}", flush=True)
+        return g
+    except Exception as exc:                                    # noqa: BLE001
+        g = load_vintage(Path(fallback_vintage_dir)).series["gdp"].dropna()
+        print(f"::warning::live GDP fetch failed ({type(exc).__name__}: {exc}); "
+              f"scoring against the recorded vintage, which ends "
+              f"{g.index[-1].date()} — quarters after it cannot be scored",
+              flush=True)
+        return g
+
+
 def latest_qoq(levels: pd.Series) -> pd.Series:
     g = levels.dropna().sort_index()
     return (g / g.shift(1) - 1) * 100

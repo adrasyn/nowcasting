@@ -875,7 +875,10 @@ gap.
 `data/first_print_misses.csv` holds one row per printed quarter — the model's
 final nowcast (the last figure a reader saw before the print), the first print
 and the miss — seeded from the retrained backtest and appended by
-`emit_backtest_json.py` each Monday after a print. `rolling_miss` averages the
+`record_first_print.py` each Monday after a print, which the weekly workflow
+runs BEFORE the nowcast so the correction sees the quarter that printed on the
+Wednesday (`emit_backtest_json.py` repeats the appends as a no-op safety net).
+`rolling_miss` averages the
 last 8 printed quarters, needs at least 4, and otherwise the weekly runner
 refuses with "no bias estimate" rather than publish an uncorrected number. At
 launch the correction is about +0.06pp.

@@ -121,6 +121,27 @@ def test_load_misses_refuses_duplicates(tmp_path):
         load_misses(p)
 
 
+def test_load_misses_refuses_a_row_whose_miss_is_not_its_own_arithmetic(tmp_path):
+    """A hand edit that moved one figure and not the others.
+
+    `miss_pp` is what the correction averages, and the two columns beside it are
+    what anyone would check it against. A row where they disagree would publish
+    a correction that no pair of numbers in the file supports, and nothing on
+    the page would show it. The quarter has to be named or the file is a
+    haystack.
+    """
+    p = tmp_path / "m.csv"
+    p.write_text(HEADER
+                 + "2025Q1,2025-06-04,0.5000,0.2000,0.3000,backtest\n"
+                 + "2025Q2,2025-09-03,0.6000,0.2000,0.3000,backtest\n")
+    with pytest.raises(ValueError, match="2025Q2"):
+        load_misses(p)
+    # ...and the arithmetic that does hold is not disturbed by rounding at the
+    # file's own precision.
+    p.write_text(HEADER + "2025Q1,2025-06-04,0.5000,0.2000,0.3000,backtest\n")
+    assert float(load_misses(p)["miss_pp"].iloc[0]) == pytest.approx(0.3)
+
+
 def test_the_committed_misses_file_covers_the_backtest_era():
     m = load_misses()
     assert len(m) == 15

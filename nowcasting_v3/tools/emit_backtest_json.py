@@ -69,43 +69,10 @@ import pandas as pd
 from nyfed.au.bias_correction import (
     BIAS_WINDOW_QUARTERS, MISSES_CSV, append_miss, load_misses, rolling_miss,
 )
-from nyfed.au.build import fetch_vintage, load_vintage
-from nyfed.au.sources import AU_SERIES
 from nyfed.au.first_release import (
-    FIRST_RELEASE_CSV, append_first_print, load_first_release,
+    FIRST_RELEASE_CSV, append_first_print, load_first_release, published_gdp,
     quarter_end_month,
 )
-
-def _published_gdp() -> pd.Series:
-    """Every quarter of real GDP the ABS has actually printed.
-
-    THIS USED TO READ A TEST FIXTURE. `tests/fixtures/au/vintage` is a recording
-    made for replay tests, and its GDP stops at 2026 Q1. The block below appends
-    quarters the model called live once the ABS prints them — and decides "has it
-    printed?" by looking the quarter up in this series. Against a frozen
-    recording the answer was permanently no, so the append never fired: 2026 Q2,
-    the first quarter this model nowcast in public, sat in
-    `nowcast_history_v3.json` and never reached the table. The commit that added
-    that block is called "a quarter the model called live would never reach the
-    track record". It was right about the problem and fed the fix a fixture.
-
-    Fetches GDP alone, not the whole panel — one ABS call. Falls back to the
-    recording if the fetch fails, because a track record that is one quarter
-    stale beats a weekly job that dies, and says which it used either way.
-    """
-    src = tuple(s for s in AU_SERIES if s.key == "gdp")
-    try:
-        g = fetch_vintage(src).series["gdp"].dropna()
-        print(f"  actuals: live ABS, through {g.index[-1].date()}", flush=True)
-        return g
-    except Exception as exc:                                    # noqa: BLE001
-        g = load_vintage(
-            ROOT / "nowcasting_v3/tests/fixtures/au/vintage").series["gdp"].dropna()
-        print(f"::warning::live GDP fetch failed ({type(exc).__name__}: {exc}); "
-              f"scoring against the recorded vintage, which ends "
-              f"{g.index[-1].date()} — quarters after it cannot be scored",
-              flush=True)
-        return g
 
 
 def _quarter_start(label: str) -> pd.Timestamp:
@@ -148,8 +115,13 @@ def main() -> int:
     # figure that stood when the ABS published, which is what "how wrong was it"
     # means to a reader. Averaging a quarter's three vintages would flatter the
     # model by cancelling revisions within the quarter.
-    gdp = _published_gdp()
+    gdp = published_gdp(REPO / "tests/fixtures/au/vintage")
 
+    # NORMALLY THERE IS NOTHING LEFT TO APPEND BY THE TIME THIS RUNS.
+    # `tools/record_first_print.py` does both appends earlier in the weekly job,
+    # before the nowcast reads the misses file; what follows is the same work
+    # again as a safety net, and a no-op when that step has already done it.
+    #
     # THE FIRST PRINT IS RECORDED HERE, ON THE MONDAY AFTER THE PRINT. This is
     # the one step in the weekly job that already holds live GDP, and the
     # newest quarter in a live fetch is its first print until the next

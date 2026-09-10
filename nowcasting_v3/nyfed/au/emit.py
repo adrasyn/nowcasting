@@ -260,8 +260,9 @@ def nowcast_payload(
         # publishes. `basis` is about the emitted figure; this is about the
         # parameters behind it, and the two were different things until
         # 2026-09-10. A reader comparing an archived payload to a current one
-        # needs to be able to tell which.
-        "target": "first_print",
+        # needs to be able to tell which. Read off the panel rather than
+        # written in, so a payload cannot claim a target the fit did not use.
+        "target": panel.target,
         "generated_at": generated_at,
         "as_of": asof,
         "target_quarter": out_h[0]["quarter"] if out_h else None,
@@ -334,10 +335,8 @@ def migrate_history_runs(runs: list[dict], pp: float) -> list[dict]:
     """Move v3-history-1 rows onto the first-print basis. Pure; returns new dicts.
 
     RETIRED for the history file itself -- `migrate_history_runs_v3` is what
-    `_record` runs now. Still used by `tools/emit_backtest_json.py`, whose
-    scoring has not moved yet; it is idempotent on a row that already carries
-    `model_qoq_growth_pct`, which every surviving row does, so it is a no-op
-    there until that scoring is rewritten.
+    `_record` runs now. Retired from the production path; kept for the record
+    and exercised only by `tests/test_au_emit.py`.
 
     A row written before 2026-09-09 holds the MODEL's figure in `qoq_growth_pct`.
     Since then `qoq_growth_pct` is the first-print nowcast (model less the mean

@@ -248,7 +248,9 @@ def main() -> int:
     # is the model's own bias against the quantity it predicts: +0.20pp with
     # t = 3.9 over the first-print backtest. The published figure takes off the
     # mean of the last eight printed quarters' misses, rolling, from
-    # `data/first_print_misses.csv`.
+    # `data/first_print_misses.csv`. That file was brought up to date earlier in
+    # the same weekly job by `tools/record_first_print.py`, so a quarter the ABS
+    # printed last Wednesday is already in the window this reads.
     #
     # A MISSING ESTIMATE IS A REFUSAL, not a degrade. Publishing the raw model
     # would put an uncorrected figure on a page whose `basis` says the bias has

@@ -85,7 +85,8 @@ def _panel(n_months: int = 60) -> Panel:
     dates = pd.date_range("2021-01-01", periods=n_months, freq="MS")
     Y = np.zeros((3, n_months))
     return Panel(Y=Y, y_location=np.zeros((3, 1)), y_scale=np.ones((3, 1)),
-                 dates=dates, series_id=["a", "b", "gdp"], i_now=2)
+                 dates=dates, series_id=["a", "b", "gdp"], i_now=2,
+                 target="first_print")
 
 
 def _correction(pp: float = _PP) -> BiasEstimate:
@@ -221,7 +222,8 @@ def _panel_with_gap(n_months: int = 60, empty_tail: int = 4) -> Panel:
     Y = np.zeros((3, n_months))
     Y[:, -empty_tail:] = np.nan
     return Panel(Y=Y, y_location=np.zeros((3, 1)), y_scale=np.ones((3, 1)),
-                 dates=dates, series_id=["a", "b", "gdp"], i_now=2)
+                 dates=dates, series_id=["a", "b", "gdp"], i_now=2,
+                 target="first_print")
 
 
 def _payload(panel, horizons, draws, months=None):

@@ -53,9 +53,18 @@ def main() -> int:
         model = round(float(last["nowcast_qq"].median()), 4)
         first = round(float(last["first_print_qq"].iloc[0]), 4)
         label = f"{target[:4]} Q{target[-1]}"
+        # NO DATE MEANS NO ROW. `rolling_miss` selects on `release_date`, so an
+        # empty one would sort to the front and quietly drop out of every
+        # window; a target label the rule cannot parse is a broken measurement
+        # file, not a quarter to record without a date.
+        release = gdp_release_date(label)
+        if release is None:
+            raise ValueError(
+                f"{target!r} does not parse as a quarter, so it has no ABS "
+                f"release date; fix the target column in {SOURCES}")
         rows.append({
             "quarter": target,
-            "release_date": gdp_release_date(label) or "",
+            "release_date": release,
             "model_qoq_pct": model,
             "first_print_qoq_pct": first,
             "miss_pp": round(model - first, 4),

@@ -32,11 +32,11 @@ import numpy as np
 import pandas as pd
 
 from nyfed.au.build import (
-    COLLAPSED_GLOBAL_LOADING,
     P_E,
     P_F,
     Panel,
     build_panel,
+    collapse_floor,
     fetch_vintage,
     load_vintage,
     target_periods,
@@ -205,10 +205,20 @@ def main() -> int:
 
     n_pad = pad_to_next_quarter(panel)
     gdp = vintage.series["gdp"].dropna()
-    # THE ABS REVISES UP. The model predicts the latest vintage, because that is
-    # what it was trained on; the page is judged against the first print. The
+    # THE ABS REVISES UP. The model predicted the latest vintage, because that
+    # is what it was trained on; the page is judged against the first print. The
     # difference has averaged about +0.1pp a quarter for forty years, and the
     # published nowcast takes it off.
+    #
+    # THAT PREMISE EXPIRED ON 2026-09-10 and this correction has not caught up
+    # yet. `build_panel` now defaults to the first-print target, so a model
+    # fitted on it already predicts the first print and subtracting a mean
+    # revision on top would double-count. Nothing publishes wrongly in the
+    # meantime: the target check above refuses any estimate fitted on the other
+    # target, and `state/au_estimate.npz` is still the latest-vintage fit, so
+    # this path cannot run until the quarterly estimate is re-run. The
+    # replacement is the model's own rolling miss against the first print
+    # (`nyfed/au/bias_correction.py`), wired in next.
     #
     # A MISSING ESTIMATE IS NOW A REFUSAL, not a degrade. Publishing the model's
     # raw figure would put a nowcast of the latest vintage on a page that says
@@ -238,17 +248,46 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    # THE SAVED FIT MUST HAVE LEARNED THE SERIES THIS PANEL CARRIES.
+    # `build_panel` and `estimate_au.py` moved to the first-print target on
+    # 2026-09-10; the estimate file's shape did not change, so a fit made on
+    # the revised target loads without complaint and produces a number that
+    # means something else entirely -- a nowcast of the revised figure on a
+    # page that says it nowcasts the first print. Nothing downstream can see
+    # the difference, so it is refused here.
+    #
+    # EXIT 1, NOT A `refused` PAYLOAD. A stale feed is a fact about this week
+    # and the site renders it; this is a deployment error -- the quarterly job
+    # has not been re-run since the target changed -- and it is fixed by
+    # running `tools/estimate_au.py`, not by waiting a week.
+    #
+    # Estimates saved before 2026-09-10 carry no `target` key at all, and every
+    # one of them was fitted on the revised target, so that is what a missing
+    # key means.
+    est_target = meta.get("target", "latest")
+    if est_target != panel.target:
+        print(f"TARGET MISMATCH: the saved estimate was fitted on the "
+              f"{est_target!r} GDP target and this panel carries "
+              f"{panel.target!r}. The parameters describe a different quantity, "
+              "and nothing further down would show it. Re-run "
+              "tools/estimate_au.py to fit the quarterly estimate on "
+              f"{panel.target!r}.", file=sys.stderr)
+        return 1
+
     # ---- the state space, from the saved fit -----------------------------
     spec = load_spec(SPEC_PATH)
     n, n_f = spec.blocks.shape
     param = map_parameter(est["param_vec"], (n, n_f, P_F, P_E))
     loading = float(param.Lambda[panel.i_now, 0])
-    if loading <= COLLAPSED_GLOBAL_LOADING:
+    # The floor follows the panel's target, and the check above has already
+    # established that the estimate was fitted on the same one.
+    floor = collapse_floor(panel.target)
+    if loading <= floor:
         write(refusal_payload(
             reason="collapsed model",
             detail=(f"the saved estimate has {panel.series_id[panel.i_now]}'s "
                     f"loading on the Global factor at {loading:.3f}, at or below "
-                    f"the {COLLAPSED_GLOBAL_LOADING} floor"),
+                    f"the {floor} floor for the {panel.target} target"),
             generated_at=now, asof=asof))
         return 0
 
@@ -421,7 +460,7 @@ def main() -> int:
         prev_level=float(gdp.iloc[-1]), prev_quarter=_quarter(gdp.index[-1]),
         vintages=vintages, next_gdp_release_date=release,
         generated_at=now, asof=asof, gdp_global_loading=loading,
-        collapse_floor=COLLAPSED_GLOBAL_LOADING,
+        collapse_floor=floor,
         n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED,
         months_with_data=months, revision=revision)
     payload["estimate"] = {"estimated_at": meta["estimated_at"],

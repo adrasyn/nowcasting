@@ -66,6 +66,28 @@ harmless as a specification: a backtest built on this primitive is
 inherits both halves. A true real-time evaluation needs recorded vintages, one
 per ``asof``, not one recording replayed at many.
 
+THE TARGET IS AN EXCEPTION, AND IT IS THE ONE THAT MATTERS
+-----------------------------------------------------------
+The paragraph above holds for the fourteen INPUT rows. It no longer holds for
+the row the model is asked to predict. Since 2026-09-10 ``build_panel``
+defaults to ``target="first_print"``: the ``gdp`` row carries the growth the ABS
+PRINTED FIRST for each quarter, cumulated into an index by
+``first_release.first_release_index``, rather than the growth today's vintage
+says happened.
+
+The reason is what the page claims. v3 headlines a nowcast of the first print --
+that is the number a reader can check against the ABS on release day -- and a
+model trained on revised data predicts the revised figure, so the published
+number had to be corrected by an average revision to mean what it said. Training
+on the target you publish removes one of those two steps and makes the remaining
+correction (`nyfed/au/bias_correction.py`) a correction for the model's OWN
+miss rather than for the ABS's revision practice.
+
+``target="latest"`` is still available and is what the end-to-end gate's pinned
+loadings were measured on. The two are guarded at different heights, because a
+first-print GDP row is noisier and loads the common factor lower when healthy:
+see ``collapse_floor``, which is the only place either floor is chosen.
+
 Freshness is checked on the series that actually enter the panel, which means
 ``household_spending`` is checked *after* deflation: if the deflator ran out
 before the nominal series did, the real row's trailing months are NaN and that
@@ -91,10 +113,12 @@ TWO GUARDS, NOT ONE
 ``check_freshness`` refuses a panel whose inputs have gone stale. The second
 guard is further down and refuses a *model*: :func:`state_space` raises
 :class:`CollapsedFactorError` when the fitted chain has left the nowcast target
-disconnected from the factor its monthly series feed. NO seed of thirty lands
-there on the shipping panel since `DEFAULT_START` moved to 1980; 18 of 30 did
-before it, the result runs and produces a plausible number, and that number is
-not a nowcast. Neither guard has a bypass flag.
+disconnected from the factor its monthly series feed. It still fires: no seed of
+thirty lands there on the revised target since `DEFAULT_START` moved to 1980,
+but two of thirty do on the first-print target the model now trains on, and 18
+of 30 did on the 1990 panel. In that basin the result runs and produces a
+plausible number, and that number is not a nowcast. Neither guard has a bypass
+flag. The floor is per target -- see `collapse_floor`.
 
 VINTAGES: WHY THE GATE DOES NOT FETCH
 -------------------------------------
@@ -131,6 +155,7 @@ from nyfed.au.deflator import (
 from nyfed.au.fetch_abs import fetch_abs_series
 from nyfed.au.fetch_rba import fetch_rba_series
 from nyfed.au.fetch_v2 import read_v2_series
+from nyfed.au.first_release import first_release_index, load_first_release
 from nyfed.au.freshness import check_freshness
 from nyfed.au.initval import seed_lambda
 from nyfed.au.panel import Panel, assemble
@@ -148,10 +173,13 @@ from nyfed.ssm import StateSpace
 
 __all__ = [
     "COLLAPSED_GLOBAL_LOADING",
+    "COLLAPSED_GLOBAL_LOADING_FIRST_PRINT",
     "CollapsedFactorError",
     "DEFAULT_START",
+    "TARGETS",
     "Vintage",
     "build_panel",
+    "collapse_floor",
     "estimate_short",
     "fetch_vintage",
     "free_parameter_mask",
@@ -216,6 +244,23 @@ __all__ = [
 # flat line this comment originally described.
 DEFAULT_START = "1980-01-01"
 
+# THE FLOOR IS PER TARGET, and this block is about the REVISED (latest-vintage)
+# one. `COLLAPSED_GLOBAL_LOADING_FIRST_PRINT` below is the shipping model's, and
+# `collapse_floor` is the only place either is chosen. The reason there are two
+# is measured, not stylistic: the first print is a noisier series than the
+# revised one -- the ABS's revision to quarterly growth has a mean ABSOLUTE size
+# of 0.64pp over the 266 quarters this repo holds both for (0.69pp before 2020,
+# `data/gdp_first_release.csv` against the recorded vintage) -- so a first-print
+# GDP row shares less of its variation with the common factor and its loading
+# sits lower for a HEALTHY chain. Over the same 40 vintages x 3 seeds of Plan
+# C's backtest the median loading is 1.473 on the revised target and 0.885 on
+# the first print, with 83% of first-print chains below 1.0 and none below 0.59
+# (`docs/measurements/2026-08-30-plan-c-backtest.csv` and
+# `2026-09-09-plan-c-first-print-target.csv`). One floor for both targets would
+# have to be wrong in one direction or the other: at 1.0 it refuses five sixths
+# of the healthy first-print chains, and at 0.5 it admits the revised target's
+# whole middle band.
+#
 # The floor the nowcast target's Global loading has to clear before a state
 # space built from a sampler run may be used. See `CollapsedFactorError`.
 #
@@ -253,6 +298,57 @@ DEFAULT_START = "1980-01-01"
 # reason -- it lands on the first vintage and the anchor fits, where the guard
 # already retries.
 COLLAPSED_GLOBAL_LOADING = 1.0
+
+# The same floor for the FIRST-PRINT target, the one that ships. Measured
+# 2026-09-10 the same way: thirty cold-start seeds at n_gs=200, n_burn=100 on
+# the shipping panel at asof 2026-08-26, sorted in
+# `tests/test_au_end_to_end.py` as `FIRST_PRINT_SEEDS_SORTED`.
+#
+# TWO BASINS, AND NOTHING BETWEEN THEM. Two of the thirty collapse (0.1824,
+# 0.2146) and the other twenty-eight run 0.7925..1.3295. Unlike the revised
+# target on the 1990 panel, this target shows NO middle band: the widest gap in
+# the distribution, 0.2146 -> 0.7925, is also the only gap wider than 0.1, and
+# nothing was observed inside it here or in the 120 backtest chains (whose
+# minimum is 0.5887).
+#
+# 0.5 sits inside that gap, which is the same placement rule that put the
+# revised target's floor at 1.0 inside ITS widest gap. It is not the midpoint
+# and does not need to be: the rule is "in the gap", and 0.5 leaves the wider
+# margin on the side that matters, refusing a chain a long way above the
+# collapsed pair rather than shaving the identified basin's lower edge.
+#
+# THE COLLAPSED BASIN IS REAL ON THIS TARGET AND WAS NOT EXPECTED. The plan for
+# this task assumed the first-print target had no collapsed basin -- thirty
+# seeds on the revised target's 1980 panel had none -- and the sweep found one
+# at 2 in 30. That is why the floor is set from the gap rather than simply put
+# below the lowest chain measured: a floor under 0.18 would admit both collapsed
+# chains, and it is a collapse guard.
+COLLAPSED_GLOBAL_LOADING_FIRST_PRINT = 0.5
+
+# EXPERIMENTS ONLY, and there is deliberately no CLI flag on the production
+# tools that reaches it. `tools/plan_c_backtest.py --collapse-floor` sets it so
+# that a sweep can RECORD chains the shipping floor would refuse and cut
+# afterwards, which is how both floors above were measured in the first place.
+# `state_space` reads it at call time; nothing in production ever sets it.
+FLOOR_OVERRIDE: float | None = None
+
+TARGETS = ("first_print", "latest")
+
+
+def collapse_floor(target: str) -> float:
+    """The Global-loading floor for a panel built on ``target``.
+
+    THE ONE PLACE EITHER FLOOR IS CHOSEN. `state_space`, `estimate_au.py`,
+    `run_au_nowcast.py` and the backtest all come through here, so a panel and
+    the guard applied to it cannot disagree about which target is in play.
+    """
+    if FLOOR_OVERRIDE is not None:
+        return FLOOR_OVERRIDE
+    if target == "first_print":
+        return COLLAPSED_GLOBAL_LOADING_FIRST_PRINT
+    if target == "latest":
+        return COLLAPSED_GLOBAL_LOADING
+    raise ValueError(f"unknown target {target!r}; expected one of {TARGETS}")
 
 
 class CollapsedFactorError(Exception):
@@ -534,12 +630,19 @@ def build_panel(
     asof: str,
     start: str = DEFAULT_START,
     vintage: str | Path | Vintage | None = None,
+    target: str = "first_print",
 ) -> Panel:
     """Fetch every registered series, refuse if any is stale, and assemble.
 
     ``vintage`` is ``None`` for a live fetch, or a recorded vintage (a
     directory, or an already-loaded :class:`Vintage`) to replay.
+
+    ``target`` is which GDP series row ``i_now`` carries -- the ABS's first
+    print (the default, and what ships) or the current revised vintage. It is
+    recorded on the returned panel, and `collapse_floor` reads it back.
     """
+    if target not in TARGETS:
+        raise ValueError(f"unknown target {target!r}; expected one of {TARGETS}")
     asof_ts = pd.Timestamp(asof)
     if vintage is None:
         v = fetch_vintage()
@@ -547,6 +650,30 @@ def build_panel(
         v = vintage
     else:
         v = load_vintage(vintage)
+
+    if target == "first_print":
+        # THE MODEL LEARNS THE FIRST PRINT. Same dates, same release lags, same
+        # level at the last quarter; only the growth path changes, to what the
+        # ABS printed first. See `first_release.first_release_index`.
+        #
+        # BEFORE `as_of`, NOT AFTER. `first_release_index` pins its cumulated
+        # index to the anchor's level at the last quarter the two share, so
+        # substituting after the release-date cut would make the index's scale
+        # a function of `asof` -- a slightly different target series at every
+        # vintage, and a backtest that is not comparable across its own rows.
+        # The cut then applies to the substituted series exactly as it did to
+        # the fetched one.
+        #
+        # ONLY `gdp` MOVES. `gdi` and `unit_labour_cost` stay latest-vintage:
+        # they are inputs, and this panel is revision-blind in its values by
+        # design (see this module's docstring). What changes here is what the
+        # model is asked to PREDICT.
+        series_fp = dict(v.series)
+        series_fp["gdp"] = first_release_index(
+            load_first_release(), v.series["gdp"].dropna()
+        )
+        v = Vintage(series=series_fp, deflator_sources=v.deflator_sources,
+                    recorded_at=v.recorded_at)
 
     vintage_asof = v.as_of(asof_ts)
     series, deflator_sources = vintage_asof.series, vintage_asof.deflator_sources
@@ -586,6 +713,9 @@ def build_panel(
     # quarterly index rather than a real monthly one, and nothing else in the
     # production path says so.
     panel.deflator_skipped = deflator.skipped
+    # Which GDP series the target row carries, carried out with the panel so
+    # that `collapse_floor` and any saved estimate can check it.
+    panel.target = target
     return panel
 
 
@@ -728,18 +858,25 @@ def state_space(
         )
     i_global = spec.block_names.index("Global")
     loading = float(param.Lambda[panel.i_now, i_global])
-    if loading <= COLLAPSED_GLOBAL_LOADING:
+    # THE FLOOR FOLLOWS THE PANEL'S TARGET. A first-print GDP row is noisier
+    # than a revised one and loads the common factor lower when healthy, so the
+    # two targets are guarded at different heights; see `collapse_floor`.
+    floor = collapse_floor(panel.target)
+    if loading <= floor:
         raise CollapsedFactorError(
             f"{panel.series_id[panel.i_now]}'s loading on the Global factor is "
-            f"{loading:.3f}, at or below the {COLLAPSED_GLOBAL_LOADING} floor: "
+            f"{loading:.3f}, at or below the {floor} floor for the "
+            f"{panel.target!r} target: "
             "this chain settled in the basin where the target series is not "
             "connected to the panel, and any nowcast from it would be driven by "
             "the target's own dynamics rather than by the monthly data. "
-            "Measured over ninety chains (thirty seeds on each of three "
-            "panels), 18 of 30 landed below this floor at the 1990 start and "
-            "9 of 30 on the shortest-cpi control, and lengthening the chain to "
-            "2,000 sweeps does not resolve it. See CollapsedFactorError for why "
-            "a different seed is a workaround and not a fix."
+            "Each floor is measured over thirty cold-start seeds and placed in "
+            "the gap between the collapsed and identified basins: 18 of 30 "
+            "landed below 1.0 on the revised target at the 1990 start, and 2 "
+            "of 30 below 0.5 on the first-print target at the 1980 one. "
+            "Lengthening the chain to 2,000 sweeps does not resolve it. See "
+            "CollapsedFactorError for why a different seed is a workaround and "
+            "not a fix."
         )
 
     latent = Latent(sigma=result.sigmas.mean(axis=2), s=result.ss.mean(axis=2))

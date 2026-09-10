@@ -65,6 +65,18 @@ class Panel:
     # quarterly prices for the months that tier would have covered, so it
     # has to be visible HERE and not only to a direct deflator caller.
     deflator_skipped: dict[str, str] = field(default_factory=dict)
+    # WHICH GDP SERIES ROW ``i_now`` CARRIES. ``"first_print"`` is what the ABS
+    # published first for each quarter (cumulated into an index by
+    # ``first_release.first_release_index``); ``"latest"`` is the current, fully
+    # revised vintage. Nothing in this module reads it -- ``assemble`` takes
+    # whatever series it is handed -- but it travels with the panel because two
+    # things downstream depend on which target was used: the collapse floor
+    # (``build.collapse_floor``; GDP's Global loading is systematically lower on
+    # the noisier first-print row) and any saved estimate, which is only valid
+    # for the target it was fitted on. The default is ``"latest"`` so a panel
+    # built by hand from ``assemble`` describes itself honestly;
+    # ``build.build_panel`` defaults to the first print, which is what ships.
+    target: str = "latest"
 
 
 MIN_OBS_TO_STANDARDISE = 2

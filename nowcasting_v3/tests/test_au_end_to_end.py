@@ -201,7 +201,22 @@ I_GLOBAL = 0
 
 @pytest.fixture(scope="module")
 def panel() -> Panel:
-    return build_panel(asof=ASOF, vintage=VINTAGE)
+    """`target="latest"` DELIBERATELY, and it is no longer the default.
+
+    THIS FIXTURE IS THE REGRESSION RECORD FOR THE REVISED TARGET. Every seed
+    list, every pinned loading and every collapse-floor constant above and below
+    was measured on the latest-vintage GDP row, over three panels and several
+    hundred chains. `build_panel` defaults to `target="first_print"` since
+    2026-09-10 (see `nyfed/au/build.py`), and a first-print row moves every one
+    of those numbers -- so pinning the target here keeps the record measuring
+    what it was measured on, rather than silently re-baselining it.
+
+    The first-print target has its own tests: `tests/test_au_build_target.py`
+    for the substitution and the floor, and
+    `test_the_gate_runs_on_the_first_print_target_and_clears_its_floor` below
+    for the whole pipeline on the shipping default.
+    """
+    return build_panel(asof=ASOF, vintage=VINTAGE, target="latest")
 
 
 @pytest.fixture(scope="module")
@@ -226,8 +241,13 @@ def legacy_panel() -> Panel:
     so the guard has nowhere to demonstrate itself. Deleting its tests because
     the current panel is healthy would leave the guard unexercised until the day
     it matters. This panel is where it fires.
+
+    `target="latest"` for the same reason as `panel` above: `COLLAPSED_SEED`,
+    `MIDDLE_BAND_SEED` and the thirty-seed list they come from are measurements
+    of the revised target on a 1990 window, and they stay measurements of it.
     """
-    return build_panel(asof=ASOF, start=LEGACY_START, vintage=VINTAGE)
+    return build_panel(asof=ASOF, start=LEGACY_START, vintage=VINTAGE,
+                       target="latest")
 
 
 @pytest.fixture(scope="module")
@@ -1346,3 +1366,86 @@ def test_the_floor_sits_in_the_gap_measured_on_both_panels():
         assert lo < COLLAPSED_GLOBAL_LOADING < hi
     assert not (control_gap[0] < 0.75 < control_gap[1])
     assert not (shipping_gap[0] < 0.75 < shipping_gap[1])
+
+
+# --- the first-print target, and its own floor ------------------------------
+
+# THE FIRST-PRINT TARGET, MEASURED 2026-08-26 on the shipping panel (the
+# recording's last buildable month), thirty cold-start seeds, 200+100 sweeps,
+# sorted:
+#
+#   0.1824 0.2146 | 0.7925 0.7936 0.7962 0.8051 0.8486 0.8568 0.8575 0.8607
+#                   0.8700 0.8752 0.8785 0.8825 0.8834 0.9076 0.9089 0.9094
+#                   0.9318 0.9500 0.9523 0.9668 0.9914 0.9990 1.0041 1.0069
+#                   1.1695 1.2776 1.2835 1.3295
+#
+# TWO BASINS AND NO MIDDLE BAND. One collapsed basin -- two of thirty, at 0.1824
+# and 0.2146 -- and one identified basin of twenty-eight running 0.7925 to
+# 1.3295. Nothing sits between them: 0.2146 -> 0.7925 is the widest gap in the
+# distribution and the only one wider than 0.1. That is the shape the revised
+# target showed on the 1990 panel MINUS its middle band, which is the part that
+# made the old 0.75 floor wrong.
+#
+# So `COLLAPSED_GLOBAL_LOADING_FIRST_PRINT` is 0.5, placed inside that gap by
+# the same rule that put the revised target's floor at 1.0 inside its own. It is
+# not a scaled-down 1.0 and it is not the midpoint; it is a value the
+# measurement leaves free, with room on both sides -- 0.28 above the highest
+# collapsed chain and 0.29 below the lowest identified one, and 0.09 below the
+# lowest first-print chain in Plan C's 120-chain backtest (0.5887).
+#
+# WHY NOT SIMPLY BELOW THE MINIMUM. The brief for this task expected no
+# collapsed basin on this target and told the implementer to stop if any seed
+# came in under 0.6. Two did. A floor below 0.1824 would admit both, and this is
+# a collapse guard: the gap is the evidence, not the minimum.
+FIRST_PRINT_SEEDS_SORTED = [
+    0.1824, 0.2146, 0.7925, 0.7936, 0.7962, 0.8051, 0.8486, 0.8568, 0.8575,
+    0.8607, 0.8700, 0.8752, 0.8785, 0.8825, 0.8834, 0.9076, 0.9089, 0.9094,
+    0.9318, 0.9500, 0.9523, 0.9668, 0.9914, 0.9990, 1.0041, 1.0069, 1.1695,
+    1.2776, 1.2835, 1.3295,
+]
+
+
+def test_the_first_print_floor_sits_in_the_gap_between_its_two_basins():
+    """0.5 is placed by the measurement, not by rounding.
+
+    The assertion is the same shape as the revised target's above: the floor is
+    strictly inside the widest gap in the measured distribution, with the
+    collapsed basin below it and the identified one above.
+    """
+    from nyfed.au.build import COLLAPSED_GLOBAL_LOADING_FIRST_PRINT as floor
+
+    gaps = [(lo, hi) for lo, hi in zip(FIRST_PRINT_SEEDS_SORTED,
+                                       FIRST_PRINT_SEEDS_SORTED[1:])]
+    widest = max(gaps, key=lambda g: g[1] - g[0])
+    assert widest == (0.2146, 0.7925)
+    assert widest[0] < floor < widest[1]
+    below = [x for x in FIRST_PRINT_SEEDS_SORTED if x < floor]
+    above = [x for x in FIRST_PRINT_SEEDS_SORTED if x > floor]
+    assert len(below) == 2 and len(above) == 28
+    assert len(FIRST_PRINT_SEEDS_SORTED) == 30
+
+
+def test_the_gate_runs_on_the_first_print_target_and_clears_its_floor():
+    """One seed, the gate's own, on the shipping panel with the first-print target.
+
+    NOT A COPY OF THE FIXTURE ABOVE. `panel` is pinned to `target="latest"`
+    because it is the regression record for the revised target; this is the only
+    place the gate takes the PRODUCTION default all the way through the sampler
+    and the guarded funnel.
+
+    Measured 2026-09-10: 0.946 at this seed and vintage, against a floor of 0.5
+    and against 1.413 for the same seed on the revised target. The gap between
+    those two is the whole reason the floor is per target. It agrees with the
+    sweep, which put seed 4 at 0.9094 on the 2026-08-26 vintage.
+    """
+    from nyfed.au.build import COLLAPSED_GLOBAL_LOADING_FIRST_PRINT
+
+    p = build_panel(asof=ASOF, vintage=VINTAGE)             # default target
+    assert p.target == "first_print"
+    res = estimate_short(p, n_gs=N_GS, n_burn=N_BURN, seed=SEED)
+    state_space(p, res)                                     # must not raise
+    spec = load_spec(SPEC_PATH)
+    n, n_f = spec.blocks.shape
+    loading = float(map_parameter(np.median(res.params, axis=1),
+                                  (n, n_f, P_F, P_E)).Lambda[p.i_now, I_GLOBAL])
+    assert loading > COLLAPSED_GLOBAL_LOADING_FIRST_PRINT

@@ -18,6 +18,13 @@ reads them. Roughly 170 KB of float64, committed, so the weekly job has no
 artifact store to depend on and a reader can see what the published number was
 built from.
 
+WHICH TARGET IS SAVED WITH THE FIT. `build_panel` defaults to
+`target="first_print"` since 2026-09-10 -- the model learns the growth the ABS
+printed first, which is the number the page headlines -- and the meta records
+which target the parameters were fitted on. The weekly job refuses an estimate
+fitted on the other one, because the two produce the same-shaped file with
+different meanings.
+
 THE LATENTS ARE TIME-INDEXED AND THE PANEL GROWS. `sigma` and `s` are
 (n_f + n, T) over the estimation panel's months. A weekly panel is longer, so the
 weekly job extends them by repeating the last column -- a starting value the
@@ -41,11 +48,11 @@ import numpy as np
 import pandas as pd
 
 from nyfed.au.build import (
-    COLLAPSED_GLOBAL_LOADING,
     P_E,
     P_F,
     CollapsedFactorError,
     build_panel,
+    collapse_floor,
     estimate_short,
     fetch_vintage,
     load_vintage,
@@ -100,7 +107,8 @@ def main() -> int:
 
     settings = QUICK if args.quick else PROD
     print(f"panel {panel.Y.shape[0]}x{panel.Y.shape[1]} "
-          f"({panel.dates[0].date()}..{panel.dates[-1].date()})", flush=True)
+          f"({panel.dates[0].date()}..{panel.dates[-1].date()}), "
+          f"target {panel.target}", flush=True)
     print(f"sampling {settings['n_gs']}+{settings['n_burn']} at seed {SEED}...",
           flush=True)
     result = estimate_short(panel, seed=SEED, spec_path=SPEC_PATH, **settings)
@@ -140,15 +148,22 @@ def main() -> int:
             "panel_cols": int(panel.Y.shape[1]),
             "series_id": list(panel.series_id),
             "gdp_global_loading": round(loading, 4),
-            "collapse_floor": COLLAPSED_GLOBAL_LOADING,
+            # WHICH GDP SERIES THIS FIT LEARNED. An estimate is only valid for
+            # the target it was fitted on -- a first-print fit used against a
+            # latest-vintage panel is the same numbers under the wrong name --
+            # so `run_au_nowcast.py` refuses a mismatch rather than assuming.
+            # Absent on estimates saved before 2026-09-10, which were all
+            # latest-vintage; that is the default the reader assumes.
+            "target": panel.target,
+            "collapse_floor": collapse_floor(panel.target),
             "minutes": round((time.perf_counter() - started) / 60, 1),
         }),
     )
     size_kb = out.stat().st_size / 1024
     print(f"\nwrote {out} ({size_kb:.0f} KB) in "
           f"{(time.perf_counter() - started) / 60:.1f} min", flush=True)
-    print(f"  GDP's Global loading {loading:.3f} "
-          f"(floor {COLLAPSED_GLOBAL_LOADING})", flush=True)
+    print(f"  target {panel.target}; GDP's Global loading {loading:.3f} "
+          f"(floor {collapse_floor(panel.target)})", flush=True)
     return 0
 
 

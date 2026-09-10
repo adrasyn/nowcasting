@@ -24,10 +24,18 @@ THREE SEEDS PER VINTAGE, MEDIAN TAKEN. Within-basin sampler noise is ~0.078pp
 q/q, which is a quarter of the error being measured. One seed per vintage would
 report the sampler as much as the model.
 
+THE TARGET DEFAULTS TO THE FIRST PRINT, which is what the model ships trained
+on since 2026-09-10. `--target latest` runs the old, revised-vintage target for
+comparison; both are scored against BOTH series in every row, so an A/B is two
+runs of this tool and a join on `asof`. The substitution itself is no longer
+done here -- `build_panel(target=...)` does it, and `collapse_floor(target)`
+picks the matching floor -- so the experiment and production cannot drift apart.
+
 WHAT THIS IS NOT: a true real-time backtest. The recorded vintage carries ABS's
 CURRENT figures, so cutting it at an `asof` reproduces what was PUBLISHED by
-then, not what those numbers LOOKED LIKE then. The model sees revised data and
-is scored against revised outcomes. That flatters it, and the write-up says so.
+then, not what those numbers LOOKED LIKE then. The model sees revised INPUTS
+(the target row excepted, above) and is scored against both the revised outcome
+and the first print. That flatters it, and the write-up says so.
 
 Run:
     cd nowcasting_v3
@@ -43,11 +51,11 @@ import pandas as pd
 
 import nyfed.au.build as build_mod
 from nyfed.au.build import (
-    COLLAPSED_GLOBAL_LOADING, P_E, P_F, Vintage, build_panel, estimate_short,
-    load_vintage, state_space, target_periods,
+    P_E, P_F, build_panel, collapse_floor, estimate_short, load_vintage,
+    state_space, target_periods,
 )
 from nyfed.au.emit import annualised_to_qoq
-from nyfed.au.first_release import first_release_index, load_first_release
+from nyfed.au.first_release import load_first_release
 from nyfed.nowcast import point_nowcast
 from nyfed.parameters import map_parameter
 from nyfed.spec import load_spec
@@ -71,38 +79,37 @@ FIELDS = ["asof", "target", "target_date", "horizon_months", "seed",
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--target", choices=("latest", "first_print"), default="latest",
-                    help="which GDP series the model is TRAINED on. Scoring is "
-                         "always reported against both.")
-    ap.add_argument("--collapse-floor", type=float, default=COLLAPSED_GLOBAL_LOADING,
-                    help="loading at or below which a chain is treated as "
-                         "collapsed and not nowcast. The shipping floor was "
-                         "calibrated on the latest-vintage target; a first-print "
-                         "target lowers gdp's loading, so the experiment records "
-                         "chains the shipping floor would refuse and cuts "
+    ap.add_argument("--target", choices=("latest", "first_print"),
+                    default="first_print",
+                    help="which GDP series the model is TRAINED on; the default "
+                         "is what ships. Scoring is always reported against "
+                         "both.")
+    ap.add_argument("--collapse-floor", type=float, default=None,
+                    help="override the floor at or below which a chain is "
+                         "treated as collapsed and not nowcast. Each target has "
+                         "its own calibrated floor (nyfed/au/build.py), and "
+                         "this is how they were measured: lowering it records "
+                         "chains the shipping floor would refuse, to be cut "
                          "afterwards.")
     args = ap.parse_args()
-    # `state_space` is the guarded funnel and it reads build.py's module global
-    # at call time, so the floor has to be set THERE, not on the name this tool
-    # imported. Both are moved together to keep the two tests in agreement.
-    floor = args.collapse_floor
-    build_mod.COLLAPSED_GLOBAL_LOADING = floor
+    # THE OVERRIDE GOES ON build.py's MODULE GLOBAL, not on a name this tool
+    # imported: `state_space` is the guarded funnel and it reads the module at
+    # call time. `collapse_floor` honours the override too, so the tool's own
+    # `collapsed` column and the funnel's refusal cannot disagree.
+    if args.collapse_floor is not None:
+        build_mod.FLOOR_OVERRIDE = args.collapse_floor
+    floor = collapse_floor(args.target)
     out = Path(args.out); t0 = time.perf_counter()
-    print(f"collapse floor: {floor}", flush=True)
+    print(f"target: {args.target}   collapse floor: {floor}"
+          f"{'  (overridden)' if args.collapse_floor is not None else ''}",
+          flush=True)
 
+    # SCORED AGAINST BOTH SERIES WHATEVER IT IS TRAINED ON, so the two runs of
+    # this tool are directly comparable. `actual_qq` is the revised outcome and
+    # `FIRST` the first print; the substitution into the panel is
+    # `build_panel`'s job, not this tool's.
     gdp = VINT.series["gdp"].dropna()
     actual_qq = (gdp / gdp.shift(1) - 1) * 100
-    vint = VINT
-    if args.target == "first_print":
-        # THE TREATMENT. Same recording, same dates, same lags; only the
-        # target's VALUES change, to what the ABS printed first. `gdi` and
-        # `unit_labour_cost` stay latest-vintage: they are inputs, and the
-        # panel is revision-blind by design (see build.py).
-        vint = Vintage(series=dict(VINT.series), deflator_sources=VINT.deflator_sources,
-                       recorded_at=VINT.recorded_at)
-        vint.series["gdp"] = first_release_index(FIRST, gdp)
-        print(f"target: first-print index, {vint.series['gdp'].index[0].date()}.."
-              f"{vint.series['gdp'].index[-1].date()}", flush=True)
 
     fh = out.open("w", newline=""); w = csv.DictWriter(fh, fieldnames=FIELDS)
     w.writeheader(); fh.flush()
@@ -110,7 +117,7 @@ def main() -> int:
     for asof in pd.date_range(WINDOW_FIRST, WINDOW_LAST, freq="MS"):
         stamp = str(asof.date())
         try:
-            panel = build_panel(asof=stamp, vintage=vint)
+            panel = build_panel(asof=stamp, vintage=VINT, target=args.target)
         except Exception as exc:                                # noqa: BLE001
             print(f"{stamp}  UNBUILDABLE {type(exc).__name__}: {str(exc)[:80]}",
                   flush=True)

@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import type { Performance } from "@/lib/types";
-import { formatMillions, formatPct } from "@/lib/format";
+import { formatMillions, formatPct, formatQuarterLabel } from "@/lib/format";
+
+/** "Q2 2026", "Q1 and Q2 2026", "Q4 2025, Q1 and Q2 2026". */
+function listQuarters(quarters: string[]): string {
+  if (quarters.length <= 1) return quarters[0] ?? "";
+  return `${quarters.slice(0, -1).join(", ")} and ${quarters[quarters.length - 1]}`;
+}
 
 interface Props {
   performance: Performance;
@@ -47,6 +53,21 @@ export default function PerformanceSection({
   tileBasis,
   actualLabel = "Actual",
 }: Props) {
+  const hasLive = performance.errors.some((e) => e.is_live);
+  // A quarter the CURRENT model never published: it was called live by the
+  // previous one, trained on revised GDP, and is kept as it stood rather than
+  // restated by a model that was not running that week. Named from the data —
+  // which quarter that is moves as the track record grows.
+  const previousModelQuarters = performance.errors
+    .filter((e) => e.model === "revised_target")
+    .map((e) => e.target_quarter)
+    // "2026 Q2" sorts chronologically as a string; "Q2 2026" does not, so
+    // order first and format second.
+    .sort((a, b) => a.localeCompare(b))
+    .map(formatQuarterLabel);
+  const previousModelNote = previousModelQuarters.length > 0
+    ? `The ${listQuarters(previousModelQuarters)} row${previousModelQuarters.length === 1 ? " is" : "s are"} the previous model's published call${previousModelQuarters.length === 1 ? "" : "s"}, kept as ${previousModelQuarters.length === 1 ? "it" : "they"} stood.`
+    : "";
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
@@ -166,7 +187,9 @@ export default function PerformanceSection({
             <tr
               key={e.target_quarter}
               className={`border-b border-border ${e.is_live ? "bg-panel" : ""}`}
-              title={e.is_live
+              title={e.model === "revised_target"
+                ? "Published by the previous model, trained on revised GDP, less the revision adjustment"
+                : e.is_live
                 ? `Published ${e.live_run_date} — before the ABS printed this quarter`
                 : undefined}
             >
@@ -202,15 +225,25 @@ export default function PerformanceSection({
         </tbody>
       </table>
       </div>
-      {performance.errors.some((e) => e.is_live) && (
+      {(hasLive || previousModelQuarters.length > 0) && (
         <p className="mt-2 flex items-center gap-2 text-[10px] text-label">
-          <span
-            aria-hidden="true"
-            className="inline-block h-3 w-6 border border-border bg-panel"
-          />
-          Shaded rows are live nowcasts — published before the ABS printed that
-          quarter. The rest are backtested: the model re-run over data that was
-          already known.
+          {hasLive && (
+            <>
+              <span
+                aria-hidden="true"
+                className="inline-block h-3 w-6 border border-border bg-panel"
+              />
+              <span>
+                Shaded rows are live nowcasts — published before the ABS printed
+                that quarter. The rest are backtested: the model re-run over
+                data that was already known.
+                {previousModelQuarters.length > 0 && ` ${previousModelNote}`}
+              </span>
+            </>
+          )}
+          {!hasLive && previousModelQuarters.length > 0 && (
+            <span>{previousModelNote}</span>
+          )}
         </p>
       )}
     </section>

@@ -111,15 +111,21 @@ export interface AccuracyError {
   qoq_error_pp?: number;
   // v3 scores one number against one target: `qoq_nowcast_pct` is the published
   // nowcast and `qoq_actual_pct` is the ABS's first print of the quarter, the
-  // number it is built to match. The two fields below are provenance rather
-  // than the score — the model's own figure before the average upward revision
-  // was taken off, and the same quarter as the ABS now reports it after
-  // revisions. Absent on v1 and v2 payloads.
+  // number it is built to match. The fields below are provenance rather than
+  // the score — the model's own figure before its rolling miss was taken off,
+  // the correction that was taken off, and the same quarter as the ABS now
+  // reports it after revisions. Absent on v1 and v2 payloads.
   qoq_model_nowcast_pct?: number | null;
+  bias_correction_pp?: number | null;
   qoq_latest_vintage_pct?: number | null;
-  // TRUE when this row was shifted by TODAY's revision adjustment rather than
-  // by the one that stood on its own day, which was never computed. Honest
-  // approximation, flagged rather than hidden.
+  // Which model produced this row: "first_print" is the current one, trained on
+  // first-print GDP and corrected by its own rolling miss; "revised_target" is
+  // the previous one, trained on the revised series, kept for quarters it
+  // published live rather than restated by a model that did not publish them.
+  model?: "first_print" | "revised_target";
+  // TRUE when this row was shifted by TODAY's correction rather than by the one
+  // that stood on its own day, which was never computed. Honest approximation,
+  // flagged rather than hidden.
   adjusted_retroactively?: boolean;
   yoy_nowcast: number | null;
   yoy_actual: number | null;
@@ -158,13 +164,15 @@ export interface Performance {
   // on v1 and v2, which score against the latest vintage.
   basis?: string;
   n?: number;
-  // The average upward revision taken off the model's figure to produce the
-  // published nowcast, and how the model's own figure scores against the
-  // latest revised data. Provenance for the published number, not the number
-  // itself — the tiles and the table above are the score.
-  revision_adjustment_pp?: number | null;
-  model_mae_vs_latest_pct?: number | null;
-  model_bias_vs_latest_pct?: number | null;
+  // What the model was trained on: "first_print" on v3. Absent on v1 and v2.
+  target?: string;
+  // How many printed quarters the rolling miss averages over, and how the
+  // model's own uncorrected figure scores against the first print. Provenance
+  // for the published number, not the number itself — the tiles and the table
+  // above are the score.
+  bias_window_quarters?: number;
+  model_mae_vs_first_print_pct?: number | null;
+  model_bias_vs_first_print_pct?: number | null;
   rba_comparison: RbaComparison;
   errors: AccuracyError[];
 }
@@ -270,10 +278,10 @@ export interface V3Horizon {
   ci_95_low?: number;
   ci_95_high?: number;
   gdp_chain_volume_millions?: number;
-  // The model's own estimate, before the ABS's average upward revision is
-  // taken off. `qoq_growth_pct` above is the published figure — this less the
-  // adjustment — and is what the whole page means by "the nowcast". This one
-  // appears once, in the methodology panel, as provenance.
+  // The model's own estimate, before its rolling miss against the first print
+  // is taken off. `qoq_growth_pct` above is the published figure — this less
+  // the correction — and is what the whole page means by "the nowcast". This
+  // one appears once, in the methodology panel, as provenance.
   model_qoq_growth_pct?: number;
 }
 
@@ -295,13 +303,20 @@ export interface LatestV3 {
   horizons: V3Horizon[];
   vintages?: V3Vintage[];
   next_gdp_release_date?: string;
-  revision_adjustment?: {
+  // What the model was trained on: "first_print". Absent on payloads emitted
+  // before 2026-09-10.
+  target?: string;
+  // The model's own rolling miss against the first print, taken off its
+  // estimate to produce the published figure. Re-estimated each week from
+  // quarters that have already printed, so it carries no information about the
+  // quarter being nowcast. Absent on payloads emitted before 2026-09-10.
+  bias_correction?: {
     pp: number;
     n: number;
+    window_quarters: number;
+    min_quarters: number;
     first_quarter: string;
     last_quarter: string;
-    window_quarters: number;
-    min_age_quarters: number;
     basis: string;
   } | null;
   ci_basis?: string;

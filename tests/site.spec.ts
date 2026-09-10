@@ -58,6 +58,10 @@ test.describe("homepage", () => {
     await expect(
       page.getByText(/New York Fed Staff Nowcast 2\.0/).first()
     ).toBeVisible();
+    // The panel is the one place that explains what the published number is:
+    // the model's estimate less its own rolling miss against the first print.
+    // The panel is closed by default, so this assertion lives here.
+    await expect(page.getByText(/rolling miss/).first()).toBeVisible();
   });
 });
 

@@ -10,9 +10,9 @@ import { formatPct } from "@/lib/format";
 // table below it no longer shows.
 //
 // THIS IS THE ONE PLACE THE MODEL'S OWN FIGURE APPEARS. Everywhere else on the
-// page "the nowcast" means the published number: the model's estimate less the
-// ABS's average upward revision. Printed beside the headline it read as a
-// second forecast; here it is provenance, which is what a reader opening
+// page "the nowcast" means the published number: the model's estimate less its
+// own rolling miss against the first print. Printed beside the headline it read
+// as a second forecast; here it is provenance, which is what a reader opening
 // Methodology came for.
 
 interface Props {
@@ -25,7 +25,13 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
   const n = performance?.n ?? performance?.errors.length ?? 0;
   const horizon = latest?.horizons?.find((h) => h.kind === "nowcast");
   const model = horizon?.model_qoq_growth_pct;
-  const adjPp = latest?.revision_adjustment?.pp ?? performance?.revision_adjustment_pp;
+  // The correction itself rides on `latest_v3.json`; the window it averages
+  // over is also on `performance_v3.json`, which is the fallback when this
+  // week's payload predates the field. Numbers are stated only from the
+  // payload that carries them — a window with no correction beside it still
+  // describes the method truthfully, an invented pp would not.
+  const bc = latest?.bias_correction;
+  const windowQuarters = bc?.window_quarters ?? performance?.bias_window_quarters;
 
   return (
     <section id="methodology" className="mb-10">
@@ -62,18 +68,25 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
             used, because Australia publishes no monthly equivalent of several
             US series and we use only freely available data.
           </p>
-          {adjPp != null && (
+          {windowQuarters != null && (
             <p>
-              This is a nowcast of the figure the ABS will print first, which it
-              later revises up by about {adjPp.toFixed(2)}pp on average
+              This is a nowcast of the figure the ABS will print first. The
+              model is trained on first-print GDP rather than the later revised
+              series, and the published number is the model&rsquo;s estimate
+              less its own rolling miss: the average gap between its final
+              nowcast and the first print over the last {windowQuarters} printed
+              quarters
+              {bc != null &&
+                `, currently ${bc.pp.toFixed(2)}pp over ${bc.n} quarters`}
+              . The correction is re-estimated each week from quarters that have
+              already printed, so it uses no information from the quarter being
+              nowcast.
               {model != null && (
                 <>
-                  ; the model&rsquo;s own estimate for this quarter is{" "}
-                  {formatPct(model)}, and the published number is that less the
-                  adjustment
+                  {" "}The model&rsquo;s own estimate for this quarter is{" "}
+                  {formatPct(model)}.
                 </>
               )}
-              .
             </p>
           )}
           {performance && n > 0 && (
@@ -85,13 +98,13 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
               {performance.bias_pct < -0.05 &&
                 `, and has run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
               .
-              {performance.model_mae_vs_latest_pct != null &&
-                performance.model_bias_vs_latest_pct != null && (
+              {performance.model_mae_vs_first_print_pct != null &&
+                performance.model_bias_vs_first_print_pct != null && (
                   <>
-                    {" "}The model&rsquo;s own figure against the latest revised
-                    data misses by {performance.model_mae_vs_latest_pct.toFixed(2)}pp
-                    with a bias of {performance.model_bias_vs_latest_pct > 0 ? "+" : ""}
-                    {performance.model_bias_vs_latest_pct.toFixed(2)}pp.
+                    {" "}Before the correction the model&rsquo;s own figure
+                    missed by {performance.model_mae_vs_first_print_pct.toFixed(2)}pp
+                    with a bias of {performance.model_bias_vs_first_print_pct > 0 ? "+" : ""}
+                    {performance.model_bias_vs_first_print_pct.toFixed(2)}pp.
                   </>
                 )}
             </p>

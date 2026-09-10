@@ -107,7 +107,9 @@ export default function Home() {
           actualLabel="First print"
           notes={
             "Actual is the ABS's first print of the quarter, the number this " +
-            "nowcast is built to match. MAE (mean absolute error) is the " +
+            "nowcast is built to match. The nowcast is the model's estimate " +
+            "less its rolling miss against recent first prints. " +
+            "MAE (mean absolute error) is the " +
             "average size of the miss, ignoring direction. Bias is the average " +
             "signed miss, so a positive value means the nowcast tends to come " +
             "in high. The RBA column shows the RBA's forecast published " +

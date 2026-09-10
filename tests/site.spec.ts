@@ -61,11 +61,11 @@ test.describe("homepage", () => {
     // a nowcast of the ABS's initial estimate, less a correction for the
     // model's recent average error. The panel is closed by default, so this
     // assertion lives here — and it is SCOPED TO #methodology because the
-    // track-record notes above also say "initial estimate", so an unscoped
+    // track-record notes above also say "average error", so an unscoped
     // match passes with the panel closed and would survive the panel's copy
     // being deleted.
     await expect(
-      page.locator("#methodology").getByText(/initial estimate/)
+      page.locator("#methodology").getByText(/most recent average error/)
     ).toBeVisible();
   });
 });

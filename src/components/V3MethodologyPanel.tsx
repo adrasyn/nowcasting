@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { LatestV3, Performance } from "@/lib/types";
-import { formatPct } from "@/lib/format";
 
 // Copy supplied by James, used as written. The figures in the last paragraphs
 // are read from `performance_v3.json` and `latest_v3.json` rather than typed
@@ -23,8 +22,6 @@ interface Props {
 export default function V3MethodologyPanel({ performance, latest }: Props) {
   const [open, setOpen] = useState(false);
   const n = performance?.n ?? performance?.errors.length ?? 0;
-  const horizon = latest?.horizons?.find((h) => h.kind === "nowcast");
-  const model = horizon?.model_qoq_growth_pct;
   // The correction itself rides on `latest_v3.json`; the window it averages
   // over is also on `performance_v3.json`, which is the fallback when this
   // week's payload predates the field. Numbers are stated only from the
@@ -56,7 +53,11 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
               New York Fed Staff Nowcast 2.0
             </a>{" "}
             — a Bayesian dynamic factor model, ported to Python from the
-            Fed&rsquo;s published MATLAB.
+            Fed&rsquo;s published MATLAB. We then apply a correction for the
+            model&rsquo;s most recent average error: the mean gap between the
+            model&rsquo;s final nowcast and the ABS figure over the last{" "}
+            {windowQuarters ?? 8} quarters
+            {bc != null && `, currently ${bc.pp.toFixed(2)}pp`}.
           </p>
           <p>
             Fourteen monthly and quarterly series load onto five latent factors:
@@ -68,31 +69,6 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
             used, because Australia publishes no monthly equivalent of several
             US series and we use only freely available data.
           </p>
-          {windowQuarters != null && (
-            <p>
-              The number published here is a nowcast of the ABS&rsquo;s initial
-              estimate of quarterly GDP growth, the figure in the first national
-              accounts release for the quarter. The ABS revises that figure in
-              later releases, on average upward by about 0.1 percentage points,
-              so a model fitted to the revised history tends to sit above the
-              number the ABS actually publishes. To avoid that, the model is
-              estimated on the initial estimates rather than the revised series.
-              The published nowcast is then the model&rsquo;s estimate less a
-              correction for its recent average error: the mean gap between the
-              model&rsquo;s final nowcast and the ABS figure over the last{" "}
-              {windowQuarters} quarters for which an ABS figure exists
-              {bc != null &&
-                `, currently ${bc.pp.toFixed(2)}pp over ${bc.n} quarters`}
-              . The correction is re-estimated each week from quarters already
-              published, so it uses nothing from the quarter being nowcast.
-              {model != null && (
-                <>
-                  {" "}The model&rsquo;s own estimate for this quarter, before
-                  the correction, is {formatPct(model)}.
-                </>
-              )}
-            </p>
-          )}
           {performance && n > 0 && (
             <p>
               Over the last {n} quarters the published nowcast has missed the
@@ -102,15 +78,6 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
               {performance.bias_pct < -0.05 &&
                 `, and has run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
               .
-              {performance.model_mae_vs_first_print_pct != null &&
-                performance.model_bias_vs_first_print_pct != null && (
-                  <>
-                    {" "}Before the correction the model&rsquo;s own figure
-                    missed by {performance.model_mae_vs_first_print_pct.toFixed(2)}pp
-                    with a bias of {performance.model_bias_vs_first_print_pct > 0 ? "+" : ""}
-                    {performance.model_bias_vs_first_print_pct.toFixed(2)}pp.
-                  </>
-                )}
             </p>
           )}
         </div>

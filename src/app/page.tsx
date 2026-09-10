@@ -113,7 +113,10 @@ export default function Home() {
             "average size of the miss, ignoring direction. Bias is the average " +
             "signed miss, so a positive value means the nowcast tends to come " +
             "in high. The RBA column shows the RBA's forecast published " +
-            "mid-quarter for each June and December quarter."
+            "mid-quarter for each June and December quarter. " +
+            "From 10 September 2026 the model is trained on first-print GDP " +
+            "and corrected by its own rolling miss; earlier figures for this " +
+            "quarter have been rebuilt on that basis."
           }
           showGap={false}
           showRbaTile={false}

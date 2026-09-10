@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Performance } from "@/lib/types";
-import { formatMillions, formatPct, formatQuarterLabel } from "@/lib/format";
+import { formatMillions, formatPct } from "@/lib/format";
 
 /** "Q2 2026", "Q1 2026 and Q2 2026", "Q4 2025, Q1 2026 and Q2 2026". */
 function listQuarters(quarters: string[]): string {
@@ -61,10 +61,11 @@ export default function PerformanceSection({
   const previousModelQuarters = performance.errors
     .filter((e) => e.model === "revised_target")
     .map((e) => e.target_quarter)
-    // "2026 Q2" sorts chronologically as a string; "Q2 2026" does not, so
-    // order first and format second.
-    .sort((a, b) => a.localeCompare(b))
-    .map(formatQuarterLabel);
+    // "2026 Q2" sorts chronologically as a string, and it is also the form the
+    // table's first column shows. Left as it stands: a legend that named the
+    // quarter "Q2 2026" would send a reader looking for a row that is not
+    // written that way anywhere on the page.
+    .sort((a, b) => a.localeCompare(b));
   const previousModelNote = previousModelQuarters.length > 0
     ? `The ${listQuarters(previousModelQuarters)} row${previousModelQuarters.length === 1 ? " is" : "s are"} the previous model's published call${previousModelQuarters.length === 1 ? "" : "s"}, kept as ${previousModelQuarters.length === 1 ? "it" : "they"} stood.`
     : "";
@@ -187,11 +188,20 @@ export default function PerformanceSection({
             <tr
               key={e.target_quarter}
               className={`border-b border-border ${e.is_live ? "bg-panel" : ""}`}
-              title={e.model === "revised_target"
-                ? "Published by the previous model, trained on revised GDP, less the revision adjustment"
-                : e.is_live
-                ? `Published ${e.live_run_date} — before the ABS printed this quarter`
-                : undefined}
+              // BOTH FACTS, NOT ONE OR THE OTHER. A row from the previous
+              // model is also a live row, and the ternary this replaces let the
+              // model note hide the date it was published on — the one thing
+              // the tooltip exists to say.
+              title={[
+                e.is_live
+                  ? `Published ${e.live_run_date} — before the ABS printed this quarter`
+                  : null,
+                e.model === "revised_target"
+                  ? "Published by the previous model, trained on revised GDP, less the revision adjustment"
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined}
             >
               <td className="whitespace-nowrap py-2 pr-4">{e.target_quarter}</td>
               <td className="whitespace-nowrap py-2 pr-4">

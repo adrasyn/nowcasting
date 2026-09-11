@@ -12,7 +12,10 @@
 #      intersected with the series available at the as-of date, so early as-of
 #      dates that predate (e.g.) the NAB/yield series simply drop them.
 #   4. nowcast_midas() the target quarter and record forecast vs the rt_dgdp_qtr
-#      actual, qoq_error, direction_correct.
+#      actual, qoq_error, direction_correct. Also nowcast the NEXT quarter
+#      (horizon = "next") whenever it already has a MAI month, into the
+#      next_target_quarter / qoq_growth_forecast_next / qoq_actual_next /
+#      n_months_in_next_quarter columns (all NA when it does not).
 #
 # This file is harness GLUE ONLY: all estimation math is the v2/RBA code reused
 # via build_mai() + nowcast_midas(). Fail loud: a step that errors at an as-of
@@ -273,7 +276,21 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
       nc <- nowcast_midas(mai = mai, gdp_growth = gdp_t, as_of = as_of,
                           model = model, qa_lag = qa_lag)
 
-      list(mai = mai, nc = nc, n_sel = length(mai_res$diagnostics$selected),
+      # 4b. and the NEXT quarter, once it has a MAI month. Same panel, same MAI,
+      # same estimation sample -- only the target moves on one quarter. NULL (not a
+      # skip) while the next quarter has no month yet: that is the normal state for
+      # the first weeks after a print, not an error.
+      nc_next <- tryCatch(
+        nowcast_midas(mai = mai, gdp_growth = gdp_t, as_of = as_of,
+                      model = model, qa_lag = qa_lag, horizon = "next"),
+        error = function(e) {
+          msg <- conditionMessage(e)
+          if (startsWith(msg, "nowcast_midas(): no MAI month beyond the current quarter")) NULL
+          else stop(e)
+        })
+
+      list(mai = mai, nc = nc, nc_next = nc_next,
+           n_sel = length(mai_res$diagnostics$selected),
            sel = paste(mai_res$diagnostics$selected, collapse = "|"))
     }, error = function(e) {
       structure(list(msg = conditionMessage(e)), class = "bt_error")
@@ -300,6 +317,24 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
     qoq_err <- if (is.na(actual)) NA_real_ else fc - actual
     dir_ok  <- if (is.na(actual)) NA else (sign(fc) == sign(actual))
 
+    # Next-quarter horizon: same columns, computed the same way. All NA when the
+    # next quarter has no MAI month at this as-of.
+    nc_n <- res$nc_next
+    if (is.null(nc_n)) {
+      nq_name <- NA_character_; nq_date_chr <- NA_character_
+      nq_fc <- NA_real_; nq_actual <- NA_real_; nq_jt <- NA_integer_
+    } else {
+      nq_name <- nc_n$target_quarter
+      nq_yr <- as.integer(sub(" .*", "", nq_name))
+      nq_q  <- as.integer(sub(".*Q", "", nq_name))
+      nq_date <- as.Date(sprintf("%04d-%02d-01", nq_yr, nq_q * 3L))
+      nq_date_chr <- as.character(nq_date)
+      nq_fc <- nc_n$qoq_growth
+      nq_actual <- gdp_full$value[match(nq_date, gdp_full$date)]
+      nq_jt <- as.integer(nc_n$n_months_in_quarter)
+    }
+    if (length(nq_actual) != 1L || is.na(nq_actual)) nq_actual <- NA_real_
+
     rows[[length(rows) + 1L]] <- data.frame(
       as_of               = as.character(as_of),
       target_quarter      = tq_name,
@@ -310,14 +345,21 @@ backtest_v2 <- function(panel_rds      = "cache/panel_vintage_latest.rds",
       direction_correct   = dir_ok,
       n_months_in_quarter = nc$n_months_in_quarter,
       n_series_selected   = res$n_sel,
+      next_target_quarter      = nq_name,
+      next_target_quarter_date = nq_date_chr,
+      qoq_growth_forecast_next = nq_fc,
+      qoq_actual_next          = nq_actual,
+      n_months_in_next_quarter = nq_jt,
       stringsAsFactors    = FALSE
     )
-    if (verbose) cat(sprintf("  %s  target %-8s  fc=%+.3f  act=%s  err=%s  dir=%s  (nsel=%d, jt=%d)\n",
+    if (verbose) cat(sprintf("  %s  target %-8s  fc=%+.3f  act=%s  err=%s  dir=%s  (nsel=%d, jt=%d)  next=%s\n",
                              as.character(as_of), tq_name, fc,
                              ifelse(is.na(actual), "NA", sprintf("%+.3f", actual)),
                              ifelse(is.na(qoq_err), "NA", sprintf("%+.3f", qoq_err)),
                              ifelse(is.na(dir_ok), "NA", as.character(dir_ok)),
-                             res$n_sel, nc$n_months_in_quarter))
+                             res$n_sel, nc$n_months_in_quarter,
+                             ifelse(is.na(nq_fc), "NA",
+                                    sprintf("%s %+.3f (jt=%d)", nq_name, nq_fc, nq_jt))))
   }
 
   results <- if (length(rows)) do.call(rbind, rows) else

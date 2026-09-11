@@ -82,7 +82,11 @@ def main() -> int:
     rng = np.random.default_rng(SEED)
     for asof in pd.date_range("2023-01-01", "2026-05-01", freq="MS"):
         try:
-            panel = build_panel(asof=str(asof.date()), vintage=VINT)
+            # `target="latest"` EXPLICITLY: this tool trains and scores against
+            # the REVISED actual throughout. The production default is the
+            # first print (see nyfed/au/build.py).
+            panel = build_panel(asof=str(asof.date()), vintage=VINT,
+                                target="latest")
         except Exception:                                       # noqa: BLE001
             continue
         res = estimate_short(panel, n_gs=200, n_burn=100, seed=SEED)
@@ -113,7 +117,8 @@ def main() -> int:
 
     # ---- 2. this quarter, week by week, one state space -------------------
     latest = "2026-08-31"
-    base = build_panel(asof=latest, vintage=VINT)
+    # `target="latest"` EXPLICITLY: the revised target, as above.
+    base = build_panel(asof=latest, vintage=VINT, target="latest")
     res = estimate_short(base, n_gs=200, n_burn=100, seed=SEED)
     ssm = state_space(base, res)
     t_now = target_periods(base)
@@ -127,7 +132,9 @@ def main() -> int:
                  "ci_68_high", "ci_95_low", "ci_95_high", "data_through"])
     for d0 in pd.date_range("2026-06-01", "2026-08-24", freq="W-MON"):
         try:
-            pv = build_panel(asof=str(d0.date()), vintage=VINT)
+            # `target="latest"` EXPLICITLY: it must match `base` above, whose
+            # standardisation these weeks reuse. The revised target, as above.
+            pv = build_panel(asof=str(d0.date()), vintage=VINT, target="latest")
         except Exception:                                       # noqa: BLE001
             continue
         # Same shape and same standardisation as the estimation panel; only the

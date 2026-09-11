@@ -1,20 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import type { Performance } from "@/lib/types";
+import type { LatestV3, Performance } from "@/lib/types";
 
-// Copy supplied by James, used as written. The three figures in the last
-// paragraph are read from `performance_v3.json` rather than typed in, so a
-// re-run of the backtest cannot leave the sentence stating numbers the table
-// below it no longer shows.
+// Copy supplied by James, used as written. The figures in the last paragraphs
+// are read from `performance_v3.json` and `latest_v3.json` rather than typed
+// in, so a re-run of the backtest cannot leave the sentence stating numbers the
+// table below it no longer shows.
+//
+// THIS IS THE ONE PLACE THE MODEL'S OWN FIGURE APPEARS. Everywhere else on the
+// page "the nowcast" means the published number: the model's estimate less a
+// correction for its recent average error. Printed beside the headline it read
+// as a second forecast; here it is provenance, which is what a reader opening
+// Methodology came for.
 
 interface Props {
   performance?: Performance;
+  latest?: LatestV3;
 }
 
-export default function V3MethodologyPanel({ performance }: Props) {
+export default function V3MethodologyPanel({ performance, latest }: Props) {
   const [open, setOpen] = useState(false);
-  const n = performance?.errors.length ?? 0;
+  const n = performance?.n ?? performance?.errors.length ?? 0;
+  // The correction itself rides on `latest_v3.json`; the window it averages
+  // over is also on `performance_v3.json`, which is the fallback when this
+  // week's payload predates the field. Numbers are stated only from the
+  // payload that carries them — a window with no correction beside it still
+  // describes the method truthfully, an invented pp would not.
+  const bc = latest?.bias_correction;
+  const windowQuarters = bc?.window_quarters ?? performance?.bias_window_quarters;
 
   return (
     <section id="methodology" className="mb-10">
@@ -39,7 +53,11 @@ export default function V3MethodologyPanel({ performance }: Props) {
               New York Fed Staff Nowcast 2.0
             </a>{" "}
             — a Bayesian dynamic factor model, ported to Python from the
-            Fed&rsquo;s published MATLAB.
+            Fed&rsquo;s published MATLAB. We then apply a correction for the
+            model&rsquo;s most recent average error: the mean gap between the
+            model&rsquo;s final nowcast and the ABS figure over the last{" "}
+            {windowQuarters ?? 8} quarters
+            {bc != null && `, currently ${bc.pp.toFixed(2)}pp`}.
           </p>
           <p>
             Fourteen monthly and quarterly series load onto five latent factors:
@@ -53,12 +71,12 @@ export default function V3MethodologyPanel({ performance }: Props) {
           </p>
           {performance && n > 0 && (
             <p>
-              Over the last {n} backtested quarters this estimate has missed the
-              actual GDP figure by {performance.mae_pct.toFixed(2)}pp on average
+              Over the last {n} quarters the published nowcast has missed the
+              ABS figure by {performance.mae_pct.toFixed(2)}pp on average
               {performance.bias_pct > 0.05 &&
-                `, and has tended to run ${performance.bias_pct.toFixed(2)}pp high`}
+                `, and has run ${performance.bias_pct.toFixed(2)}pp high`}
               {performance.bias_pct < -0.05 &&
-                `, and has tended to run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
+                `, and has run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
               .
             </p>
           )}

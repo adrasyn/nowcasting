@@ -12,6 +12,9 @@ def _ok(**over):
         "status": "ok",
         "data_through": "2026-07",
         "prev_level": {"quarter": "2026 Q1", "value": 695945},
+        "basis": "abs_first_print",
+        "target": "first_print",
+        "bias_correction": {"pp": 0.0631},
         "horizons": [
             {"quarter": "2026 Q2", "kind": "nowcast", "months_with_data": 3},
             {"quarter": "2026 Q3", "kind": "forecast", "months_with_data": 1},
@@ -20,6 +23,18 @@ def _ok(**over):
                       "months_with_data": 3}],
     }
     d.update(over)
+    # Every horizon carries the model's own figure and the published one it
+    # implies -- the model less the correction -- whether the horizon came from
+    # the base dict above or from a caller's own `horizons=[...]` override, so
+    # that tests overriding `horizons` for an unrelated reason don't also have
+    # to restate the basis.
+    pp = (d.get("bias_correction") or {}).get("pp")
+    for h in d.get("horizons") or []:
+        h.setdefault("model_qoq_growth_pct", 0.5)
+        if pp is not None:
+            h.setdefault("qoq_growth_pct", h["model_qoq_growth_pct"] - pp)
+        else:
+            h.setdefault("qoq_growth_pct", h["model_qoq_growth_pct"])
     return d
 
 
@@ -115,3 +130,68 @@ def test_a_data_less_forecast_vintage_is_still_rejected():
     bad = check_payload(d, today="2026-09")
     assert any("2026 Q3" in b and "should not have been recorded" in b
                for b in bad), bad
+
+
+def test_a_nowcast_that_is_not_the_model_less_the_correction_is_a_bug():
+    d = _ok()
+    d["horizons"][0]["qoq_growth_pct"] = d["horizons"][0]["model_qoq_growth_pct"] + 1.0
+    assert any("model_qoq_growth_pct" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_an_ok_payload_without_a_correction_is_incoherent():
+    d = _ok()
+    d["bias_correction"] = None
+    assert any("bias_correction" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_an_implausible_correction_is_refused():
+    """The rolling miss is a mean of eight quarterly errors near +0.06pp. One
+    outside +-0.6 is a broken estimate, not a finding."""
+    d = _ok()
+    d["bias_correction"]["pp"] = 0.9
+    for h in d["horizons"]:
+        h["qoq_growth_pct"] = h["model_qoq_growth_pct"] - 0.9
+    assert any("bias_correction" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_correction_that_is_not_a_number_is_refused():
+    """`True` is an `int` in Python, and `pp: true` would otherwise pass the
+    range test and then shift every figure by one whole point."""
+    d = _ok()
+    d["bias_correction"]["pp"] = True
+    assert any("bias_correction" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_leftover_expected_first_print_field_is_a_bug():
+    d = _ok()
+    d["horizons"][0]["expected_first_print_pct"] = 0.5
+    assert any("expected_first_print_pct" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_leftover_revision_adjustment_is_a_bug():
+    """The retired design. A payload carrying both keys has been through half a
+    migration, and there is no telling which of the two made its figures."""
+    d = _ok()
+    d["revision_adjustment"] = {"pp": 0.1}
+    assert any("revision_adjustment" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_payload_that_does_not_name_its_basis_is_incoherent():
+    """The arithmetic can be right and the label still missing."""
+    d = _ok()
+    del d["basis"]
+    assert any("basis" in p for p in check_payload(d, today="2026-09-07"))
+
+
+def test_a_payload_that_does_not_name_its_target_is_incoherent():
+    """`target` says the MODEL was fitted on first-print GDP.
+
+    A model fitted on the revised vintage, less a rolling miss measured against
+    first prints, is a different and unvalidated quantity. The runner refuses
+    that combination; this is the last place it could still reach the site.
+    """
+    d = _ok()
+    d["target"] = "latest"
+    assert any("target" in p for p in check_payload(d, today="2026-09-07"))
+    del d["target"]
+    assert any("target" in p for p in check_payload(d, today="2026-09-07"))

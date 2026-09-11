@@ -70,15 +70,36 @@ def test_qoq_below_minus_100_raises():
 
 import numpy as np
 
-from nyfed.au.emit import SCHEMA, nowcast_payload, refusal_payload
+from nyfed.au.bias_correction import BiasEstimate
+from nyfed.au.emit import (SCHEMA, migrate_history_runs,
+                           migrate_history_runs_v3, nowcast_payload,
+                           refusal_payload)
 from nyfed.au.panel import Panel
+
+# The model's rolling miss on 2026-09-10: the mean of the last eight printed
+# quarters' misses in `data/first_print_misses.csv`.
+_PP = 0.0631
 
 
 def _panel(n_months: int = 60) -> Panel:
     dates = pd.date_range("2021-01-01", periods=n_months, freq="MS")
     Y = np.zeros((3, n_months))
     return Panel(Y=Y, y_location=np.zeros((3, 1)), y_scale=np.ones((3, 1)),
-                 dates=dates, series_id=["a", "b", "gdp"], i_now=2)
+                 dates=dates, series_id=["a", "b", "gdp"], i_now=2,
+                 target="first_print")
+
+
+def _correction(pp: float = _PP) -> BiasEstimate:
+    """A stand-in bias correction. Every payload needs one now.
+
+    The published figure is the first-print model's estimate less that model's
+    own rolling miss against the ABS first print, so `nowcast_payload` cannot
+    be built without a correction to subtract. The tests below that are about
+    something else -- units, bands, the schema stamp -- pass `_correction(0.0)`
+    so the figures they assert are the model's own, unshifted.
+    """
+    return BiasEstimate(pp=pp, n=8, window_quarters=8, min_quarters=4,
+                        first_quarter="2024Q3", last_quarter="2026Q2")
 
 
 def test_a_refusal_carries_no_number_at_all():
@@ -94,7 +115,9 @@ def test_a_refusal_carries_no_number_at_all():
     assert p["status"] == "refused"
     assert p["horizons"] == []
     assert "AiG PMI" in p["refusal_detail"]
-    for banned in ("qoq_growth_pct", "target_quarter", "prev_level", "panel"):
+    for banned in ("qoq_growth_pct", "target_quarter", "prev_level", "panel",
+                   "revision_adjustment", "bias_correction",
+                   "model_qoq_growth_pct"):
         assert banned not in p, f"a refusal must not carry {banned}"
 
 
@@ -111,7 +134,7 @@ def test_the_bands_come_from_the_draws_not_from_a_rule_of_thumb():
         panel=_panel(), horizons=[("2026 Q2", 4.0)], draws=draws,
         prev_level=700_000.0, prev_quarter="2026 Q1",
         generated_at="x", asof="2026-08-31", gdp_global_loading=1.3,
-        collapse_floor=1.0, n_gs=200, n_burn=100, seed=4)
+        collapse_floor=1.0, n_gs=200, n_burn=100, seed=4, correction=_correction(0.0))
     h = p["horizons"][0]
     want = np.percentile(annualised_to_qoq(draws[:, 0]), [2.5, 16, 84, 97.5])
     assert h["ci_95_low"] == pytest.approx(want[0], abs=5e-4)
@@ -132,7 +155,7 @@ def test_the_published_figure_is_qoq_not_annualised():
         panel=_panel(), horizons=[("2026 Q2", 4.0)], draws=np.zeros((0, 1)),
         prev_level=700_000.0, prev_quarter="2026 Q1", generated_at="x",
         asof="2026-08-31", gdp_global_loading=1.3, collapse_floor=1.0,
-        n_gs=200, n_burn=100, seed=4)
+        n_gs=200, n_burn=100, seed=4, correction=_correction(0.0))
     h = p["horizons"][0]
     assert h["annualised_growth_pct"] == pytest.approx(4.0)
     assert h["qoq_growth_pct"] == pytest.approx(0.98534, abs=1e-4)
@@ -145,7 +168,8 @@ def test_too_few_draws_emits_no_bands_rather_than_fake_ones():
     p = nowcast_payload(
         panel=_panel(), horizons=[("2026 Q2", 4.0)], draws=np.zeros((5, 1)),
         prev_level=None, prev_quarter=None, generated_at="x", asof="2026-08-31",
-        gdp_global_loading=1.3, collapse_floor=1.0, n_gs=200, n_burn=100, seed=4)
+        gdp_global_loading=1.3, collapse_floor=1.0, n_gs=200, n_burn=100, seed=4,
+        correction=_correction(0.0))
     assert "ci_68_low" not in p["horizons"][0]
     assert p["horizons"][0]["qoq_growth_pct"] == pytest.approx(0.98534, abs=1e-4)
 
@@ -161,7 +185,7 @@ def test_later_horizons_are_labelled_forecasts_not_nowcasts():
         panel=_panel(), horizons=[("2026 Q2", 3.0), ("2026 Q3", 2.5)],
         draws=draws, prev_level=700_000.0, prev_quarter="2026 Q1",
         generated_at="x", asof="2026-08-31", gdp_global_loading=1.3,
-        collapse_floor=1.0, n_gs=200, n_burn=100, seed=4)
+        collapse_floor=1.0, n_gs=200, n_burn=100, seed=4, correction=_correction(0.0))
     kinds = [h["kind"] for h in p["horizons"]]
     assert kinds == ["nowcast", "forecast"]
     assert p["target_quarter"] == "2026 Q2"
@@ -177,7 +201,8 @@ def test_the_schema_is_stamped_so_the_site_can_refuse_an_old_shape():
                               draws=np.zeros((0, 1)), prev_level=None,
                               prev_quarter=None, generated_at="x",
                               asof="y", gdp_global_loading=1.3,
-                              collapse_floor=1.0, n_gs=1, n_burn=1, seed=1)):
+                              collapse_floor=1.0, n_gs=1, n_burn=1, seed=1,
+                              correction=_correction(0.0))):
         assert p["schema"] == SCHEMA
 
 
@@ -197,7 +222,8 @@ def _panel_with_gap(n_months: int = 60, empty_tail: int = 4) -> Panel:
     Y = np.zeros((3, n_months))
     Y[:, -empty_tail:] = np.nan
     return Panel(Y=Y, y_location=np.zeros((3, 1)), y_scale=np.ones((3, 1)),
-                 dates=dates, series_id=["a", "b", "gdp"], i_now=2)
+                 dates=dates, series_id=["a", "b", "gdp"], i_now=2,
+                 target="first_print")
 
 
 def _payload(panel, horizons, draws, months=None):
@@ -206,7 +232,8 @@ def _payload(panel, horizons, draws, months=None):
         prev_level=100.0, prev_quarter="2025 Q4",
         generated_at="2026-08-31T00:00:00+00:00", asof="2026-08-31",
         gdp_global_loading=1.3, collapse_floor=1.0,
-        n_gs=10, n_burn=5, seed=4, months_with_data=months)
+        n_gs=10, n_burn=5, seed=4, months_with_data=months,
+        correction=_correction(0.0))
 
 
 def test_data_through_is_the_last_month_with_data_not_the_last_column():
@@ -316,3 +343,119 @@ def test_the_release_date_rule_and_the_scraped_date_agree_on_the_month():
     assert pick("2026-09-02", "2026 Q3") == "2026-12-02"
     # No scraped date at all falls back to the rule.
     assert pick(None, "2026 Q3") == "2026-12-02"
+
+
+# --------------------------------------------------------------------------- #
+# The first-print basis
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def panel_stub() -> Panel:
+    """The same panel the schema tests above build."""
+    return _panel()
+
+
+def test_the_published_nowcast_is_the_first_print_basis(panel_stub):
+    # One column of constant draws per horizon, each equal to that horizon's
+    # own annualised figure, so every band collapses onto the point and the
+    # loop below can assert both against the same number.
+    draws = np.column_stack([np.full(30, 2.0), np.full(30, 2.4)])
+    p = nowcast_payload(panel=panel_stub, horizons=[("2026 Q3", 2.0), ("2026 Q4", 2.4)],
+                        draws=draws, prev_level=700000.0,
+                        prev_quarter="2026 Q2", generated_at="t", asof="2026-09-07",
+                        gdp_global_loading=1.4, collapse_floor=0.3,
+                        n_gs=10, n_burn=5, seed=4, correction=_correction())
+    assert p["schema"] == "v3-preview-3"
+    assert p["basis"] == "abs_first_print"
+    # The MODEL is trained on first-print GDP now, so the payload says which
+    # target it was fitted on as well as which quantity it publishes.
+    assert p["target"] == "first_print"
+    assert p["bias_correction"]["pp"] == _PP
+    assert "revision_adjustment" not in p
+    for h in p["horizons"]:
+        model = float(annualised_to_qoq(h["annualised_growth_pct"]))
+        assert h["model_qoq_growth_pct"] == pytest.approx(model, abs=1e-4)
+        assert h["qoq_growth_pct"] == pytest.approx(model - _PP, abs=1e-4)
+        assert "expected_first_print_pct" not in h
+        for k in ("ci_68_low", "ci_68_high", "ci_95_low", "ci_95_high"):
+            assert h[k] == pytest.approx(model - _PP, abs=1e-3)   # constant draws
+    nc = p["horizons"][0]
+    assert nc["gdp_chain_volume_millions"] == round(700000.0 * (1 + nc["qoq_growth_pct"] / 100))
+
+
+def test_a_payload_cannot_be_built_without_a_bias_correction(panel_stub):
+    with pytest.raises(ValueError, match="bias"):
+        nowcast_payload(panel=panel_stub, horizons=[("2026 Q3", 2.0)],
+                        draws=np.full((30, 1), 2.0), prev_level=700000.0,
+                        prev_quarter="2026 Q2", generated_at="t", asof="2026-09-07",
+                        gdp_global_loading=1.4, collapse_floor=0.3,
+                        n_gs=10, n_burn=5, seed=4)
+
+
+def test_migrate_history_runs_moves_old_rows_to_the_first_print_basis():
+    old = [{"run_date": "2026-08-31", "target_quarter": "2026 Q2", "qoq_growth_pct": 0.6354,
+            "ci_68_low": 0.3, "ci_68_high": 0.9, "ci_95_low": 0.0, "ci_95_high": 1.2,
+            "expected_first_print_pct": None},
+           {"run_date": "2026-09-14", "target_quarter": "2026 Q3", "qoq_growth_pct": 0.64,
+            "model_qoq_growth_pct": 0.74, "revision_adjustment_pp": 0.1}]
+    new = migrate_history_runs(old, 0.0989)
+    a, b = new
+    assert a["model_qoq_growth_pct"] == 0.6354
+    assert a["qoq_growth_pct"] == pytest.approx(0.6354 - 0.0989, abs=1e-4)
+    assert a["ci_68_low"] == pytest.approx(0.3 - 0.0989, abs=1e-4)
+    assert a["revision_adjustment_pp"] == 0.0989 and a["adjusted_retroactively"] is True
+    assert "expected_first_print_pct" not in a
+    assert b == old[1]                          # already on the new basis: untouched
+    assert old[0]["qoq_growth_pct"] == 0.6354   # input not mutated
+
+
+# --------------------------------------------------------------------------- #
+# The move to the rolling miss
+# --------------------------------------------------------------------------- #
+
+
+def _row(target: str, **over) -> dict:
+    r = {"run_date": "2026-08-31", "target_quarter": target, "kind": "nowcast",
+         "qoq_growth_pct": 0.5365, "model_qoq_growth_pct": 0.6354,
+         "revision_adjustment_pp": 0.0989}
+    r.update(over)
+    return r
+
+
+def test_migrate_v3_keeps_a_printed_quarter_exactly_as_it_was():
+    """A printed quarter's rows are the RECORD OF WHAT WAS PUBLISHED.
+
+    They were on the page on release morning and the track record scores them.
+    Rewriting them onto the new model's basis would rewrite history, so they
+    keep their figures and their `revision_adjustment_pp` -- the number that
+    actually made them.
+    """
+    old = [_row("2026 Q2")]
+    new = migrate_history_runs_v3(old, {"2026 Q2"})
+    assert new == old
+    assert new[0] is not old[0], "pure: new dicts, so the caller's are safe"
+
+
+def test_migrate_v3_drops_a_quarter_the_abs_has_not_printed():
+    """Those rows belong to the SUPERSEDED model.
+
+    A row for an unprinted quarter is still live on the evolution chart, beside
+    the rows the new model is about to write. Two models' figures on one line
+    read as news; the step between them is a change of definition. They are
+    dropped, and `run_au_nowcast.py --backfill` rebuilds the quarter.
+    """
+    old = [_row("2026 Q2"), _row("2026 Q3", run_date="2026-09-07")]
+    new = migrate_history_runs_v3(old, {"2026 Q2"})
+    assert [r["target_quarter"] for r in new] == ["2026 Q2"]
+
+
+def test_migrate_v3_drops_everything_when_nothing_has_printed():
+    old = [_row("2026 Q2"), _row("2026 Q3")]
+    assert migrate_history_runs_v3(old, set()) == []
+
+
+def test_migrate_v3_does_not_mutate_its_input():
+    old = [_row("2026 Q2")]
+    migrate_history_runs_v3(old, {"2026 Q2"})[0]["qoq_growth_pct"] = 99.0
+    assert old[0]["qoq_growth_pct"] == 0.5365

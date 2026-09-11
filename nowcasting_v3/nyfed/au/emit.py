@@ -82,8 +82,46 @@ def qoq_to_annualised(qoq):
 # feed, or a chain that left GDP disconnected from the panel. Emitting nothing
 # at all would let the site show the previous week's number as if it were
 # current, which is the exact failure the guards exist to prevent.
+#
+# THERE IS ONE NOWCAST, AND IT IS A NOWCAST OF THE ABS'S FIRST PRINT. `basis`
+# says so, and `qoq_growth_pct` -- the field the page headlines, the bands
+# describe and the chart plots -- carries it. Two things make it:
+#
+#   1. THE MODEL IS TRAINED ON FIRST-PRINT GDP. `target: "first_print"` says
+#      so, and `run_au_nowcast.py` refuses an estimate fitted on any other
+#      target. Until 2026-09-10 the model was trained on the LATEST vintage and
+#      the payload subtracted a forty-year mean revision (+0.1pp) to get from
+#      one to the other. That indirection is gone: the model predicts the
+#      quantity the page is judged by, directly.
+#
+#   2. IT IS STILL BIASED, AND THE BIAS IS SUBTRACTED IN THE OPEN.
+#      `bias_correction` is the mean of the model's OWN recent misses against
+#      the first print -- eight quarters rolling, from
+#      `nyfed/au/bias_correction.py`. Section 4.1 of
+#      `docs/2026-09-01-upside-bias-report.md` asked for exactly this: subtract
+#      the recent mean error, publish it as a separate line, never fold it in
+#      silently. It is not an optional companion -- without it there is no
+#      figure to publish under this schema, and `nowcast_payload` refuses.
+#
+# The model's own figure still travels, in `model_qoq_growth_pct`, as
+# provenance -- the reader can see what was subtracted and `bias_correction`
+# says over which quarters it was measured. `annualised_growth_pct` stays the
+# MODEL's, because it is the model's native unit and the miss was never
+# measured in it.
+#
+# THE CORRECTION IS A PATCH AND IS MEANT TO GO. Same section of the same
+# report: if the rolling miss stays inside +/-0.05pp for six consecutive
+# quarters, drop it, because a correction that small is noise published as
+# information.
+#
+# `revision_adjustment` was the field this replaced, and before that a
+# two-number design (`qoq_growth_pct` raw, plus a companion
+# `expected_first_print_pct`). Two figures on a page is a question the reader
+# has to answer -- which one is the nowcast -- and the site had already decided
+# the answer. `tools/check_payload.py` treats either old name as a fault, so a
+# half-finished migration cannot reach the site.
 
-SCHEMA = "v3-preview-1"
+SCHEMA = "v3-preview-3"
 
 
 def _pct(x) -> float:
@@ -148,6 +186,7 @@ def nowcast_payload(
     n_burn: int,
     seed: int,
     months_with_data: list[int] | None = None,
+    correction=None,
 ) -> dict:
     """Assemble the emitted object from an already-run, already-guarded fit.
 
@@ -161,24 +200,47 @@ def nowcast_payload(
     zero is the model's unconditional anchor and nothing else, so the site is
     given the number rather than left to infer it from ``data_through``.
 
+    ``correction`` is a ``bias_correction.BiasEstimate``. It is the last
+    keyword for backwards compatibility of the call sites only; it is
+    REQUIRED. Every published figure -- the point, the bands and the level --
+    is the model's less ``correction.pp``, the mean of the model's own recent
+    misses against the ABS first print. The model's own quarter-on-quarter
+    figure rides beside it in ``model_qoq_growth_pct``.
+
     This function does no estimation and no fetching. It is pure so that the
-    emitted shape can be tested without a sampler run.
+    emitted shape can be tested without a sampler run. It is also duck-typed on
+    ``correction`` -- ``.pp`` and ``.as_dict()`` -- so that ``bias_correction``,
+    and the pandas read it drags in, stay out of the presentation layer.
     """
     import numpy as np
+
+    if correction is None:
+        raise ValueError(
+            "no bias estimate: the published figure is the first-print model's "
+            "nowcast less that model's own rolling miss against the first "
+            "print. Without the correction there is no published number to "
+            "emit; refuse rather than print the raw model figure under a name "
+            "that says the bias has been taken off.")
+    pp = float(correction.pp)
 
     draws = np.asarray(draws, dtype=float)
     out_h = []
     for k, (label, ann) in enumerate(horizons):
-        qoq = float(annualised_to_qoq(ann))
+        model = float(annualised_to_qoq(ann))
+        qoq = model - pp
         col = draws[:, k] if draws.ndim == 2 and draws.shape[1] > k else None
         band = {}
         if col is not None and np.isfinite(col).sum() >= 20:
+            # The bands shift with the point. They describe the published
+            # figure, so an unshifted interval would sit off-centre from the
+            # number it is drawn around.
             q = np.nanpercentile(annualised_to_qoq(col[np.isfinite(col)]),
-                                 [2.5, 16, 84, 97.5])
+                                 [2.5, 16, 84, 97.5]) - pp
             band = {"ci_68_low": _pct(q[1]), "ci_68_high": _pct(q[2]),
                     "ci_95_low": _pct(q[0]), "ci_95_high": _pct(q[3])}
         entry = {"quarter": label, "kind": "nowcast" if k == 0 else "forecast",
                  "qoq_growth_pct": _pct(qoq),
+                 "model_qoq_growth_pct": _pct(model),
                  "annualised_growth_pct": _pct(ann), **band}
         if months_with_data is not None and k < len(months_with_data):
             entry["months_with_data"] = int(months_with_data[k])
@@ -193,6 +255,14 @@ def nowcast_payload(
     return {
         "schema": SCHEMA,
         "status": "ok",
+        "basis": "abs_first_print",
+        # WHAT THE MODEL WAS FITTED ON, which is now the same quantity the page
+        # publishes. `basis` is about the emitted figure; this is about the
+        # parameters behind it, and the two were different things until
+        # 2026-09-10. A reader comparing an archived payload to a current one
+        # needs to be able to tell which. Read off the panel rather than
+        # written in, so a payload cannot claim a target the fit did not use.
+        "target": panel.target,
         "generated_at": generated_at,
         "as_of": asof,
         "target_quarter": out_h[0]["quarter"] if out_h else None,
@@ -211,11 +281,13 @@ def nowcast_payload(
         # is not worth a fabricated point.
         "vintages": vintages or [],
         "next_gdp_release_date": next_gdp_release_date,
+        "bias_correction": correction.as_dict(),
         "ci_basis": (
             "probability band: the 68%/95% mass of the model's posterior, from "
             f"{int(np.isfinite(draws).all(axis=1).sum())} density_nowcast draws on the same "
-            "chain as the point estimate. Not a confidence interval, and not "
-            "recalibrated from past errors."),
+            "chain as the point estimate, shifted by the same bias correction "
+            "as the point. Not a confidence interval, and not recalibrated "
+            "from past errors."),
         "panel": {
             "n_series": int(panel.Y.shape[0]),
             "n_months": int(panel.Y.shape[1]),
@@ -229,6 +301,67 @@ def nowcast_payload(
             "n_gs": n_gs, "n_burn": n_burn, "seed": seed,
         },
     }
+
+
+def migrate_history_runs_v3(runs: list[dict], printed: set[str]) -> list[dict]:
+    """Move a pre-`v3-history-3` record onto the new model. Pure; new dicts.
+
+    `printed` is the set of `target_quarter` labels the ABS has already
+    published as at the run date. `run_au_nowcast._record` computes it from
+    `load_first_release`; this function is given the answer so that `emit` stays
+    free of the pandas read.
+
+    A ROW FOR A PRINTED QUARTER IS KEPT EXACTLY AS IT IS, `revision_adjustment_pp`
+    and all. Those rows are the record of what the site actually published on
+    the mornings before each release, and the track record scores them against
+    what the ABS then printed. Restating them on the new model's basis would be
+    rewriting history to make it tidier -- and the old model, with its old
+    correction, is genuinely what a reader saw.
+
+    A ROW FOR AN UNPRINTED QUARTER IS DROPPED. That quarter is still live on the
+    evolution chart, so its old rows would sit on one line beside the rows the
+    new model writes from today. The two models measure different quantities --
+    one was fitted on the revised vintage and corrected by a forty-year mean
+    revision, the other on first prints and corrected by its own rolling miss --
+    and the step between them would read as news arriving rather than as a
+    change of definition. `run_au_nowcast.py --backfill` rebuilds the quarter's
+    earlier weeks from the new model, which is the only honest version of that
+    line.
+    """
+    return [dict(r) for r in runs if r.get("target_quarter") in printed]
+
+
+def migrate_history_runs(runs: list[dict], pp: float) -> list[dict]:
+    """Move v3-history-1 rows onto the first-print basis. Pure; returns new dicts.
+
+    RETIRED for the history file itself -- `migrate_history_runs_v3` is what
+    `_record` runs now. Retired from the production path; kept for the record
+    and exercised only by `tests/test_au_emit.py`.
+
+    A row written before 2026-09-09 holds the MODEL's figure in `qoq_growth_pct`.
+    Since then `qoq_growth_pct` is the first-print nowcast (model less the mean
+    revision) and the model's figure lives in `model_qoq_growth_pct`. Old rows
+    are shifted by TODAY's adjustment and say so, because the adjustment they
+    would have carried on the day was never computed. Rows already on the new
+    basis pass through untouched.
+    """
+    out = []
+    for r in runs:
+        if "model_qoq_growth_pct" in r:
+            out.append(dict(r))
+            continue
+        n = dict(r)
+        model = float(n["qoq_growth_pct"])
+        n["model_qoq_growth_pct"] = round(model, 4)
+        n["qoq_growth_pct"] = round(model - pp, 4)
+        for k in ("ci_68_low", "ci_68_high", "ci_95_low", "ci_95_high"):
+            if k in n and n[k] is not None:
+                n[k] = round(float(n[k]) - pp, 4)
+        n.pop("expected_first_print_pct", None)
+        n["revision_adjustment_pp"] = round(pp, 4)
+        n["adjusted_retroactively"] = True
+        out.append(n)
+    return out
 
 
 def refusal_payload(*, reason: str, detail: str, generated_at: str,

@@ -54,7 +54,10 @@ MONTHLY = [k for k in SPEC.series_id if k not in ("gdp", "gdi", "unit_labour_cos
 
 for start in STARTS:
     for asof in VINTAGES:
-        p = build_panel(asof=asof, start=start, vintage=V)
+        # `target="latest"` EXPLICITLY: this tool measures the REVISED target,
+        # and its floor and its `collapsed` column are calibrated on it. The
+        # production default is the first print (see nyfed/au/build.py).
+        p = build_panel(asof=asof, start=start, vintage=V, target="latest")
         restrict = build_restrict(p, SPEC, p_f=P_F)
         t_now = target_periods(p)
         n, n_f = SPEC.blocks.shape

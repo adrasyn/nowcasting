@@ -88,7 +88,9 @@ export default function V3NextQuarter({ latest, gdp }: Props) {
 
   return (
     <section className="mb-8 border border-border p-4 text-label">
-      <p className="text-[10px] uppercase tracking-wider">{label}: GDP nowcast</p>
+      <p className="text-[10px] uppercase tracking-wider">
+        {label}: GDP nowcast
+      </p>
 
       <div className="mt-2 flex flex-wrap items-baseline gap-x-8 gap-y-2">
         <span className="flex items-baseline gap-x-2">

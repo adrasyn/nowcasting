@@ -24,10 +24,18 @@ THREE SEEDS PER VINTAGE, MEDIAN TAKEN. Within-basin sampler noise is ~0.078pp
 q/q, which is a quarter of the error being measured. One seed per vintage would
 report the sampler as much as the model.
 
+THE TARGET DEFAULTS TO THE FIRST PRINT, which is what the model ships trained
+on since 2026-09-10. `--target latest` runs the old, revised-vintage target for
+comparison; both are scored against BOTH series in every row, so an A/B is two
+runs of this tool and a join on `asof`. The substitution itself is no longer
+done here -- `build_panel(target=...)` does it, and `collapse_floor(target)`
+picks the matching floor -- so the experiment and production cannot drift apart.
+
 WHAT THIS IS NOT: a true real-time backtest. The recorded vintage carries ABS's
 CURRENT figures, so cutting it at an `asof` reproduces what was PUBLISHED by
-then, not what those numbers LOOKED LIKE then. The model sees revised data and
-is scored against revised outcomes. That flatters it, and the write-up says so.
+then, not what those numbers LOOKED LIKE then. The model sees revised INPUTS
+(the target row excepted, above) and is scored against both the revised outcome
+and the first print. That flatters it, and the write-up says so.
 
 Run:
     cd nowcasting_v3
@@ -35,17 +43,19 @@ Run:
 """
 from __future__ import annotations
 
-import csv, sys, time
+import argparse, csv, time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+import nyfed.au.build as build_mod
 from nyfed.au.build import (
-    COLLAPSED_GLOBAL_LOADING, P_E, P_F, build_panel, estimate_short,
-    load_vintage, state_space, target_periods,
+    P_E, P_F, build_panel, collapse_floor, estimate_short, load_vintage,
+    state_space, target_periods,
 )
 from nyfed.au.emit import annualised_to_qoq
+from nyfed.au.first_release import load_first_release
 from nyfed.nowcast import point_nowcast
 from nyfed.parameters import map_parameter
 from nyfed.spec import load_spec
@@ -53,29 +63,61 @@ from nyfed.spec import load_spec
 REPO = Path(__file__).resolve().parents[1]
 SPEC = load_spec(REPO / "model_spec_AU.csv")
 VINT = load_vintage(REPO / "tests/fixtures/au/vintage")
+FIRST = load_first_release()
 
-FIRST, LAST = "2023-01-01", "2026-05-01"
+WINDOW_FIRST, WINDOW_LAST = "2023-01-01", "2026-05-01"
 SEEDS = (4, 13, 19)
 N_GS, N_BURN = 200, 100
 
 FIELDS = ["asof", "target", "target_date", "horizon_months", "seed",
-          "nowcast_qq", "forecast_next_qq", "actual_qq", "error_qq",
-          "gdp_global_loading", "collapsed", "cols", "gdp_obs",
+          "target_series", "nowcast_qq", "forecast_next_qq", "actual_qq",
+          "first_print_qq", "error_qq", "error_first_print_qq",
+          "gdp_global_loading", "collapsed", "collapse_floor", "cols", "gdp_obs",
           "deflator_skipped", "seconds"]
 
 
 def main() -> int:
-    out = Path(sys.argv[1]); t0 = time.perf_counter()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("out")
+    ap.add_argument("--target", choices=("latest", "first_print"),
+                    default="first_print",
+                    help="which GDP series the model is TRAINED on; the default "
+                         "is what ships. Scoring is always reported against "
+                         "both.")
+    ap.add_argument("--collapse-floor", type=float, default=None,
+                    help="override the floor at or below which a chain is "
+                         "treated as collapsed and not nowcast. Each target has "
+                         "its own calibrated floor (nyfed/au/build.py), and "
+                         "this is how they were measured: lowering it records "
+                         "chains the shipping floor would refuse, to be cut "
+                         "afterwards.")
+    args = ap.parse_args()
+    # THE OVERRIDE GOES ON build.py's MODULE GLOBAL, not on a name this tool
+    # imported: `state_space` is the guarded funnel and it reads the module at
+    # call time. `collapse_floor` honours the override too, so the tool's own
+    # `collapsed` column and the funnel's refusal cannot disagree.
+    if args.collapse_floor is not None:
+        build_mod.FLOOR_OVERRIDE = args.collapse_floor
+    floor = collapse_floor(args.target)
+    out = Path(args.out); t0 = time.perf_counter()
+    print(f"target: {args.target}   collapse floor: {floor}"
+          f"{'  (overridden)' if args.collapse_floor is not None else ''}",
+          flush=True)
+
+    # SCORED AGAINST BOTH SERIES WHATEVER IT IS TRAINED ON, so the two runs of
+    # this tool are directly comparable. `actual_qq` is the revised outcome and
+    # `FIRST` the first print; the substitution into the panel is
+    # `build_panel`'s job, not this tool's.
     gdp = VINT.series["gdp"].dropna()
     actual_qq = (gdp / gdp.shift(1) - 1) * 100
 
     fh = out.open("w", newline=""); w = csv.DictWriter(fh, fieldnames=FIELDS)
     w.writeheader(); fh.flush()
 
-    for asof in pd.date_range(FIRST, LAST, freq="MS"):
+    for asof in pd.date_range(WINDOW_FIRST, WINDOW_LAST, freq="MS"):
         stamp = str(asof.date())
         try:
-            panel = build_panel(asof=stamp, vintage=VINT)
+            panel = build_panel(asof=stamp, vintage=VINT, target=args.target)
         except Exception as exc:                                # noqa: BLE001
             print(f"{stamp}  UNBUILDABLE {type(exc).__name__}: {str(exc)[:80]}",
                   flush=True)
@@ -85,6 +127,7 @@ def main() -> int:
         tgt = panel.dates[t_now[0]]
         label = f"{tgt.year}Q{(tgt.month - 1) // 3 + 1}"
         act = float(actual_qq.get(tgt, np.nan))
+        fp = float(FIRST.get(tgt, np.nan))
         # Months from the vintage to the END of the target quarter. Negative
         # means the quarter has not finished: a genuine forecast.
         horizon = (asof.year - tgt.year) * 12 + (asof.month - tgt.month)
@@ -97,7 +140,7 @@ def main() -> int:
             secs = time.perf_counter() - s0
             par = map_parameter(np.median(res.params, axis=1), (n, n_f, P_F, P_E))
             loading = float(par.Lambda[panel.i_now, 0])
-            collapsed = loading <= COLLAPSED_GLOBAL_LOADING
+            collapsed = loading <= floor
             nc = nxt = ""
             if not collapsed:
                 # `state_space` is the guarded funnel; it re-checks the loading.
@@ -112,12 +155,16 @@ def main() -> int:
             w.writerow({
                 "asof": stamp, "target": label, "target_date": str(tgt.date()),
                 "horizon_months": horizon, "seed": seed,
+                "target_series": args.target,
                 "nowcast_qq": round(nc, 4) if nc != "" else "",
                 "forecast_next_qq": round(nxt, 4) if nxt != "" else "",
-                "actual_qq": round(act, 4), "error_qq":
+                "actual_qq": round(act, 4),
+                "first_print_qq": round(fp, 4), "error_qq":
                     round(nc - act, 4) if nc != "" else "",
+                "error_first_print_qq": round(nc - fp, 4) if nc != "" else "",
                 "gdp_global_loading": round(loading, 4),
-                "collapsed": int(collapsed), "cols": panel.Y.shape[1],
+                "collapsed": int(collapsed), "collapse_floor": floor,
+                "cols": panel.Y.shape[1],
                 "gdp_obs": int(np.isfinite(panel.Y[panel.i_now]).sum()),
                 "deflator_skipped": ";".join(sorted(panel.deflator_skipped)),
                 "seconds": round(secs, 1)})
@@ -126,7 +173,7 @@ def main() -> int:
         good = [r for r in rows if r != ""]
         med = float(np.median(good)) if good else float("nan")
         print(f"{stamp}  {label}  h={horizon:+d}m  median {med:6.3f}  "
-              f"actual {act:6.3f}  err {med - act:+6.3f}  "
+              f"actual {act:6.3f}  first {fp:6.3f}  err {med - act:+6.3f}  "
               f"({len(good)}/{len(SEEDS)} ok, {(time.perf_counter()-t0)/60:.0f} min)",
               flush=True)
 

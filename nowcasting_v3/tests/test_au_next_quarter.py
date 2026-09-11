@@ -126,13 +126,19 @@ def test_record_keys_on_run_date_and_target_together(tmp_path, monkeypatch):
         {"run_date": "2026-08-31", "target_quarter": "2026 Q3",
          "kind": "forecast", "qoq_growth_pct": 0.78},
     ]
-    mine = _record(rows, ["2026 Q2", "2026 Q3"])
+    # A CURRENT SCHEMA, in this test and the four below it. `_record` also
+    # migrates an older history file, and migration now DROPS the rows of
+    # quarters the ABS has not printed. These tests are about de-duplication and
+    # provenance, not about the migration, so their files are stamped
+    # `v3-history-3` and the migration does not run. It is tested on its own
+    # below.
+    mine = _record(rows, ["2026 Q2", "2026 Q3"], "2026-09-07")
     assert len(mine) == 2
     assert {r["target_quarter"] for r in mine} == {"2026 Q2", "2026 Q3"}
 
     # Re-running the same Monday corrects both rows rather than duplicating.
     rows[0]["qoq_growth_pct"] = 0.70
-    mine = _record(rows, ["2026 Q2", "2026 Q3"])
+    mine = _record(rows, ["2026 Q2", "2026 Q3"], "2026-09-07")
     assert len(mine) == 2
     q2 = next(r for r in mine if r["target_quarter"] == "2026 Q2")
     assert q2["qoq_growth_pct"] == 0.70
@@ -146,13 +152,13 @@ def test_record_leaves_other_quarters_alone(tmp_path, monkeypatch):
     import run_au_nowcast as mod
 
     hist = tmp_path / "history.json"
-    hist.write_text(json.dumps({"schema": "v3-history-1", "runs": [
+    hist.write_text(json.dumps({"schema": "v3-history-3", "runs": [
         {"run_date": "2026-05-04", "target_quarter": "2026 Q1",
          "kind": "nowcast", "qoq_growth_pct": 0.31}]}))
     monkeypatch.setattr(mod, "HISTORY", hist)
 
     _record([{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
-              "kind": "nowcast", "qoq_growth_pct": 0.64}], ["2026 Q2"])
+              "kind": "nowcast", "qoq_growth_pct": 0.64}], ["2026 Q2"], "2026-09-07")
     runs = json.loads(hist.read_text())["runs"]
     assert len(runs) == 2
     old = next(r for r in runs if r["target_quarter"] == "2026 Q1")
@@ -173,14 +179,14 @@ def test_a_backfilled_row_never_replaces_a_live_one(tmp_path, monkeypatch):
     import run_au_nowcast as mod
 
     hist = tmp_path / "history.json"
-    hist.write_text(json.dumps({"schema": "v3-history-1", "runs": [
+    hist.write_text(json.dumps({"schema": "v3-history-3", "runs": [
         {"run_date": "2026-08-31", "target_quarter": "2026 Q2",
          "kind": "nowcast", "qoq_growth_pct": 0.6354}]}))
     monkeypatch.setattr(mod, "HISTORY", hist)
 
     _record([{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
               "kind": "nowcast", "qoq_growth_pct": 0.6362,
-              "backfilled": True}], ["2026 Q2"])
+              "backfilled": True}], ["2026 Q2"], "2026-09-07")
     runs = json.loads(hist.read_text())["runs"]
     assert len(runs) == 1
     assert runs[0]["qoq_growth_pct"] == 0.6354, "the live figure must survive"
@@ -194,12 +200,12 @@ def test_a_backfilled_row_still_fills_a_gap(tmp_path, monkeypatch):
     import run_au_nowcast as mod
 
     hist = tmp_path / "history.json"
-    hist.write_text(json.dumps({"schema": "v3-history-1", "runs": []}))
+    hist.write_text(json.dumps({"schema": "v3-history-3", "runs": []}))
     monkeypatch.setattr(mod, "HISTORY", hist)
 
     _record([{"run_date": "2026-06-01", "target_quarter": "2026 Q2",
               "kind": "nowcast", "qoq_growth_pct": 0.63,
-              "backfilled": True}], ["2026 Q2"])
+              "backfilled": True}], ["2026 Q2"], "2026-09-07")
     runs = json.loads(hist.read_text())["runs"]
     assert len(runs) == 1 and runs[0]["backfilled"] is True
 
@@ -215,15 +221,80 @@ def test_a_live_row_may_correct_an_earlier_live_row(tmp_path, monkeypatch):
     import run_au_nowcast as mod
 
     hist = tmp_path / "history.json"
-    hist.write_text(json.dumps({"schema": "v3-history-1", "runs": [
+    hist.write_text(json.dumps({"schema": "v3-history-3", "runs": [
         {"run_date": "2026-08-31", "target_quarter": "2026 Q2",
          "kind": "nowcast", "qoq_growth_pct": 0.6354}]}))
     monkeypatch.setattr(mod, "HISTORY", hist)
 
     _record([{"run_date": "2026-08-31", "target_quarter": "2026 Q2",
-              "kind": "nowcast", "qoq_growth_pct": 0.70}], ["2026 Q2"])
+              "kind": "nowcast", "qoq_growth_pct": 0.70}], ["2026 Q2"], "2026-09-07")
     runs = json.loads(hist.read_text())["runs"]
     assert runs[0]["qoq_growth_pct"] == 0.70
+
+
+def test_record_migrates_an_old_history_file_by_dropping_unprinted_quarters(
+        tmp_path, monkeypatch):
+    """The standing record moves with the model, on the next write.
+
+    Rows written before 2026-09-10 came from a model trained on the REVISED
+    vintage and corrected by a mean revision. A printed quarter's rows are kept
+    exactly as they are -- they are the record of what the site published, and
+    the track record scores them. A quarter the ABS has not printed yet is
+    still live on the evolution chart, so leaving those rows there would draw
+    two models on one line and the step between them would read as news;
+    `--backfill` rebuilds the quarter from the new model instead.
+
+    `printed` is computed from `load_first_release`: a quarter counts once its
+    ABS release date has passed. 2026 Q2 printed on 2026-09-02; 2026 Q3 does
+    not print until December.
+    """
+    import json
+
+    import run_au_nowcast as mod
+
+    hist = tmp_path / "history.json"
+    kept = {"run_date": "2026-08-31", "target_quarter": "2026 Q2",
+            "kind": "nowcast", "qoq_growth_pct": 0.5365,
+            "model_qoq_growth_pct": 0.6354, "revision_adjustment_pp": 0.0989,
+            "ci_68_low": 0.3, "ci_68_high": 0.9,
+            "ci_95_low": 0.0, "ci_95_high": 1.2}
+    hist.write_text(json.dumps({"schema": "v3-history-2", "runs": [
+        kept,
+        {"run_date": "2026-09-07", "target_quarter": "2026 Q3",
+         "kind": "nowcast", "qoq_growth_pct": 0.64,
+         "model_qoq_growth_pct": 0.74, "revision_adjustment_pp": 0.0989}]}))
+    monkeypatch.setattr(mod, "HISTORY", hist)
+
+    _record([], ["2026 Q3"], "2026-09-07")
+
+    stored = json.loads(hist.read_text())
+    assert stored["schema"] == "v3-history-3"
+    assert stored["runs"] == [kept], (
+        "the printed quarter is kept verbatim, the unprinted one is dropped")
+
+
+def test_record_leaves_a_current_file_alone(tmp_path, monkeypatch):
+    """The migration is one-way and must not fire twice.
+
+    A `v3-history-3` file already holds the new model's rows, including rows
+    for the quarter in flight. Re-running the migration on it would drop those
+    every Monday.
+    """
+    import json
+
+    import run_au_nowcast as mod
+
+    hist = tmp_path / "history.json"
+    row = {"run_date": "2026-09-07", "target_quarter": "2026 Q3",
+           "kind": "nowcast", "qoq_growth_pct": 0.64,
+           "model_qoq_growth_pct": 0.7031, "bias_correction_pp": 0.0631,
+           "target": "first_print"}
+    hist.write_text(json.dumps({"schema": "v3-history-3", "runs": [row]}))
+    monkeypatch.setattr(mod, "HISTORY", hist)
+
+    _record([], ["2026 Q3"], "2026-09-07")
+
+    assert json.loads(hist.read_text())["runs"] == [row]
 
 
 def test_the_track_record_scores_nowcast_rows_only():

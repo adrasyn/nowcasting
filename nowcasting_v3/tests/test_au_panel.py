@@ -99,6 +99,19 @@ def test_gdp_is_i_now():
     assert panel.series_id[panel.i_now] == "gdp"
 
 
+def test_an_assembled_panel_says_its_gdp_row_is_the_latest_vintage():
+    """`assemble` takes whatever GDP series it is handed and does not substitute.
+
+    `Panel.target` exists so that the collapse floor and a saved estimate can
+    tell which GDP series row `i_now` carries. Choosing the first print is
+    `build.build_panel`'s job -- this module has no idea what it was given, so
+    its default has to be the un-substituted one, or a hand-assembled panel
+    would claim a target it does not carry.
+    """
+    panel = assemble(_panel_inputs(), start=START, end=END)
+    assert panel.target == "latest"
+
+
 def test_quarterly_series_sit_in_the_last_month_of_their_quarter():
     panel = assemble(_panel_inputs(), start=START, end=END)
     row = panel.series_id.index("gdp")

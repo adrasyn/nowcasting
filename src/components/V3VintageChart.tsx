@@ -63,6 +63,13 @@ interface Props {
   height?: number;
 }
 
+// "2026-09-07" -> "Mon 7 Sep 2026". The run date is what the weekly job wrote;
+// naming the weekday makes a non-Monday vintage visible at a glance.
+function formatRunDate(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  return d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
 export default function V3VintageChart({
   vintages,
   targetQuarter,
@@ -177,7 +184,16 @@ export default function V3VintageChart({
             />
             <Tooltip
               contentStyle={{ fontSize: 12, borderColor: chartColors.border }}
-              labelFormatter={(x) => `${x} days to release`}
+              // The run date first, then the countdown: a reader wants to know
+              // WHICH Monday this was before how far it sat from the print.
+              labelFormatter={(x, payload) => {
+                const run = (payload?.[0]?.payload as { runDate?: string } | undefined)?.runDate;
+                return run ? `${formatRunDate(run)} · ${x} days to release` : `${x} days to release`;
+              }}
+              // The point estimate above the bands. Recharts lists series in
+              // render order, which puts the line (drawn last, on top) at the
+              // bottom of the popup; the number a reader is after goes first.
+              itemSorter={(item) => (item.name === "point" ? 0 : 1)}
               formatter={(value, name) => {
                 if (name === "point") return [`${Number(value).toFixed(2)}%`, "Point estimate"];
                 const [lo, hi] = value as unknown as [number, number];

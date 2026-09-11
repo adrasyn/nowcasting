@@ -69,8 +69,6 @@ export default function V3Headline({ latest, gdp }: Props) {
         )}
       </div>
 
-
-
       <div className="mt-4 h-20">
         <ResponsiveContainer>
           <BarChart data={bars} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>

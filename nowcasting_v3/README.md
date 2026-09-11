@@ -857,6 +857,66 @@ payloads that were verified against published ABS and RBA releases, and
 caffeinate -i .venv/bin/python tools/record_au_vintage.py    # needs network
 ```
 
+### The first-print model and its rolling miss
+
+Since 2026-09-10 `build_panel` defaults to `target="first_print"`: the `gdp`
+row carries the ABS's first-printed growth for each quarter, via
+`first_release.first_release_index`, applied post-load in place of today's
+revised vintage. `Panel.target` records which, and travels with a saved
+estimate. `target="latest"` still exists (its own 1.0 floor, legacy tests, and
+the end-to-end gate's pinned loadings). `collapse_floor(target)` picks the
+floor: `COLLAPSED_GLOBAL_LOADING_FIRST_PRINT = 0.5`, measured 2026-09-10 over
+thirty cold-start seeds on the shipping panel — two collapsed (0.18, 0.21),
+twenty-eight identified (0.79–1.33), nothing between, an unexpected basin since
+thirty seeds on the revised target's 1980 panel found none — 0.5 sits in that
+gap.
+
+**The model still runs high, so its own miss is subtracted in the open.**
+`data/first_print_misses.csv` holds one row per printed quarter — the model's
+final nowcast (the last figure a reader saw before the print), the first print
+and the miss — seeded from the retrained backtest and appended by
+`record_first_print.py` each Monday after a print, which the weekly workflow
+runs BEFORE the nowcast so the correction sees the quarter that printed on the
+Wednesday (`emit_backtest_json.py` repeats the appends as a no-op safety net).
+`rolling_miss` averages the
+last 8 printed quarters, needs at least 4, and otherwise the weekly runner
+refuses with "no bias estimate" rather than publish an uncorrected number. At
+launch the correction is about +0.06pp.
+
+**What ships carries both figures.** `latest_v3.json` (`v3-preview-3`,
+`target: "first_print"`, `basis: "abs_first_print"`) publishes
+`qoq_growth_pct` — the model's estimate less `bias_correction.pp` — beside raw
+`model_qoq_growth_pct`, with the correction's window and quarter range in
+`bias_correction`. History is `v3-history-3`: unprinted quarters' rows were
+dropped at cutover and rebuilt with `--backfill`; the already-printed Q2 2026
+row was kept exactly as the previous (revised-target) model published it.
+`performance_v3.json` scores the corrected model against the first print
+(`bias_pct`, `mae_pct`, `bias_window_quarters`, `model_bias_vs_first_print_pct`,
+`model_mae_vs_first_print_pct`); rows carry `bias_correction_pp` (null before
+four prints existed) and `model` (`first_print`, or `revised_target` for the
+kept Q2 2026 row). Year-ended figures stay hybrid — latest-vintage levels
+chained to each quarter's first print, since a first-print level four quarters
+back does not exist inside one vintage.
+
+First prints live in `data/gdp_first_release.csv` (1959Q4 onward: the RBA's
+RDP 2024-04 file to 2022Q2, the ABS vintage spreadsheets after). The weekly job
+appends the newest quarter on the Monday after each print
+(`nyfed/au/first_release.append_first_print`), and refuses to once the print is
+80 days old, so a quarter the job missed must be filled by hand from that
+release's Key Aggregates spreadsheet at
+`https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product/<mon-yyyy>/5206001_Key_Aggregates.xlsx`.
+
+**The quarterly estimate is target-bound**: a saved fit records the target it
+was trained on, and `run_au_nowcast.py` refuses to run against the other one
+(`TARGET MISMATCH`, exit 1); re-run `tools/estimate_au.py` whenever the target
+changes. **The revision adjustment is retired** — `revision_adjustment`,
+`expected_first_print_pct` and the `model_*_vs_latest_pct` reference columns
+are out of the production path (`nyfed/au/first_release.py` still provides
+`first_release_index` and `append_first_print`, which this model also uses).
+The A/B measurement is `docs/measurements/2026-09-09-first-print-target-ab.md`;
+the plan is
+`docs/superpowers/plans/2026-09-10-first-print-model-with-rolling-miss.md`.
+
 ## Measured timings
 
 Measured on this project's development machine: Apple Silicon macOS (arm64),

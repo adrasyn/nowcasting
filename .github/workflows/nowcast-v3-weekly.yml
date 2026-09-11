@@ -66,6 +66,25 @@ jobs:
                 f"loading {m['gdp_global_loading']}")
           PY
 
+      # BEFORE THE NOWCAST, AND THAT IS THE WHOLE POINT. The published figure is
+      # the model less the mean of its last eight misses against the ABS first
+      # print, read from `data/first_print_misses.csv`. On the Monday after a
+      # print — the quarter came out the Wednesday before — that file has to
+      # carry the quarter that just printed, or the correction is measured over
+      # a window one quarter out of date. These appends used to run in
+      # "Refresh the track record", after the nowcast had already read the file.
+      #
+      # IT DOES NOT STOP THE JOB, like the track-record step below. The runner
+      # already wraps `rolling_miss(load_misses())` in `except Exception` and
+      # writes a refusal payload the site renders when the misses file is bad,
+      # so a stale page — last week's number presented as current — is the
+      # failure the guards exist to prevent, not a hard stop here. Nothing new
+      # to append is a normal week and exits 0.
+      - name: Record the first print and the model's miss
+        id: record
+        continue-on-error: true
+        run: python -u tools/record_first_print.py
+
       - name: Nowcast
         run: python -u tools/run_au_nowcast.py
 
@@ -76,7 +95,16 @@ jobs:
       # prints a quarter this model called live, that quarter becomes a row.
       # Without this step the fix in `emit_backtest_json.py` would never run and
       # the table would sit at its backtested quarters forever.
+      #
+      # IT DOES NOT STOP THE JOB. `emit_backtest_json.py` exits 1 on a failed
+      # revision estimate or a missing first print, and a hard failure here would
+      # skip the payload check, the outcome report and the commit — so the week's
+      # nowcast, refusal payload included, would never reach the site and readers
+      # would see last week's number. The job still fails, in the step after the
+      # deploy is triggered.
       - name: Refresh the track record
+        id: track
+        continue-on-error: true
         run: python -u tools/emit_backtest_json.py
 
       # The failure handler below covers a step that THROWS. This covers a run
@@ -114,6 +142,13 @@ jobs:
           git add data/latest_v3.json data/indicators_v3.json
           git add data/nowcast_history_v3.json
           git add data/performance_v3.json data/backtest_v3.json
+          # The first print of a newly released quarter is recorded by
+          # record_first_print.py on the Monday after the ABS prints, along
+          # with the model's miss against it, before the nowcast reads them.
+          # Both are inputs to this week's and next week's bias correction, so
+          # they are committed with the data.
+          git add nowcasting_v3/data/gdp_first_release.csv
+          git add nowcasting_v3/data/first_print_misses.csv
           if git diff --staged --quiet; then
             echo "No v3 changes to commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -131,6 +166,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run deploy.yml --ref main
+
+      # A failed track-record refresh must still alert, but only after the
+      # week's nowcast has been committed and deployed: the publish is the
+      # thing a reader is waiting for, the table can be a week stale.
+      - name: Fail the job if the track record did not refresh
+        if: steps.track.outcome == 'failure'
+        run: |
+          echo "::error::emit_backtest_json.py failed; the nowcast was published, the track record was not refreshed"
+          exit 1
+
+      - name: Fail the job if the first print or the miss was not recorded
+        if: steps.record.outcome == 'failure'
+        run: |
+          echo "::error::record_first_print.py failed; the nowcast ran on the misses file as it stood and the job is failed so someone looks"
+          exit 1
 
       - name: Alert on failure
         if: failure()

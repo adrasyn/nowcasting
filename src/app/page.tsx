@@ -103,26 +103,30 @@ export default function Home() {
           isBacktest
           sourceFile="data/backtest_v3.json"
           title="Track record"
-          intro="These are backtested estimates, not live nowcasts."
+          intro=""
+          actualLabel="Actual"
           notes={
-            "MAE (mean absolute error) is the average size of the miss, ignoring " +
-            "direction. Bias is the average signed miss, so a positive value means " +
-            "the model tends to come in a little high. For comparison, the RBA " +
+            "Actual is the ABS's initial estimate of quarterly GDP growth, the " +
+            "figure the nowcast is built to match. The nowcast is the model's " +
+            "estimate less its average error over recent quarters. MAE (mean " +
+            "absolute error) is the average size of the miss, ignoring " +
+            "direction. Bias is the average signed miss, so a positive value " +
+            "means the nowcast tends to come in high. For comparison, the RBA " +
             "column shows the RBA's forecast published mid-quarter (about two " +
-            "months before our full-quarter estimate) for each June and December " +
-            "quarter."
+            "months before our full-quarter estimate) for each June and " +
+            "December quarter."
           }
           showGap={false}
           showRbaTile={false}
           tileBasis="quarterly growth"
-          afterTiles={
+          maeTile={
             <V3RbaCompare rba={data.performanceV3.rba_comparison} />
           }
         />
       )}
 
 
-      <V3MethodologyPanel performance={data.performanceV3} />
+      <V3MethodologyPanel performance={data.performanceV3} latest={v3} />
       <Footer />
     </main>
   );

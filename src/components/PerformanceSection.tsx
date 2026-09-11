@@ -2,6 +2,12 @@ import type { ReactNode } from "react";
 import type { Performance } from "@/lib/types";
 import { formatMillions, formatPct } from "@/lib/format";
 
+/** "Q2 2026", "Q1 2026 and Q2 2026", "Q4 2025, Q1 2026 and Q2 2026". */
+function listQuarters(quarters: string[]): string {
+  if (quarters.length <= 1) return quarters[0] ?? "";
+  return `${quarters.slice(0, -1).join(", ")} and ${quarters[quarters.length - 1]}`;
+}
+
 interface Props {
   performance: Performance;
   isBacktest?: boolean;
@@ -28,6 +34,14 @@ interface Props {
   // basis and a different number of quarters. Without each saying which,
   // 0.26 beside 0.27 reads as one of them being wrong.
   tileBasis?: string;
+  // The header over the actual column. v3 scores against the ABS's initial
+  // estimate of the quarter rather than the latest vintage, so the page can
+  // override this. Default keeps v1 and v2 as they are.
+  actualLabel?: string;
+  // What sits in the first tile slot. Default: the MAE tile. `false` drops
+  // it; a node replaces it (v3 puts the RBA comparison there, because the
+  // owner would rather see the miss against a benchmark than the miss alone).
+  maeTile?: ReactNode | false;
 }
 
 export default function PerformanceSection({
@@ -41,7 +55,25 @@ export default function PerformanceSection({
   showRbaTile = true,
   afterTiles,
   tileBasis,
+  actualLabel = "Actual",
+  maeTile,
 }: Props) {
+  const hasLive = performance.errors.some((e) => e.is_live);
+  // A quarter the CURRENT model never published: it was called live by the
+  // previous one, trained on revised GDP, and is kept as it stood rather than
+  // restated by a model that was not running that week. Named from the data —
+  // which quarter that is moves as the track record grows.
+  const previousModelQuarters = performance.errors
+    .filter((e) => e.model === "revised_target")
+    .map((e) => e.target_quarter)
+    // "2026 Q2" sorts chronologically as a string, and it is also the form the
+    // table's first column shows. Left as it stands: a legend that named the
+    // quarter "Q2 2026" would send a reader looking for a row that is not
+    // written that way anywhere on the page.
+    .sort((a, b) => a.localeCompare(b));
+  const previousModelNote = previousModelQuarters.length > 0
+    ? `The ${listQuarters(previousModelQuarters)} row${previousModelQuarters.length === 1 ? " is" : "s are"} the previous version of the model's published call${previousModelQuarters.length === 1 ? "" : "s"}, kept as ${previousModelQuarters.length === 1 ? "it" : "they"} stood.`
+    : "";
   const rba = performance.rba_comparison;
   const edge = rba.avg_edge_pp;
   const edgeValue = edge === null ? "—" : `${edge > 0 ? "+" : edge < 0 ? "−" : ""}${Math.abs(edge).toFixed(2)}pp`;
@@ -61,7 +93,7 @@ export default function PerformanceSection({
       </p>
       {isBacktest &&
         (intro !== undefined ? (
-          <p className="text-xs text-label mb-3">{intro}</p>
+          intro ? <p className="text-xs text-label mb-3">{intro}</p> : null
         ) : (
           <p className="text-xs text-label mb-3">
             <strong>These are backtested estimates, not live nowcasts.</strong> The model was re-run
@@ -71,15 +103,19 @@ export default function PerformanceSection({
           </p>
         ))}
       <div className={`grid gap-3 mb-4 ${showRbaTile ? "grid-cols-3" : "grid-cols-2"}`}>
-        <Tile
-          label="MAE"
-          value={`${performance.mae_pct.toFixed(2)}pp`}
-          sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
-        />
+        {maeTile === undefined ? (
+          <Tile
+            label="MAE"
+            value={`${performance.mae_pct.toFixed(2)}pp`}
+            sub={tileBasis ? `${tileBasis} · ${formatMillions(performance.mae_millions)}` : formatMillions(performance.mae_millions)}
+          />
+        ) : maeTile}
         <Tile
           label="Bias"
           value={`${performance.bias_pct > 0 ? "+" : ""}${performance.bias_pct.toFixed(2)}pp`}
-          sub={`${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
+          sub={tileBasis
+            ? `${tileBasis} · ${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`
+            : `${formatMillions(performance.bias_millions)} · ${performance.bias_millions < 0 ? "underpredicts" : performance.bias_millions > 0 ? "overpredicts" : "neutral"}`}
         />
         {showRbaTile &&
           (rba.ours_mae != null && rba.rba_mae != null ? (
@@ -144,7 +180,7 @@ export default function PerformanceSection({
                 the shaded rows below are live nowcasts, not simulations, and
                 the intro paragraph already says which rows are which. */}
             <th className="py-2 pr-4">Nowcast</th>
-            <th className="py-2 pr-4">Actual</th>
+            <th className="py-2 pr-4">{actualLabel}</th>
             <th className="py-2 pr-4">Error (pp)</th>
             <th className="py-2 pr-4">Nowcast (YoY)</th>
             <th className="py-2 pr-4">RBA (YoY)</th>
@@ -159,9 +195,20 @@ export default function PerformanceSection({
             <tr
               key={e.target_quarter}
               className={`border-b border-border ${e.is_live ? "bg-panel" : ""}`}
-              title={e.is_live
-                ? `Published ${e.live_run_date} — before the ABS printed this quarter`
-                : undefined}
+              // BOTH FACTS, NOT ONE OR THE OTHER. A row from the previous
+              // model is also a live row, and the ternary this replaces let the
+              // model note hide the date it was published on — the one thing
+              // the tooltip exists to say.
+              title={[
+                e.is_live
+                  ? `Published ${e.live_run_date} — before the ABS printed this quarter`
+                  : null,
+                e.model === "revised_target"
+                  ? "Published by the previous version of the model"
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined}
             >
               <td className="whitespace-nowrap py-2 pr-4">{e.target_quarter}</td>
               <td className="whitespace-nowrap py-2 pr-4">
@@ -195,15 +242,24 @@ export default function PerformanceSection({
         </tbody>
       </table>
       </div>
-      {performance.errors.some((e) => e.is_live) && (
+      {(hasLive || previousModelQuarters.length > 0) && (
         <p className="mt-2 flex items-center gap-2 text-[10px] text-label">
-          <span
-            aria-hidden="true"
-            className="inline-block h-3 w-6 border border-border bg-panel"
-          />
-          Shaded rows are live nowcasts — published before the ABS printed that
-          quarter. The rest are backtested: the model re-run over data that was
-          already known.
+          {hasLive && (
+            <>
+              <span
+                aria-hidden="true"
+                className="inline-block h-3 w-6 border border-border bg-panel"
+              />
+              <span>
+                Shaded rows are live nowcasts. The rest are backtested i.e. the
+                model re-run over data that was already known.
+                {previousModelQuarters.length > 0 && ` ${previousModelNote}`}
+              </span>
+            </>
+          )}
+          {!hasLive && previousModelQuarters.length > 0 && (
+            <span>{previousModelNote}</span>
+          )}
         </p>
       )}
     </section>

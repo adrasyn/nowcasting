@@ -91,10 +91,33 @@ CI_QA     <- "../pipeline/seed/ci_params_v2.json"
   format(seq(d, today, by = "week"), "%Y-%m-%d")
 }
 
-# yoy from the last 3 actual QoQ growths + the target-quarter nowcast.
-.compute_yoy <- function(gdp, nowcast_qoq) {
+# yoy: the three quarters before the target compounded with the target-quarter
+# nowcast. Those three come from data/gdp.json (the latest vintage), NOT from
+# `gdp` (data_raw/rt_dgdp_qtr.csv): since 2026-09 that file holds the ABS's
+# initial estimate of each quarter, which is what the model is estimated on, but
+# year-ended growth is a comparison with the level a year ago and every other
+# year-ended figure on the site is quoted on the latest vintage (gdp.json's own
+# yoy_pct, the RBA comparison in gen_performance_v2.py). Compounding initial
+# estimates here would move the headline "vs a year ago" by ~0.2pp for no model
+# reason. `gdp` still fixes WHICH three quarters (the ones before the target).
+# Falls back to `gdp`'s own values, with a warning, if gdp.json lacks them.
+.compute_yoy <- function(gdp, nowcast_qoq, repo_root = "..") {
   g <- gdp[order(as.Date(gdp$date)), ]
-  last3 <- tail(g$value, 3L)
+  last_date <- max(as.Date(g$date))
+  # first-of-month dates, so stepping back by whole months is exact
+  qdates <- rev(seq(last_date, by = "-3 months", length.out = 3L))
+  want <- sprintf("%d Q%d", as.integer(format(qdates, "%Y")),
+                  as.integer(format(qdates, "%m")) %/% 3L)
+  latest <- tryCatch(jsonlite::fromJSON(file.path(repo_root, "data", "gdp.json"))$series,
+                     error = function(e) NULL)
+  last3 <- if (!is.null(latest) && all(want %in% latest$quarter)) {
+    latest$qoq_pct[match(want, latest$quarter)]
+  } else {
+    warning(sprintf(paste("emit_v2_json(): data/gdp.json lacks %s; year-ended growth",
+                          "compounds the initial-estimate file instead."),
+                    paste(want, collapse = ", ")), call. = FALSE)
+    tail(g$value, 3L)
+  }
   (prod(1 + c(last3, nowcast_qoq) / 100) - 1) * 100
 }
 
@@ -186,7 +209,7 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
          gdp_chain_volume_millions = round(as.numeric(level_adj)),
          qoq_growth_pct = round(qoq_adj, 2),
          qoq_growth_raw_pct = round(qoq, 2),
-         yoy_growth_pct = round(.compute_yoy(gdpt, qoq_adj), 2),
+         yoy_growth_pct = round(.compute_yoy(gdpt, qoq_adj, repo_root), 2),
          ci_68_low = b68$low, ci_68_high = b68$high, ci_95_low = b95$low, ci_95_high = b95$high,
          n_months_in_quarter = nc$n_months_in_quarter,
          # which of the paper's per-stage models actually produced this figure:

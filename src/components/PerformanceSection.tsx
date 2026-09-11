@@ -93,7 +93,7 @@ export default function PerformanceSection({
       </p>
       {isBacktest &&
         (intro !== undefined ? (
-          <p className="text-xs text-label mb-3">{intro}</p>
+          intro ? <p className="text-xs text-label mb-3">{intro}</p> : null
         ) : (
           <p className="text-xs text-label mb-3">
             <strong>These are backtested estimates, not live nowcasts.</strong> The model was re-run
@@ -251,9 +251,8 @@ export default function PerformanceSection({
                 className="inline-block h-3 w-6 border border-border bg-panel"
               />
               <span>
-                Shaded rows are live nowcasts — published before the ABS printed
-                that quarter. The rest are backtested: the model re-run over
-                data that was already known.
+                Shaded rows are live nowcasts. The rest are backtested i.e. the
+                model re-run over data that was already known.
                 {previousModelQuarters.length > 0 && ` ${previousModelNote}`}
               </span>
             </>

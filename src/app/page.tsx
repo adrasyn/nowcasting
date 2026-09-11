@@ -103,7 +103,7 @@ export default function Home() {
           isBacktest
           sourceFile="data/backtest_v3.json"
           title="Track record"
-          intro="These are backtested estimates, not live nowcasts."
+          intro=""
           actualLabel="Actual"
           notes={
             "Actual is the ABS's initial estimate of quarterly GDP growth, the " +
@@ -114,10 +114,7 @@ export default function Home() {
             "means the nowcast tends to come in high. For comparison, the RBA " +
             "column shows the RBA's forecast published mid-quarter (about two " +
             "months before our full-quarter estimate) for each June and " +
-            "December quarter. From 10 September 2026 the model is estimated " +
-            "on the ABS's initial estimates and corrected for its recent " +
-            "average error; earlier figures for this quarter have been rebuilt " +
-            "on that basis."
+            "December quarter."
           }
           showGap={false}
           showRbaTile={false}

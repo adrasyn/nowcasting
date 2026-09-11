@@ -54,15 +54,6 @@ export default function V3RbaCompare({ rba }: Props) {
           </div>
         ))}
       </div>
-      {/* The year-ended figures are on a hybrid basis: the level path is the
-          latest vintage, chained to the ABS's initial estimate for the quarter
-          itself. Said here rather than left implied, because the quarterly
-          table above uses the initial estimate alone and the two would
-          otherwise look like one basis. */}
-      <p className="mt-3 text-[10px] text-label-light">
-        Both are measured against year-ended GDP growth as initially published
-        by the ABS.
-      </p>
     </div>
   );
 }

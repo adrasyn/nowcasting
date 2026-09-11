@@ -62,6 +62,16 @@ export interface Vintage {
   ci_95_low: number;
   ci_95_high: number;
   data_through: string;
+  // Which horizon produced the row: "current" (the earliest quarter the ABS has
+  // not printed at that run date) or "next" (the one after it). Optional —
+  // rows written before 2026-09-12 have no field and are all current-horizon.
+  //
+  // A row is keyed on (run_date, target_quarter), and a "next" row OUTLIVES its
+  // horizon: once the ABS prints, the quarter it targets becomes the current
+  // one, so the log then holds several rows for the current quarter that were
+  // made at the next horizon. Anything selecting on target_quarter alone must
+  // therefore say which horizons it wants.
+  horizon?: string;
 }
 
 export interface VintageSeries {
@@ -213,6 +223,13 @@ export interface V2Model {
   // Which information stage's CI params were used ("pooled" if this stage was too
   // thin to calibrate). Optional for the same reason.
   ci_stage?: number | string;
+  // "current" or "next". The next-quarter model nowcasts the quarter AFTER the
+  // one the ABS has not printed yet, off the same MAI, and `current_quarter`
+  // names the quarter it lags into — which is also the quarter whose level its
+  // own level chains off, so its level inherits the headline's error. Optional:
+  // payloads emitted before 2026-09-12 carry neither.
+  horizon?: string;
+  current_quarter?: string;
 }
 
 export interface LatestV2 {
@@ -221,8 +238,12 @@ export interface LatestV2 {
   target_quarter: string;
   data_through: string;
   prev_level: { value: number; date: string | null; source: string };
-  models: { headline: V2Model };
-  vintages: Vintage[]; // qa nowcast at each Monday — drives the evolution chart
+  // `next_quarter` is absent in the weeks when v2's index has no month past the
+  // current quarter, which is the ordinary state early in a quarter.
+  models: { headline: V2Model; next_quarter?: V2Model };
+  // qa nowcast at each Monday — drives the evolution chart. Two rows per Monday
+  // once the next quarter has data, told apart by `horizon`.
+  vintages: Vintage[];
   v1_comparison: {
     model_name: string;
     target_quarter: string;

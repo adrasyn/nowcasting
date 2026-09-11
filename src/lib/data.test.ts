@@ -41,6 +41,43 @@ describe("loadDashboardData", () => {
     }
   });
 
+  // v2 publishes two horizons: the quarter the ABS has not printed, and the one
+  // after it once that quarter has a month of data. The second is absent early in
+  // a quarter, which is not an error, so the shape is only checked when it is
+  // there. What must always hold is that /v2's evolution chart sees no
+  // next-quarter row: those rows outlive their horizon, and after a print they
+  // carry the current quarter's own target_quarter.
+  it("v2's next-quarter model targets the quarter after the headline", () => {
+    const data = loadDashboardData();
+    const v2 = data.latestV2;
+    if (!v2?.models.next_quarter) return;
+    const nq = v2.models.next_quarter;
+    const after = (q: string) => {
+      const [y, n] = q.split(" Q").map(Number);
+      return n === 4 ? `${y + 1} Q1` : `${y} Q${n + 1}`;
+    };
+    expect(nq.target_quarter).toBe(after(v2.models.headline.target_quarter));
+    expect(nq.horizon).toBe("next");
+    expect(nq.current_quarter).toBe(v2.models.headline.target_quarter);
+  });
+
+  it("v2's vintage log separates the two horizons", () => {
+    const data = loadDashboardData();
+    const v2 = data.latestV2;
+    expect(v2).toBeDefined();
+    for (const vt of v2!.vintages) {
+      // A missing horizon means a row written before 2026-09-12: current.
+      expect([undefined, "current", "next"]).toContain(vt.horizon);
+    }
+    // The /v2 chart's own selection: current-horizon rows for the headline
+    // quarter. It must never pick up a next-quarter row.
+    const drawn = v2!.vintages.filter(
+      (vt) => vt.horizon !== "next" && vt.target_quarter === v2!.target_quarter,
+    );
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(drawn.every((vt) => vt.horizon !== "next")).toBe(true);
+  });
+
   it("the published nowcast is the model's figure less its recent average error", () => {
     const data = loadDashboardData();
     const v3 = data.latestV3;

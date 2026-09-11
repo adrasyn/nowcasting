@@ -23,8 +23,15 @@ export default function V2Dashboard() {
   const v2 = data.latestV2;
   const generatedAt = v2 ? v2.generated_at : data.latest.generated_at;
 
-  // v2 evolution chart: the qa nowcast at each Monday (emitted in latest_v2.json).
-  const v2Nowcasts = v2 ? { vintages: v2.vintages } : data.nowcasts;
+  // v2 evolution chart: the CURRENT-quarter qa nowcast at each Monday (emitted in
+  // latest_v2.json). Since 2026-09-12 the log also carries next-quarter rows, and
+  // those must be dropped here rather than left to the chart's target_quarter
+  // filter: a next-quarter row outlives its horizon, so once the ABS prints, the
+  // quarter it targeted becomes the current one and its rows would silently
+  // extend this line backwards. This page shows the current quarter only.
+  const v2Nowcasts = v2
+    ? { vintages: v2.vintages.filter((vt) => vt.horizon !== "next") }
+    : data.nowcasts;
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">

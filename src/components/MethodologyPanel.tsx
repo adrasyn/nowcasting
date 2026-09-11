@@ -35,6 +35,11 @@ export default function MethodologyPanel() {
             ours are limited to data that is freely and publicly available, so the panel behind the
             indicator is not the same as the paper&rsquo;s. The estimation method follows the paper.
           </p>
+          <p>
+            The model is estimated on the ABS&rsquo;s initial estimate of each quarter &mdash; the
+            figure published on the day, not the later-revised series &mdash; as the paper does. That
+            is also the number the track record below is scored against.
+          </p>
         </div>
       )}
     </section>

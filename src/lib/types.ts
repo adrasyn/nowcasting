@@ -161,10 +161,13 @@ export interface Performance {
   bias_pct: number;
   // What the errors above are measured against: "abs_first_print" on v3, where
   // the published nowcast and the target are both first-print figures. Absent
-  // on v1 and v2, which score against the latest vintage.
+  // on v1, which scores against the latest vintage, and on v2, which scores
+  // against the ABS's initial estimates but predates this field.
   basis?: string;
   n?: number;
-  // What the model was trained on: "first_print" on v3. Absent on v1 and v2.
+  // What the model was trained on: "first_print" on v3. Absent on v1 and v2 --
+  // v2 was retargeted to the ABS's initial estimates in 2026-09 but its payload
+  // does not carry the field.
   target?: string;
   // How many printed quarters the rolling miss averages over, and how the
   // model's own uncorrected figure scores against the first print. Provenance

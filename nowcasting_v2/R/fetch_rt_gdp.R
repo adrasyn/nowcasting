@@ -127,6 +127,16 @@ fetch_rt_gdp <- function(out_csv = "data_raw/rt_dgdp_qtr.csv",
                           "appends it."), series_id), call. = FALSE)
   } else {
     add <- live[live$date > max(out$date), , drop = FALSE]
+    if (nrow(add) > 1L) {
+      # One missing quarter is the print-Monday case and the appended value is
+      # the initial estimate. Two or more means the v3 job has stopped
+      # appending: only the NEWEST of these is an initial estimate, the older
+      # ones are revised figures, so the target is wrong until v3 catches up.
+      warning(sprintf(paste("fetch_rt_gdp(): the first-release file is %d quarters",
+                            "behind the ABS; only the newest appended quarter is an",
+                            "initial estimate. Check the v3 weekly job."), nrow(add)),
+              call. = FALSE)
+    }
     if (nrow(add) > 0L) {
       out <- rbind(out, add)
       out <- out[order(out$date), , drop = FALSE]

@@ -80,5 +80,17 @@ export function loadDashboardData(): DashboardData {
     backtestV3: readJsonOptional<V3Backtest>("backtest_v3.json"),
     indicatorsV3: readJsonOptional<IndicatorData>("indicators_v3.json"),
     performanceV3: readJsonOptional<Performance>("performance_v3.json"),
+    // The equal-weight average of v2 and v3, written by
+    // `nowcasting_v3/tools/emit_combination.py` at the end of the weekly v3
+    // job. Optional because the emitter is newer than the job: a checkout from
+    // before it, or a week it refused before writing, has v3's files and not
+    // these.
+    //
+    // READ ALONGSIDE v3's, NOT IN PLACE OF THEM — see `DashboardData`. The
+    // loader states what is on disk and `page.tsx` decides, so the choice is
+    // one line in one component rather than a `??` buried in a file reader,
+    // and `latestV3` still means v3's own payload wherever it is read.
+    latestCombo: readJsonOptional<LatestV3>("latest_combo.json"),
+    performanceCombo: readJsonOptional<Performance>("performance_combo.json"),
   };
 }

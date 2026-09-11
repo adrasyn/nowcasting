@@ -58,14 +58,26 @@ test.describe("homepage", () => {
       page.getByText(/New York Fed Staff Nowcast 2\.0/).first()
     ).toBeVisible();
     // The panel is the one place that explains what the published number is:
-    // a nowcast of the ABS's initial estimate, less a correction for the
-    // model's recent average error. The panel is closed by default, so this
-    // assertion lives here — and it is SCOPED TO #methodology because the
-    // track-record notes above also say "average error", so an unscoped
-    // match passes with the panel closed and would survive the panel's copy
-    // being deleted.
+    // the average of two models, each a nowcast of the ABS's initial estimate.
+    // The panel is closed by default, so this assertion lives here — and it is
+    // SCOPED TO #methodology because the track-record notes above also say
+    // "average error", so an unscoped match passes with the panel closed and
+    // would survive the panel's copy being deleted.
+    //
+    // `/average error/` rather than `/most recent average error/`: the copy
+    // now attaches the correction to the NY Fed model that owns it ("its own
+    // average error over the last 8 quarters") instead of to the published
+    // figure, which is an average of two already corrected models.
     await expect(
-      page.locator("#methodology").getByText(/most recent average error/)
+      page.locator("#methodology").getByText(/average error/).first()
+    ).toBeVisible();
+    // BOTH MODELS HAVE TO BE NAMED, because the published figure is their
+    // average. The NY Fed assertion above is one half; this is the other, and
+    // the paper number is the part a reader can look up. `ModelSwitch` is gone
+    // from the foot of the page (commit 2cf1e6d), so neither string can now
+    // reach this page from anywhere but the methodology copy.
+    await expect(
+      page.locator("#methodology").getByText(/Research Discussion Paper 2024-04/)
     ).toBeVisible();
   });
 });

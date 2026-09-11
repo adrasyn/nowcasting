@@ -53,4 +53,42 @@ describe("loadDashboardData", () => {
       nowcast!.model_qoq_growth_pct! - v3.bias_correction.pp;
     expect(Math.abs(nowcast!.qoq_growth_pct - implied)).toBeLessThan(1e-3);
   });
+
+  // ---- the combination (2026-09-12) ---------------------------------------
+  // The homepage publishes the equal-weight average of v2 and v3. The loader
+  // reports it as its own fields; `page.tsx` prefers them over v3's.
+
+  it("reads the combination payloads as their own fields, not as v3's", () => {
+    const data = loadDashboardData();
+    // Optional by design: a checkout from before the emitter has no combo
+    // files and the page serves v3 alone.
+    if (!data.latestCombo) return;
+    expect(data.latestCombo.schema).toMatch(/^combo-/);
+    // THE POINT OF THE EXPLICIT FIELDS. `latestV3` must still be v3's own
+    // payload; a loader that returned the average under that name would leave
+    // nothing able to name either model's own figure.
+    expect(data.latestV3?.schema).not.toMatch(/^combo-/);
+    expect(data.performanceCombo?.method).toMatch(/equal-weight average/);
+  });
+
+  it("the combination's published figure is the mean of its two components", () => {
+    const data = loadDashboardData();
+    const combo = data.latestCombo;
+    if (!combo || combo.status !== "ok") return;
+    expect(combo.horizons.length).toBeGreaterThan(0);
+    for (const h of combo.horizons) {
+      expect(h.components).toBeDefined();
+      const mean = (h.components!.v2 + h.components!.v3) / 2;
+      expect(Math.abs(h.qoq_growth_pct - mean)).toBeLessThan(1e-4);
+    }
+  });
+
+  it("every combination track-record row says it is the combination", () => {
+    const data = loadDashboardData();
+    const p = data.performanceCombo;
+    if (!p) return;
+    expect(p.basis).toBe("abs_first_print");
+    expect(p.errors.length).toBeGreaterThan(0);
+    for (const e of p.errors) expect(e.model).toBe("combination");
+  });
 });

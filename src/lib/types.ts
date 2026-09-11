@@ -122,7 +122,17 @@ export interface AccuracyError {
   // first-print GDP and corrected by its own rolling miss; "revised_target" is
   // the previous one, trained on the revised series, kept for quarters it
   // published live rather than restated by a model that did not publish them.
-  model?: "first_print" | "revised_target";
+  // "combination" is the equal-weight average of v2 and v3 the homepage
+  // publishes, and every row of `performance_combo.json` carries it.
+  model?: "first_print" | "revised_target" | "combination";
+  // The two component figures behind a "combination" row, so the table can be
+  // read as arithmetic rather than as a third model. Absent on v1, v2 and v3.
+  v2_qoq_nowcast_pct?: number | null;
+  v3_qoq_nowcast_pct?: number | null;
+  // The run date the scored figure comes from, live or backtested.
+  // `live_run_date` names the same date only on rows that were published
+  // before the ABS printed; this one is always present on a combination row.
+  final_run_date?: string;
   // TRUE when this row was shifted by TODAY's correction rather than by the one
   // that stood on its own day, which was never computed. Honest approximation,
   // flagged rather than hidden.
@@ -176,6 +186,16 @@ export interface Performance {
   bias_window_quarters?: number;
   model_mae_vs_first_print_pct?: number | null;
   model_bias_vs_first_print_pct?: number | null;
+  // How the scored figure was made: "equal-weight average of v2 and v3" on
+  // `performance_combo.json`. Absent on the single-model payloads.
+  method?: string;
+  // The combination's own provenance: how many of the quarters below it called
+  // live rather than in backtest, and how each component model scored over the
+  // same quarters. The case for averaging is that these two are both worse
+  // than `mae_pct`, so the numbers sit beside it rather than in a note.
+  n_live?: number;
+  v2_mae_pct?: number;
+  v3_mae_pct?: number;
   rba_comparison: RbaComparison;
   errors: AccuracyError[];
 }
@@ -286,6 +306,11 @@ export interface V3Horizon {
   // the correction — and is what the whole page means by "the nowcast". This
   // one appears once, in the methodology panel, as provenance.
   model_qoq_growth_pct?: number;
+  // On a combination payload, the two figures `qoq_growth_pct` is the mean of.
+  // `check_payload.py` asserts that identity to four decimals on every horizon,
+  // so these are the audit trail for the published figure and not a second
+  // view of it. Absent on v3's own payload.
+  components?: { v2: number; v3: number };
 }
 
 export interface LatestV3 {
@@ -323,6 +348,30 @@ export interface LatestV3 {
     basis: string;
   } | null;
   ci_basis?: string;
+  // ---- combination payloads (`data/latest_combo.json`, schema "combo-1") ----
+  // Same shape as v3's, so every component on the homepage renders it
+  // unchanged. These four fields are the difference, and all four are absent
+  // on v3's own payload.
+  //
+  // NOTE ON WHAT IS *NOT* THE COMBINATION'S. `bias_correction`, `panel`,
+  // `diagnostics` and `estimate` are copied straight from v3 and describe the
+  // v3 half only: the combination's own figure has no single correction behind
+  // it and no single panel. The methodology panel says so.
+  method?: string;
+  // The empirical band parameters, per horizon. `provisional_next` is true
+  // while the next-quarter band is the pooled current-quarter one, which
+  // understates a forecast's uncertainty.
+  band_pp?: {
+    current?: { p68: number; p95: number; n: number; mae: number; bias: number };
+    next?: { p68: number; p95: number; n: number; mae: number; bias: number };
+    provisional_next?: boolean;
+  };
+  // Which run of each model this week's average is built from, and how stale
+  // v2's was if it did not run.
+  components?: {
+    v2?: { as_of: string; run_date: string; schema?: string; stale_days?: number };
+    v3?: { as_of: string; schema?: string };
+  };
   panel?: {
     n_series: number;
     n_months: number;
@@ -350,6 +399,16 @@ export interface V3Vintage {
   ci_95_low: number;
   ci_95_high: number;
   data_through: string;
+  // On a combination vintage, the two figures this row averages and the v2 run
+  // it took (v2 runs at 02:00 UTC and v3 at 03:30, and a quiet v2 week is
+  // carried forward up to seven days, so the two dates need not match).
+  v2_qoq_growth_pct?: number;
+  v2_run_date?: string;
+  v3_qoq_growth_pct?: number;
+  // "current" or "next" — which quarter this row was FOR at the time it was
+  // written, decided by the run's own date against the ABS release calendar.
+  // A 2026 Q3 row is "next" before Q2 printed and "current" after.
+  horizon?: string;
 }
 
 export interface V3Score {
@@ -398,4 +457,13 @@ export interface DashboardData {
   backtestV3?: V3Backtest;
   indicatorsV3?: IndicatorData; // the v3 model's input panel
   performanceV3?: Performance;  // v3's backtest track record
+  // The equal-weight average of v2 and v3 — what the homepage publishes when
+  // these are present. SEPARATE FIELDS RATHER THAN AN OVERRIDE OF latestV3,
+  // deliberately. `latestV3` means v3's own payload everywhere it is read, so
+  // a test or a future panel that wants the v3 half can still have it; a
+  // loader that quietly returned an average under that name would leave
+  // nothing on the site able to name either model's own figure. `page.tsx`
+  // chooses which to publish; the loader only reports what is on disk.
+  latestCombo?: LatestV3;
+  performanceCombo?: Performance;
 }

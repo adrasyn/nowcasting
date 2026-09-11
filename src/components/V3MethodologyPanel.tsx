@@ -4,10 +4,16 @@ import { useState } from "react";
 import type { LatestV3, Performance } from "@/lib/types";
 
 // The combination's methodology, as the owner asked for it: v3, then v2, then
-// the averaging. The figures in the last paragraphs
-// are read from `performance_v3.json` and `latest_v3.json` rather than typed
-// in, so a re-run of the backtest cannot leave the sentence stating numbers the
-// table below it no longer shows.
+// the averaging. The figures in the last paragraphs are read from whichever
+// payloads the page is publishing — `performance_combo.json` and
+// `latest_combo.json` when the combination exists, v3's own otherwise — rather
+// than typed in, so a re-run of the backtest cannot leave the sentence stating
+// numbers the table below it no longer shows.
+//
+// ONE FIGURE HERE IS V3'S AND NOT THE AVERAGE'S: the correction in the second
+// paragraph, which the combination copies from v3 because it belongs to v3's
+// half. It is stated inside the sentence about the NY Fed model for that
+// reason, and must stay there.
 //
 // THIS IS THE ONE PLACE THE MODEL'S OWN FIGURE APPEARS. Everywhere else on the
 // page "the nowcast" means the published number: the model's estimate less a
@@ -104,7 +110,9 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
                 `, and has run ${performance.bias_pct.toFixed(2)}pp high`}
               {performance.bias_pct < -0.05 &&
                 `, and has run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
-              .
+              . For quarters before the average went live, the shaded rows in
+              the track record average the two models&rsquo; figures as each
+              was published that week.
             </p>
           )}
         </div>

@@ -68,6 +68,21 @@
 #     the interval spuriously. We keep the LAST (most informed) Monday in each
 #     cell, so n per stage is the number of quarters, not the number of Mondays.
 #
+# TWO HORIZONS (2026-09-12). The backtest now also records a NEXT-quarter figure
+# (`qoq_growth_forecast_next`, scored against `qoq_actual_next` at stage
+# `n_months_in_next_quarter`). That estimator lags one further quarter into the
+# future off the same MAI, so it is a different estimator again and gets its own
+# calibration, written to a top-level `next` block with the same {pooled, by_jt}
+# shape. Everything about the method is identical: post-CALIB_FROM target
+# quarters, one observation per (target quarter, stage), MIN_N fallback -- only
+# the columns differ. The current-quarter block is byte-unchanged by this: the
+# two are computed by the same function over different columns.
+#
+# Observed next-quarter stages are 1 and 2 only. 0 cannot occur (nowcast_midas()
+# refuses the next horizon when the MAI has no month past the current quarter)
+# and 3 needs a late ABS print. A stage that never occurs simply has no entry and
+# would fall back to `next$pooled`.
+#
 # Usage (from nowcasting_v2/):
 #   Rscript R/compute_ci_params_v2.R <backtest.csv> <out.json> [model_label]
 
@@ -100,23 +115,7 @@ BIAS_ALPHA <- 0.05  # two-sided significance required before we subtract a bias
 # post-pandemic quarters. Another COVID-scale shock is not in them.
 CALIB_FROM <- as.Date("2022-01-01")
 
-b <- read.csv(src, stringsAsFactors = FALSE)
-b$target_quarter_date <- as.Date(b$target_quarter_date)
-b <- b[!is.na(b$qoq_error) & !is.na(b$n_months_in_quarter), ]
-if (!nrow(b)) stop("no usable rows in ", src)
-
-n_all <- nrow(b)
-b     <- b[b$target_quarter_date >= CALIB_FROM, ]
-cat(sprintf("%s: kept %d of %d rows (target quarter >= %s)\n",
-            label, nrow(b), n_all, CALIB_FROM))
-if (!nrow(b)) stop("no rows at or after CALIB_FROM ", CALIB_FROM)
-
-# --- one row per (target quarter, stage): keep the last as-of in each cell ------
-b$as_of <- as.Date(b$as_of)
-b <- b[order(b$target_quarter_date, b$n_months_in_quarter, b$as_of), ]
-key <- paste(b$target_quarter_date, b$n_months_in_quarter, sep = "|")
-b <- b[!duplicated(key, fromLast = TRUE), ]
-cat(sprintf("%s: %d independent (quarter, stage) observations\n", label, nrow(b)))
+raw <- read.csv(src, stringsAsFactors = FALSE)
 
 stats_for <- function(e) {
   n <- length(e)
@@ -141,22 +140,67 @@ stats_for <- function(e) {
        t_95               = round(qt(0.975,   n - 1L), 4))
 }
 
-pooled <- stats_for(b$qoq_error)
-if (is.null(pooled)) stop("not enough observations to calibrate")
+# Calibrate ONE horizon: `err`, `stage` and `qdate` are the three columns that
+# define it, `as_of` breaks the within-cell tie. Returns list(pooled, by_jt).
+# Run over (qoq_error, n_months_in_quarter, target_quarter_date) this reproduces
+# exactly what this script did before the next horizon existed.
+calibrate <- function(d, err, stage, qdate, tag) {
+  d <- data.frame(err = as.numeric(err), stage = as.numeric(stage),
+                  qdate = as.Date(qdate), as_of = as.Date(d$as_of))
+  d <- d[!is.na(d$err) & !is.na(d$stage) & !is.na(d$qdate), ]
+  if (!nrow(d)) stop("no usable ", tag, " rows in ", src)
 
-by_jt <- list()
-for (j in sort(unique(b$n_months_in_quarter))) {
-  e <- b$qoq_error[b$n_months_in_quarter == j]
-  s <- stats_for(e)
-  if (is.null(s) || s$n < MIN_N) {
-    cat(sprintf("  jt=%d: n=%d < %d -- will fall back to pooled\n", j, length(e), MIN_N))
-    next
+  n_all <- nrow(d)
+  d     <- d[d$qdate >= CALIB_FROM, ]
+  cat(sprintf("%s [%s]: kept %d of %d rows (target quarter >= %s)\n",
+              label, tag, nrow(d), n_all, CALIB_FROM))
+  if (!nrow(d)) stop("no ", tag, " rows at or after CALIB_FROM ", CALIB_FROM)
+
+  # --- one row per (target quarter, stage): keep the last as-of in each cell ----
+  d <- d[order(d$qdate, d$stage, d$as_of), ]
+  key <- paste(d$qdate, d$stage, sep = "|")
+  d <- d[!duplicated(key, fromLast = TRUE), ]
+  cat(sprintf("%s [%s]: %d independent (quarter, stage) observations\n",
+              label, tag, nrow(d)))
+
+  pooled <- stats_for(d$err)
+  if (is.null(pooled)) stop("not enough ", tag, " observations to calibrate")
+
+  by_jt <- list()
+  for (j in sort(unique(d$stage))) {
+    e <- d$err[d$stage == j]
+    s <- stats_for(e)
+    if (is.null(s) || s$n < MIN_N) {
+      cat(sprintf("  [%s] jt=%d: n=%d < %d -- will fall back to pooled\n",
+                  tag, j, length(e), MIN_N))
+      next
+    }
+    s$stage <- j
+    by_jt[[as.character(j)]] <- s
+    cat(sprintf("  [%s] jt=%d: n=%2d  bias %+0.4f (t=%+.2f%s)  sd %.4f  t95 %.3f\n",
+                tag, j, s$n, s$qoq_bias_pp, s$bias_t,
+                if (s$bias_significant) ", SIGNIFICANT but not applied" else ", n.s.",
+                s$qoq_sd_pp, s$t_95))
   }
-  s$stage <- j
-  by_jt[[as.character(j)]] <- s
-  cat(sprintf("  jt=%d: n=%2d  bias %+0.4f (t=%+.2f%s)  sd %.4f  t95 %.3f\n",
-              j, s$n, s$qoq_bias_pp, s$bias_t,
-              if (s$bias_significant) ", SIGNIFICANT but not applied" else ", n.s.", s$qoq_sd_pp, s$t_95))
+  list(pooled = pooled, by_jt = by_jt)
+}
+
+cur <- calibrate(raw, raw$qoq_error, raw$n_months_in_quarter,
+                 raw$target_quarter_date, "current")
+pooled <- cur$pooled
+by_jt  <- cur$by_jt
+
+# The next horizon exists only in backtests run after 2026-09-12. An older CSV
+# simply produces no `next` block, and ci_params_for_stage() then falls back to
+# the current-quarter pooled params.
+has_next <- all(c("qoq_growth_forecast_next", "qoq_actual_next",
+                  "n_months_in_next_quarter", "next_target_quarter_date") %in% names(raw))
+nxt <- if (has_next && any(!is.na(raw$qoq_growth_forecast_next) & !is.na(raw$qoq_actual_next))) {
+  calibrate(raw, raw$qoq_growth_forecast_next - raw$qoq_actual_next,
+            raw$n_months_in_next_quarter, raw$next_target_quarter_date, "next")
+} else {
+  cat(sprintf("%s: no next-quarter columns -- writing no `next` block\n", label))
+  NULL
 }
 
 params <- list(
@@ -169,11 +213,17 @@ params <- list(
   method      = paste("interval = point +/- t(df) * sd, centred on the model's raw output.",
                       "The measured bias is reported (qoq_bias_pp, bias_t) but NOT applied:",
                       "RDP 2024-04 does not bias-correct and evaluates on RMSE, which already",
-                      "penalises bias. Stages with fewer than MIN_N observations fall back to `pooled`."),
+                      "penalises bias. Stages with fewer than MIN_N observations fall back to `pooled`.",
+                      "The top-level `next` block is the same calculation for the nowcast of the",
+                      "quarter AFTER the current one, at its own information stage."),
   min_n       = MIN_N,
   bias_alpha  = BIAS_ALPHA,
   pooled      = pooled,
   by_jt       = by_jt,
+  # Same shape, one quarter further out: the nowcast for the quarter AFTER the
+  # current one, at its own information stage. Absent when the backtest CSV has
+  # no next-quarter columns. `next` is an R keyword, so read it as p[["next"]].
+  "next"      = nxt,
   model       = label,
   source      = src,
   computed_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
@@ -182,3 +232,6 @@ params <- list(
 write_json(params, out, auto_unbox = TRUE, pretty = TRUE, digits = 6)
 cat(sprintf("wrote %s  (pooled n=%d, sd=%.4f; %d per-stage entries)\n",
             out, pooled$n, pooled$qoq_sd_pp, length(by_jt)))
+if (!is.null(nxt))
+  cat(sprintf("  next: pooled n=%d, sd=%.4f; %d per-stage entries\n",
+              nxt$pooled$n, nxt$pooled$qoq_sd_pp, length(nxt$by_jt)))

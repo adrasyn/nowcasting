@@ -13,19 +13,46 @@ payload in any week, so a failure here is a bug and not a judgement call. That i
 the bar for putting a check in front of a publish: a check that needs a human to
 decide whether it matters will eventually be ignored.
 
-Usage:  python tools/check_payload.py [path-to-latest_v3.json]
+TWO PAYLOADS, ONE SET OF INVARIANTS. `data/latest_combo.json` — the
+equal-weight average of v2 and v3 that the homepage publishes — is written in
+this same schema and goes through this same function; the weekly job runs it
+twice, once per file. Everything above holds for both, and the combination adds
+two facts of its own: that the published figure really is the mean of the two
+component figures, and that it sits inside its own 68% band.
+
+ONE INVARIANT HAD TO BE GATED, AND HERE IS WHY. v3's headline is arithmetic:
+the model's figure less its rolling miss. The combination's is not. It averages
+two figures that have each ALREADY had their own correction taken off, and it
+copies v3's `bias_correction` across as provenance for its v3 half, so
+`qoq_growth_pct` equals `model_qoq_growth_pct` and differs from
+`model_qoq_growth_pct - bias_correction.pp` by exactly v3's correction. That is
+correct for an average and would fail the v3 identity on every combination
+payload ever published, so the identity check is keyed on the payload's own
+`schema`: a `combo-` schema gets the component-mean check in its place. The
+correction's presence and plausible range are still asserted on both, because
+the combination's v3 half is still built from it.
+
+Usage:  python tools/check_payload.py [--file path] [path-to-latest_v3.json]
 Exits 1 and prints ::error:: lines on failure, so the workflow fails and the
 existing alert path opens an issue.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 __all__ = ["check_payload", "quarter_key"]
+
+# The combination payloads declare themselves in `schema` ("combo-1"), which is
+# what selects the invariants above. `method` says the same thing in prose and
+# is checked too, so a payload that carries the combination's method under some
+# other schema is not silently run through v3's arithmetic.
+COMBO_SCHEMA_PREFIX = "combo-"
+COMBO_METHOD_PREFIX = "equal-weight average"
 
 
 def quarter_key(label: str) -> tuple[int, int]:
@@ -34,9 +61,68 @@ def quarter_key(label: str) -> tuple[int, int]:
     return int(year), int(q)
 
 
+def is_combination(d: dict) -> bool:
+    """True for the equal-weight v2+v3 payload, which reports itself as such."""
+    schema = d.get("schema") or ""
+    method = d.get("method") or ""
+    return (isinstance(schema, str) and schema.startswith(COMBO_SCHEMA_PREFIX)) or (
+        isinstance(method, str) and method.startswith(COMBO_METHOD_PREFIX))
+
+
+def _combination_problems(d: dict) -> list[str]:
+    """The two invariants that belong to an average and not to a single model.
+
+    THE PUBLISHED FIGURE IS THE MEAN, TO THE DIGIT. Equal weights are the whole
+    claim the page makes about how the two models are put together, and it is
+    the one thing a reader cannot check: both component figures are printed
+    beside the average, so a weight that had quietly drifted would look like
+    arithmetic nobody had done. Checked on every horizon and every vintage,
+    because the evolution chart is drawn from the vintages and a weight that
+    was right today and wrong in June is still wrong on the page.
+
+    AND IT SITS INSIDE ITS OWN BAND. The bands are the average's past absolute
+    errors placed either side of the point, so a point outside its own 68% band
+    is not a wide interval but a band computed from something other than the
+    figure it is drawn around.
+    """
+    bad: list[str] = []
+
+    def check(where: str, qoq, parts: dict, lo, hi) -> None:
+        missing = [k for k in ("v2", "v3")
+                   if not isinstance(parts.get(k), (int, float))
+                   or isinstance(parts.get(k), bool)]
+        if missing:
+            bad.append(f"{where}: the combination carries no {'/'.join(missing)} "
+                       f"components, so nothing says what it is the average of")
+        else:
+            mean = round((parts["v2"] + parts["v3"]) / 2, 4)
+            if not isinstance(qoq, (int, float)) or isinstance(qoq, bool) or \
+                    abs(qoq - mean) > 1e-4:
+                bad.append(f"{where}: qoq_growth_pct {qoq!r} is not the mean of its "
+                           f"components (v2 {parts['v2']!r}, v3 {parts['v3']!r} -> "
+                           f"{mean}); the page claims equal weights")
+        if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and \
+                isinstance(qoq, (int, float)):
+            if not (lo < qoq < hi):
+                bad.append(f"{where}: the point {qoq!r} is outside its own 68% band "
+                           f"[{lo!r}, {hi!r}]")
+        else:
+            bad.append(f"{where}: no 68% band, which the page draws around every point")
+
+    for h in d.get("horizons") or []:
+        check(h.get("quarter", "?"), h.get("qoq_growth_pct"),
+              h.get("components") or {}, h.get("ci_68_low"), h.get("ci_68_high"))
+    for v in d.get("vintages") or []:
+        parts = {"v2": v.get("v2_qoq_growth_pct"), "v3": v.get("v3_qoq_growth_pct")}
+        check(f"vintage {v.get('run_date', '?')} for {v.get('target_quarter', '?')}",
+              v.get("qoq_growth_pct"), parts, v.get("ci_68_low"), v.get("ci_68_high"))
+    return bad
+
+
 def check_payload(d: dict, *, today: str | None = None) -> list[str]:
     """Return a list of problems. Empty means the payload is coherent."""
     bad: list[str] = []
+    combo = is_combination(d)
     status = d.get("status")
     if status not in {"ok", "refused"}:
         return [f"status is {status!r}, expected 'ok' or 'refused'"]
@@ -92,7 +178,8 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
                 f"vintage {v['run_date']} for {v['target_quarter']} has no "
                 "month of data and should not have been recorded")
 
-    # THE HEADLINE IS ARITHMETIC ON THE MODEL'S FIGURE. `qoq_growth_pct` is the
+    # THE HEADLINE IS ARITHMETIC ON THE MODEL'S FIGURE -- ON V3'S PAYLOAD.
+    # `qoq_growth_pct` is the
     # published nowcast of the ABS's first print: the model's own estimate less
     # the model's rolling miss against past first prints. If the two stop
     # agreeing, the page headlines a number nothing on it explains. An 'ok'
@@ -100,6 +187,11 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
     # headline is mislabelled rather than merely unexplained. And the correction
     # itself is a mean of eight quarterly errors, historically inside +-0.35pp
     # each; one outside +-0.6 is a broken estimate, not a finding.
+    #
+    # THE IDENTITY IS SKIPPED ON THE COMBINATION, for the reason in the module
+    # docstring: an average of two already corrected figures cannot satisfy it.
+    # `_combination_problems` asserts the mean instead, so neither payload goes
+    # unchecked on how its headline was made.
     adj = d.get("bias_correction")
     if adj is None:
         bad.append("status is 'ok' but bias_correction is absent: the published "
@@ -109,7 +201,7 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
         pp = adj.get("pp")
         if not isinstance(pp, (int, float)) or isinstance(pp, bool) or abs(pp) > 0.6:
             bad.append(f"bias_correction.pp is {pp!r}; expected a number within +-0.6")
-        else:
+        elif not combo:
             for h in horizons:
                 model = h.get("model_qoq_growth_pct")
                 if model is None or abs(h["qoq_growth_pct"] - (model - pp)) > 1e-3:
@@ -159,12 +251,22 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
     if through and through > now:
         bad.append(f"data_through {through} is in the future (now {now})")
 
+    if combo:
+        bad.extend(_combination_problems(d))
+
     return bad
 
 
-def main() -> int:
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else (
-        Path(__file__).resolve().parents[2] / "data" / "latest_v3.json")
+def main(argv: list[str] | None = None) -> int:
+    default = Path(__file__).resolve().parents[2] / "data" / "latest_v3.json"
+    ap = argparse.ArgumentParser(description=__doc__)
+    # `--file` is what the workflow uses, so the two invocations read as two
+    # named files rather than one named and one implied. The bare positional is
+    # kept because every earlier caller and runbook passes the path that way.
+    ap.add_argument("--file", dest="file", default=None)
+    ap.add_argument("path", nargs="?", default=None)
+    args = ap.parse_args(argv)
+    path = Path(args.file or args.path or default)
     problems = check_payload(json.loads(path.read_text()))
     for p in problems:
         print(f"::error::{path.name}: {p}", file=sys.stderr)

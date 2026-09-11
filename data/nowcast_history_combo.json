@@ -178,6 +178,22 @@
       "ci_95_high": 0.8558
     },
     {
+      "run_date": "2026-08-10",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "qoq_growth_pct": 0.6108,
+      "v2_qoq_growth_pct": 0.77,
+      "v2_run_date": "2026-08-10",
+      "v3_qoq_growth_pct": 0.4515,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "horizon": "next",
+      "ci_68_low": 0.4669,
+      "ci_68_high": 0.7547,
+      "ci_95_low": 0.2595,
+      "ci_95_high": 0.9621
+    },
+    {
       "run_date": "2026-08-17",
       "target_quarter": "2026 Q2",
       "kind": "nowcast",
@@ -192,6 +208,22 @@
       "ci_68_high": 0.6482,
       "ci_95_low": 0.153,
       "ci_95_high": 0.8556
+    },
+    {
+      "run_date": "2026-08-17",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "qoq_growth_pct": 0.5122,
+      "v2_qoq_growth_pct": 0.56,
+      "v2_run_date": "2026-08-17",
+      "v3_qoq_growth_pct": 0.4644,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "horizon": "next",
+      "ci_68_low": 0.3683,
+      "ci_68_high": 0.6561,
+      "ci_95_low": 0.1609,
+      "ci_95_high": 0.8635
     },
     {
       "run_date": "2026-08-24",
@@ -210,6 +242,22 @@
       "ci_95_high": 0.8553
     },
     {
+      "run_date": "2026-08-24",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "qoq_growth_pct": 0.5121,
+      "v2_qoq_growth_pct": 0.56,
+      "v2_run_date": "2026-08-24",
+      "v3_qoq_growth_pct": 0.4642,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "horizon": "next",
+      "ci_68_low": 0.3682,
+      "ci_68_high": 0.656,
+      "ci_95_low": 0.1608,
+      "ci_95_high": 0.8634
+    },
+    {
       "run_date": "2026-08-31",
       "target_quarter": "2026 Q2",
       "kind": "nowcast",
@@ -224,6 +272,22 @@
       "ci_68_high": 0.6772,
       "ci_95_low": 0.182,
       "ci_95_high": 0.8846
+    },
+    {
+      "run_date": "2026-08-31",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "qoq_growth_pct": 0.5113,
+      "v2_qoq_growth_pct": 0.56,
+      "v2_run_date": "2026-08-24",
+      "v3_qoq_growth_pct": 0.4627,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "horizon": "next",
+      "ci_68_low": 0.3674,
+      "ci_68_high": 0.6552,
+      "ci_95_low": 0.16,
+      "ci_95_high": 0.8626
     },
     {
       "run_date": "2026-09-07",

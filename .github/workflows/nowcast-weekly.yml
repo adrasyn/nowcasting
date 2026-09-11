@@ -131,8 +131,13 @@ jobs:
         run: |
           Rscript R/fetch/fetch_rba_panel.R
           Rscript R/fetch/fetch_abs_panel.R
-          # GDP regressand + target-quarter driver for the v2 model (ABS, no WAF) —
-          # must refresh or v2 keeps targeting a superseded quarter.
+          # GDP regressand + target-quarter driver for the v2 model — must refresh
+          # or v2 keeps targeting a superseded quarter. Since 2026-09 it reads the
+          # first-release series maintained by the v3 pipeline
+          # (nowcasting_v3/data/gdp_first_release.csv, in this same checkout) and
+          # tops it up from the live ABS fetch. This step runs at 02:00 UTC and the
+          # v3 job that appends a new print runs at 03:30, so on a print Monday the
+          # top-up is what supplies the just-printed quarter.
           Rscript R/fetch_rt_gdp.R
           Rscript R/emit_v2_json.R
           # Refresh the indicator-grid display (data/indicators_v2.json) from the

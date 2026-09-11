@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { LatestV3, Performance } from "@/lib/types";
 
-// Copy supplied by James, used as written. The figures in the last paragraphs
+// The combination's methodology, as the owner asked for it: v3, then v2, then
+// the averaging. The figures in the last paragraphs
 // are read from `performance_v3.json` and `latest_v3.json` rather than typed
 // in, so a re-run of the backtest cannot leave the sentence stating numbers the
 // table below it no longer shows.
@@ -43,7 +44,13 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
         <div className="space-y-3 border border-t-0 border-border-heavy px-4 py-4 text-sm text-border-heavy">
           <p>
             This page nowcasts Australia&rsquo;s quarterly real GDP growth ahead
-            of the ABS release using the{" "}
+            of the ABS release. The published figure is the equal-weighted
+            average of two models. Both are estimated on the ABS&rsquo;s initial
+            estimate of GDP for each quarter, the figure published on the day,
+            and the track record below is scored against the same figure.
+          </p>
+          <p>
+            The first model is the{" "}
             <a
               href="https://www.newyorkfed.org/research/policy/nowcast"
               target="_blank"
@@ -51,23 +58,43 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
               className="underline hover:text-teal"
             >
               New York Fed Staff Nowcast 2.0
-            </a>{" "}
-            — a Bayesian dynamic factor model, ported to Python from the
-            Fed&rsquo;s published MATLAB. We then apply a correction for the
-            model&rsquo;s most recent average error: the mean gap between the
-            model&rsquo;s final nowcast and the ABS figure over the last{" "}
-            {windowQuarters ?? 8} quarters
+            </a>
+            , a Bayesian dynamic factor model ported to Python from the
+            Fed&rsquo;s published MATLAB. Fourteen monthly and quarterly series
+            load onto five latent factors: global, soft, nominal, labour, and a
+            COVID factor active only between March 2020 and December 2021.
+            Stochastic volatility and outlier states let the model absorb a
+            shock like 2020 without over-reacting to every large surprise
+            afterwards. Its estimate is corrected for its own average error over
+            the last {windowQuarters ?? 8} quarters
             {bc != null && `, currently ${bc.pp.toFixed(2)}pp`}.
           </p>
           <p>
-            Fourteen monthly and quarterly series load onto five latent factors:
-            global, soft, nominal, labour, and a COVID factor active only
-            between March 2020 and December 2021. Stochastic volatility and
-            outlier states let the model absorb a shock like 2020 without
-            over-reacting to every large surprise afterwards. The estimation
-            matches the NY Fed&rsquo;s method; what differs is the data series
-            used, because Australia publishes no monthly equivalent of several
-            US series and we use only freely available data.
+            The second follows the Reserve Bank of Australia&rsquo;s{" "}
+            <a
+              href="https://www.rba.gov.au/publications/rdp/2024/2024-04.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-teal"
+            >
+              Research Discussion Paper 2024-04
+            </a>
+            . A dynamic factor model condenses a panel of monthly indicators
+            into a single monthly activity indicator. A mixed-frequency (U-MIDAS)
+            regression then maps the months of that indicator available so far
+            in the quarter onto quarterly GDP growth, and the indicators in the
+            panel are re-selected each quarter on their explanatory power. Our
+            panel is limited to freely available data, so it is not the same as
+            the paper&rsquo;s.
+          </p>
+          <p>
+            The two models miss in different quarters. In a backtest of every
+            Monday from 2023, their errors were close to uncorrelated and the
+            average missed the ABS figure by about a quarter less than either
+            model on its own, which is the standard case for combining
+            forecasts with equal weights. The probability bands are the range of
+            the average&rsquo;s own past misses at any point in the quarter, so
+            68% and 95% of them fell inside the two bands.
           </p>
           {performance && n > 0 && (
             <p>

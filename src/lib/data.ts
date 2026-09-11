@@ -76,9 +76,11 @@ export function loadDashboardData(): DashboardData {
     backcasts: readJsonOptional<BackcastData>("backcasts.json"),
     performanceV2: readJsonOptional<Performance>("performance_v2.json"),
     indicatorsV2: readJsonOptional<IndicatorData>("indicators_v2.json"),
-    latestV3: readJsonOptional<LatestV3>("latest_v3.json"),
+    // PREVIEW: the combination payloads, when present, replace v3's on the
+    // homepage. Same schema, so every component renders unchanged.
+    latestV3: readJsonOptional<LatestV3>("latest_combo.json") ?? readJsonOptional<LatestV3>("latest_v3.json"),
     backtestV3: readJsonOptional<V3Backtest>("backtest_v3.json"),
     indicatorsV3: readJsonOptional<IndicatorData>("indicators_v3.json"),
-    performanceV3: readJsonOptional<Performance>("performance_v3.json"),
+    performanceV3: readJsonOptional<Performance>("performance_combo.json") ?? readJsonOptional<Performance>("performance_v3.json"),
   };
 }

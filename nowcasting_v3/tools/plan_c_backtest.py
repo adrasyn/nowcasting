@@ -31,6 +31,17 @@ runs of this tool and a join on `asof`. The substitution itself is no longer
 done here -- `build_panel(target=...)` does it, and `collapse_floor(target)`
 picks the matching floor -- so the experiment and production cannot drift apart.
 
+THE PANEL IS PADDED, so every vintage reports BOTH horizons. `target_periods`
+stops at the panel's last column, and `build_panel` ends the panel at the as-of
+date, so for two months in every three the next quarter had no aligned column
+and `forecast_next_qq` came back empty -- 8 rows of 189 in the weekly run of
+2026-09-12. `pad_to_next_quarter` appends all-NaN months to reach it, which is
+what a quarter that has not happened yet IS, and it leaves the nowcast where it
+was: on the 2026-08-03 vintage, seed 4, padded and unpadded both give 2026 Q2
+at +0.4884, a difference of 0.0000pp, well under a basis point. That holds only
+because the SAMPLER still sees the unpadded panel -- see the loop below.
+`--no-pad` restores the old shape for comparison.
+
 WHAT THIS IS NOT: a true real-time backtest. The recorded vintage carries ABS's
 CURRENT figures, so cutting it at an `asof` reproduces what was PUBLISHED by
 then, not what those numbers LOOKED LIKE then. The model sees revised INPUTS
@@ -40,10 +51,14 @@ and the first print. That flatters it, and the write-up says so.
 Run:
     cd nowcasting_v3
     caffeinate -i .venv/bin/python -u tools/plan_c_backtest.py OUT.csv
+    # weekly, both horizons, one seed per process:
+    ... tools/plan_c_backtest.py OUT.csv --freq W-MON \
+        --first 2023-01-02 --last 2026-09-07 --seeds 4
 """
 from __future__ import annotations
 
-import argparse, csv, time
+import argparse, copy, csv, time
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -52,7 +67,7 @@ import pandas as pd
 import nyfed.au.build as build_mod
 from nyfed.au.build import (
     P_E, P_F, build_panel, collapse_floor, estimate_short, load_vintage,
-    state_space, target_periods,
+    months_with_data, pad_to_next_quarter, state_space, target_periods,
 )
 from nyfed.au.emit import annualised_to_qoq
 from nyfed.au.first_release import load_first_release
@@ -72,8 +87,19 @@ N_GS, N_BURN = 200, 100
 FIELDS = ["asof", "target", "target_date", "horizon_months", "seed",
           "target_series", "nowcast_qq", "forecast_next_qq", "actual_qq",
           "first_print_qq", "error_qq", "error_first_print_qq",
+          "next_target", "next_first_print_qq", "next_months_with_data",
           "gdp_global_loading", "collapsed", "collapse_floor", "cols", "gdp_obs",
           "deflator_skipped", "seconds"]
+
+
+def _seeds(text: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in text.split(",") if part.strip())
+
+
+def _stretch(latent: np.ndarray, n_pad: int) -> np.ndarray:
+    """Repeat a latent's last month `n_pad` times. Shape is (rows, T, draws)."""
+    return np.concatenate(
+        [latent, np.repeat(latent[:, -1:, :], n_pad, axis=1)], axis=1)
 
 
 def main() -> int:
@@ -91,7 +117,21 @@ def main() -> int:
                          "this is how they were measured: lowering it records "
                          "chains the shipping floor would refuse, to be cut "
                          "afterwards.")
+    ap.add_argument("--freq", choices=("MS", "W-MON"), default="MS",
+                    help="vintage cadence: monthly (the Plan C measurement) or "
+                         "the Monday cadence the site publishes on.")
+    ap.add_argument("--seeds", type=_seeds, default=SEEDS,
+                    help="comma-separated seeds, default 4,13,19. One seed per "
+                         "process is how the weekly run is parallelised; the "
+                         "median across seeds is then taken at analysis time.")
+    ap.add_argument("--first", default=WINDOW_FIRST)
+    ap.add_argument("--last", default=WINDOW_LAST)
+    ap.add_argument("--pad", action=argparse.BooleanOptionalAction, default=True,
+                    help="pad the panel with empty months so the quarter after "
+                         "the nowcast has an aligned column and every row "
+                         "carries a forecast. --no-pad is the old shape.")
     args = ap.parse_args()
+    seeds = tuple(args.seeds)
     # THE OVERRIDE GOES ON build.py's MODULE GLOBAL, not on a name this tool
     # imported: `state_space` is the guarded funnel and it reads the module at
     # call time. `collapse_floor` honours the override too, so the tool's own
@@ -114,7 +154,7 @@ def main() -> int:
     fh = out.open("w", newline=""); w = csv.DictWriter(fh, fieldnames=FIELDS)
     w.writeheader(); fh.flush()
 
-    for asof in pd.date_range(WINDOW_FIRST, WINDOW_LAST, freq="MS"):
+    for asof in pd.date_range(args.first, args.last, freq=args.freq):
         stamp = str(asof.date())
         try:
             panel = build_panel(asof=stamp, vintage=VINT, target=args.target)
@@ -123,18 +163,41 @@ def main() -> int:
                   flush=True)
             continue
 
-        t_now = target_periods(panel)
-        tgt = panel.dates[t_now[0]]
+        # PADDING IS FOR THE FILTER, NOT FOR THE SAMPLER, and that distinction
+        # is the whole of why there are two panels here. Production estimates
+        # quarterly on an unpadded panel and then pads the weekly one, so the
+        # empty months never reach the sampler. Padding before `estimate_short`
+        # instead gives the sampler columns to fit that carry nothing, and it
+        # moves the answer: on 2026-08-03, seed 4, the 2026 Q2 nowcast went
+        # +0.488 -> +1.021 and the GDP loading 0.932 -> 0.857. Estimating on
+        # `panel` and filtering over `pan` reproduces the unpadded nowcast to
+        # 0.0000pp and buys the second horizon for nothing.
+        cols = panel.Y.shape[1]
+        pan = copy.deepcopy(panel)
+        n_pad = pad_to_next_quarter(pan) if args.pad else 0
+
+        t_now = target_periods(pan)
+        tgt = pan.dates[t_now[0]]
         label = f"{tgt.year}Q{(tgt.month - 1) // 3 + 1}"
         act = float(actual_qq.get(tgt, np.nan))
         fp = float(FIRST.get(tgt, np.nan))
+        # The second horizon: the quarter after the nowcast. With --no-pad it
+        # is only reachable in the third month of a quarter, which is why the
+        # unpadded weekly run left `forecast_next_qq` blank in 181 of 189 rows.
+        if len(t_now) > 1:
+            nxt_tgt = pan.dates[int(t_now[1])]
+            nxt_label = f"{nxt_tgt.year}Q{(nxt_tgt.month - 1) // 3 + 1}"
+            nxt_fp = float(FIRST.get(nxt_tgt, np.nan))
+            nxt_months = months_with_data(pan, int(t_now[1]))
+        else:
+            nxt_label, nxt_fp, nxt_months = "", float("nan"), ""
         # Months from the vintage to the END of the target quarter. Negative
         # means the quarter has not finished: a genuine forecast.
         horizon = (asof.year - tgt.year) * 12 + (asof.month - tgt.month)
         n, n_f = SPEC.blocks.shape
-        rows = []
+        rows, nxt_rows = [], []
 
-        for seed in SEEDS:
+        for seed in seeds:
             s0 = time.perf_counter()
             res = estimate_short(panel, n_gs=N_GS, n_burn=N_BURN, seed=seed)
             secs = time.perf_counter() - s0
@@ -143,15 +206,25 @@ def main() -> int:
             collapsed = loading <= floor
             nc = nxt = ""
             if not collapsed:
+                # THE LATENTS ARE STRETCHED OVER THE PADDED MONTHS, repeating
+                # the last column, which is what `run_au_nowcast._fit_latents`
+                # does to the saved estimate every week. They are a starting
+                # value the filter refines, not an imputation.
+                if n_pad:
+                    res = replace(
+                        res,
+                        sigmas=_stretch(res.sigmas, n_pad),
+                        ss=_stretch(res.ss, n_pad))
                 # `state_space` is the guarded funnel; it re-checks the loading.
-                ssm = state_space(panel, res)
-                pt = point_nowcast(panel.Y, panel.Y, ssm, ssm, panel.i_now, t_now)
+                ssm = state_space(pan, res)
+                pt = point_nowcast(pan.Y, pan.Y, ssm, ssm, pan.i_now, t_now)
                 loc = float(panel.y_location[panel.i_now, 0])
                 scl = float(panel.y_scale[panel.i_now, 0])
                 nc = float(annualised_to_qoq(loc + scl * float(pt.nowcast[3, 0])))
                 if pt.nowcast.shape[1] > 1:
                     nxt = float(annualised_to_qoq(loc + scl * float(pt.nowcast[3, 1])))
             rows.append(nc)
+            nxt_rows.append(nxt)
             w.writerow({
                 "asof": stamp, "target": label, "target_date": str(tgt.date()),
                 "horizon_months": horizon, "seed": seed,
@@ -162,9 +235,12 @@ def main() -> int:
                 "first_print_qq": round(fp, 4), "error_qq":
                     round(nc - act, 4) if nc != "" else "",
                 "error_first_print_qq": round(nc - fp, 4) if nc != "" else "",
+                "next_target": nxt_label,
+                "next_first_print_qq": round(nxt_fp, 4) if nxt_label else "",
+                "next_months_with_data": nxt_months,
                 "gdp_global_loading": round(loading, 4),
                 "collapsed": int(collapsed), "collapse_floor": floor,
-                "cols": panel.Y.shape[1],
+                "cols": cols,
                 "gdp_obs": int(np.isfinite(panel.Y[panel.i_now]).sum()),
                 "deflator_skipped": ";".join(sorted(panel.deflator_skipped)),
                 "seconds": round(secs, 1)})
@@ -172,9 +248,13 @@ def main() -> int:
 
         good = [r for r in rows if r != ""]
         med = float(np.median(good)) if good else float("nan")
+        nxt_good = [r for r in nxt_rows if r != ""]
+        nxt_med = float(np.median(nxt_good)) if nxt_good else float("nan")
         print(f"{stamp}  {label}  h={horizon:+d}m  median {med:6.3f}  "
               f"actual {act:6.3f}  first {fp:6.3f}  err {med - act:+6.3f}  "
-              f"({len(good)}/{len(SEEDS)} ok, {(time.perf_counter()-t0)/60:.0f} min)",
+              f"next {nxt_label or '-':6s} {nxt_med:6.3f} "
+              f"({nxt_months if nxt_months != '' else '-'}m)  "
+              f"({len(good)}/{len(seeds)} ok, {(time.perf_counter()-t0)/60:.0f} min)",
               flush=True)
 
     fh.close()

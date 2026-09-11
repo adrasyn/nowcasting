@@ -39,6 +39,8 @@ from nyfed.au.build import (
     collapse_floor,
     fetch_vintage,
     load_vintage,
+    months_with_data,
+    pad_to_next_quarter,
     target_periods,
 )
 from nyfed.au.bias_correction import load_misses, rolling_miss
@@ -88,48 +90,6 @@ def _fit_latents(sigma: np.ndarray, s: np.ndarray, n_cols: int):
     elif pad < 0:
         sigma, s = sigma[:, :n_cols], s[:, :n_cols]
     return sigma, s
-
-
-def pad_to_next_quarter(panel) -> int:
-    """Extend the panel with empty months so the quarter AFTER the current
-    target has a column, and return how many were added.
-
-    `target_periods` steps three months at a time from the quarter after GDP's
-    last observation and stops at the panel's last column, so how many horizons
-    come back is a property of where the panel ENDS. `build_panel` ends it at
-    the as-of date, which through most of a quarter falls short of the next
-    quarter's aligned column -- on 2026-08-31 the panel ended 2026-08 and the
-    only horizon was 2026 Q2, a quarter that had already closed nine weeks
-    earlier. Two months in every three the page led with a quarter nobody could
-    learn anything more about.
-
-    The added columns are all-NaN. The filter treats a missing observation as
-    missing, which is exactly what a quarter that has not happened yet is, so
-    this buys a forecast rather than fabricating an input. It also leaves the
-    NOWCAST untouched: padding moved 2026 Q2 by less than a basis point.
-
-    PADDING HAPPENS HERE, NOT IN `build_panel`. The estimation path and the
-    Plan C backtest both call `build_panel`, and neither wants a panel that
-    runs past its data.
-    """
-    obs = np.flatnonzero(np.isfinite(panel.Y[panel.i_now]))
-    if obs.size == 0:
-        return 0
-    need = int(obs[-1]) + 7          # arange(obs+3, T, 3) has to reach obs+6
-    pad = need - panel.Y.shape[1]
-    if pad <= 0:
-        return 0
-    panel.Y = np.hstack([panel.Y, np.full((panel.Y.shape[0], pad), np.nan)])
-    panel.dates = panel.dates.append(
-        pd.date_range(panel.dates[-1] + pd.DateOffset(months=1),
-                      periods=pad, freq="MS"))
-    return pad
-
-
-def months_with_data(panel, t: int) -> int:
-    """How many of the three months ending at column ``t`` carry any series."""
-    lo = max(0, t - 2)
-    return int(np.isfinite(panel.Y[:, lo:t + 1]).any(axis=0).sum())
 
 
 def main() -> int:

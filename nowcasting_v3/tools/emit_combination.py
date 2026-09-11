@@ -1,204 +1,209 @@
 """Emit the combination payloads: the equal-weight average of v2 and v3.
 
-PREVIEW DRAFT (2026-09-12). Reads the two models' published payloads and writes
-`data/latest_combo.json`, `data/nowcast_history_combo.json` and
-`data/performance_combo.json` in the v3 schemas, so the homepage components
-render them unchanged.
+Runs at the end of the weekly v3 job, after v3 has emitted and its track record
+has been refreshed. Reads the two models' PUBLISHED payloads -- nothing is
+re-estimated here -- and writes `data/latest_combo.json`,
+`data/nowcast_history_combo.json` and `data/performance_combo.json` in v3's
+schemas, so the homepage components render them unchanged.
 
-Rules:
-  * A combination exists for a Monday and a target quarter only where BOTH
-    models published a nowcast for that quarter. v2 nowcasts the latest
-    unpublished quarter only, so the combination for a new quarter starts on
-    the first Monday after the previous quarter's ABS print.
-  * v2's figure for a Monday is its run at that date, or its most recent run
-    before it for the same quarter (v2 skips the occasional Monday).
-  * Bands are the empirical quantiles of the combination's own backtest error
-    (docs/measurements/2026-09-12-v2-v3-weekly-combination.csv), pooled over
-    horizons because the error barely varies with the horizon, centred on the
-    point.
-  * The track record is the backtest's final pre-print Monday for each quarter,
-    on the same hybrid level basis as v3's (levels chained on gdp.json).
+Every rule lives in `nyfed.au.combination`, which is pure and tested on
+hand-built inputs. This file is the I/O: which files, which columns, what to
+print, and where the band parameters come from.
+
+THE BAND PARAMETERS. `pipeline/seed/ci_params_combo.json` is the calibrated
+file, written by `tools/combination_backtest.py`: an absolute-error quantile
+pair per horizon. Until it exists, this tool computes the POOLED current-
+quarter band from the combination measurement CSV and uses it for both
+horizons, saying so on stderr and in the payload's `ci_basis`. A next-quarter
+figure is built on less data than a current-quarter one, so its true band is
+wider than the pooled one: the fallback is provisional and is labelled
+provisional wherever it travels.
+
+INPUTS
+  data/latest_v2.json                    v2's published week (models + vintages)
+  data/latest_v3.json                    v3's published week
+  data/nowcast_history_v3.json           v3's weekly runs, both horizons
+  data/gdp.json                          the ABS's latest vintage, for levels
+  nowcasting_v3/data/gdp_first_release.csv   the target: initial estimates
+  pipeline/rba_somp_forecasts_v2.csv     the RBA's year-ended comparison
+  docs/measurements/2026-09-12-v2-v3-weekly-combination.csv   the backtest
+  pipeline/seed/ci_params_combo.json     the bands, once Task 5 has written it
 """
 from __future__ import annotations
 
-import argparse, json
-from datetime import date, datetime, timezone
+import argparse
+import csv
+import json
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
+from nyfed.au.combination import (HISTORY_SCHEMA, bands_from_errors,
+                                  latest_payload, make_is_current, pair_runs,
+                                  refusal_from_v3, refusal_payload,
+                                  track_record, v2_vintage_rows, with_bands)
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
 BACKTEST = ROOT / "docs/measurements/2026-09-12-v2-v3-weekly-combination.csv"
 SOMP = ROOT / "pipeline/rba_somp_forecasts_v2.csv"
 FIRST = ROOT / "nowcasting_v3/data/gdp_first_release.csv"
-SCHEMA = "combo-preview-1"
+CI_PARAMS = ROOT / "pipeline/seed/ci_params_combo.json"
+
+FALLBACK_BASIS = (
+    "empirical absolute-error quantiles of the equal-weight v2+v3 average "
+    "against the ABS's initial estimate, weekly vintages, pooled over the "
+    "current-quarter horizon and centred on the point.")
 
 
-def qlabel(q: str) -> str:            # "2026Q2" -> "2026 Q2"
-    return f"{q[:4]} {q[4:]}"
+def _spaced(label: str) -> str:
+    """``2026Q2`` -> ``2026 Q2``."""
+    return f"{label[:4]} Q{label[-1]}" if " " not in label else label
+
+
+def read_backtest(path: Path = BACKTEST) -> list[dict]:
+    """The combination backtest, one row per weekly vintage."""
+    with open(path, newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    out = []
+    for r in rows:
+        if not r.get("combo"):
+            continue
+        out.append({"as_of": r["as_of"][:10], "target": _spaced(r["target"]),
+                    "release": (r.get("release") or "")[:10],
+                    "first": float(r["first"]), "v2": float(r["v2"]),
+                    "v3": float(r["v3"]), "combo": float(r["combo"])})
+    return out
+
+
+def read_first_release(path: Path = FIRST) -> dict:
+    with open(path, newline="") as fh:
+        return {_spaced(r["quarter"]): float(r["qoq_pct"])
+                for r in csv.DictReader(fh) if r.get("qoq_pct")}
+
+
+def read_somp(path: Path = SOMP) -> dict:
+    with open(path, newline="") as fh:
+        return {r["target_quarter"]: {"yoy_forecast_pct": float(r["yoy_forecast_pct"]),
+                                      "somp_release": r["somp_release"]}
+                for r in csv.DictReader(fh) if r.get("yoy_forecast_pct")}
+
+
+def load_params(backtest: list[dict], path: Path = CI_PARAMS) -> dict:
+    """The per-horizon bands: the calibrated file, or the pooled fallback.
+
+    The fallback exists so the emitter runs before `tools/combination_backtest.py`
+    has been written, and it is deliberately loud: a `next` band copied from the
+    `current` horizon understates a forecast's uncertainty.
+    """
+    if path.exists():
+        params = json.loads(path.read_text())
+        missing = [h for h in ("current", "next") if h not in params]
+        if missing:
+            raise SystemExit(f"{path}: missing horizon block(s) {missing}")
+        params.setdefault("source", {"file": str(path.relative_to(ROOT))})
+        return params
+    pooled = bands_from_errors(r["combo"] - r["first"] for r in backtest)
+    print(f"WARNING: {path.relative_to(ROOT)} does not exist yet; the "
+          f"next-quarter band is PROVISIONAL -- it reuses the pooled "
+          f"current-quarter parameters (p68 {pooled['p68']}, p95 "
+          f"{pooled['p95']}, n {pooled['n']}). Run tools/combination_backtest.py "
+          f"to calibrate it.", file=sys.stderr, flush=True)
+    return {"schema": "combo-ci-fallback-1", "basis": FALLBACK_BASIS,
+            "current": pooled, "next": dict(pooled), "provisional_next": True,
+            "source": {"backtest": str(BACKTEST.relative_to(ROOT))}}
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--asof", default=None, help="pretend today is this date (YYYY-MM-DD): "
-                    "drop later runs, so the page shows the quarter in force then")
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--asof", default=None,
+                    help="pretend today is this date (YYYY-MM-DD): drop later "
+                         "runs, so the page shows the quarter in force then")
     ap.add_argument("--out", default=str(DATA))
     args = ap.parse_args()
-    out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
-    asof = pd.Timestamp(args.asof) if args.asof else None
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    asof = args.asof
 
-    v2 = json.load(open(DATA / "latest_v2.json"))
-    v3 = json.load(open(DATA / "latest_v3.json"))
-    hist = json.load(open(DATA / "nowcast_history_v3.json"))["runs"]
-    gdp = json.load(open(DATA / "gdp.json"))["series"]
-    lvl = {g["quarter"]: float(g["value"]) for g in gdp}
-    quarters = [g["quarter"] for g in gdp]
+    v2 = json.loads((DATA / "latest_v2.json").read_text())
+    v3 = json.loads((DATA / "latest_v3.json").read_text())
+    history = json.loads((DATA / "nowcast_history_v3.json").read_text())["runs"]
+    gdp = json.loads((DATA / "gdp.json").read_text())["series"]
 
-    # ---- bands from the combination's own backtest errors ------------------
-    bt = pd.read_csv(BACKTEST, parse_dates=["as_of"])
-    err = bt.combo - bt["first"]
-    q68, q95 = (float(np.percentile(err.abs(), p)) for p in (68, 95))
-    ci_basis = (f"probability band: the range holding 68% and 95% of the combination's own "
-                f"backtest misses against the ABS's initial estimate ({len(err)} weekly vintages, "
-                f"2022Q4 to 2026Q2), pooled across horizons and centred on the point. "
-                f"Not a posterior and not a confidence interval.")
+    generated_at = (f"{asof}T00:00:00+00:00" if asof else
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"))
 
-    # ---- v2 runs: (run_date, quarter) -> qoq ----------------------------------
-    v2_runs = {(r["run_date"], r["target_quarter"]): float(r["qoq_growth_pct"]) for r in v2["vintages"]}
-    h = v2["models"]["headline"]
-    v2_runs[(v2["as_of"], h["target_quarter"])] = float(h["qoq_growth_pct"])
+    # A refusal is an outcome, not an error: half a combination is v3 published
+    # under another name, so the page declines for v3's reason.
+    if v3.get("status") != "ok":
+        payload = refusal_from_v3(v3, generated_at=generated_at)
+        (out / "latest_combo.json").write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"refused: {payload['refusal_reason']} -- {payload['refusal_detail']}")
+        return 0
 
-    def v2_at(run_date: str, quarter: str):
-        cands = [(d, q) for (d, q) in v2_runs if q == quarter and d <= run_date]
-        if not cands:
-            return None, None
-        d = max(cands)[0]
-        return v2_runs[(d, quarter)], d
+    if asof:
+        # PREVIEW MODE. Everything published after the pretend date is dropped,
+        # including v2's own `models` block when its run postdates the date --
+        # that block is a run, not a timeless field, and keeping it would put
+        # next week's figure on this week's Monday.
+        v3 = {**v3, "as_of": min(v3["as_of"], asof)}
+        history = [r for r in history if r["run_date"] <= asof]
+        models = {} if (v2.get("as_of") or "") > asof else v2.get("models") or {}
+        v2 = {**v2, "as_of": min(v2.get("as_of") or asof, asof), "models": models,
+              "vintages": [r for r in (v2.get("vintages") or [])
+                           if r["run_date"] <= asof]}
 
-    # ---- combination runs over v3's history -------------------------------
-    runs = []
-    for r in hist:
-        # Rows written before the `kind` field exist; every one of them is a
-        # nowcast (the forecast horizon was never recorded without it).
-        if r.get("kind", "nowcast") != "nowcast":
-            continue
-        if asof is not None and pd.Timestamp(r["run_date"]) > asof:
-            continue
-        v2q, v2d = v2_at(r["run_date"], r["target_quarter"])
-        if v2q is None:
-            continue
-        q = round((v2q + float(r["qoq_growth_pct"])) / 2, 4)
-        runs.append({
-            "run_date": r["run_date"], "target_quarter": r["target_quarter"], "kind": "nowcast",
-            "qoq_growth_pct": q, "v2_qoq_growth_pct": round(v2q, 4), "v2_run_date": v2d,
-            "v3_qoq_growth_pct": round(float(r["qoq_growth_pct"]), 4),
-            "ci_68_low": round(q - q68, 4), "ci_68_high": round(q + q68, 4),
-            "ci_95_low": round(q - q95, 4), "ci_95_high": round(q + q95, 4),
-            "data_through": r["data_through"], "months_with_data": r.get("months_with_data"),
-        })
-    runs.sort(key=lambda x: (x["run_date"], x["target_quarter"]))
-    if not runs:
-        raise SystemExit("no Monday where both models nowcast the same quarter")
-    latest_run = runs[-1]
-    target = latest_run["target_quarter"]
-    vintages = [r for r in runs if r["target_quarter"] == target]
+    backtest = read_backtest()
+    params = load_params(backtest)
+    is_current = make_is_current()
 
-    # ---- latest payload, v3 schema ---------------------------------------
-    prev_q = quarters[quarters.index(target) - 1] if target in quarters else quarters[-1]
-    prev_level = lvl[prev_q]
-    q = latest_run["qoq_growth_pct"]
-    nowcast = {
-        "quarter": target, "kind": "nowcast", "qoq_growth_pct": q,
-        "model_qoq_growth_pct": q,
-        "annualised_growth_pct": round(((1 + q / 100) ** 4 - 1) * 100, 4),
-        "ci_68_low": latest_run["ci_68_low"], "ci_68_high": latest_run["ci_68_high"],
-        "ci_95_low": latest_run["ci_95_low"], "ci_95_high": latest_run["ci_95_high"],
-        "months_with_data": latest_run["months_with_data"],
-        "release_date": next((x["release_date"] for x in v3["horizons"] if x["quarter"] == target), v3.get("next_gdp_release_date")),
-        "gdp_chain_volume_millions": round(prev_level * (1 + q / 100)),
-        "components": {"v2": latest_run["v2_qoq_growth_pct"], "v3": latest_run["v3_qoq_growth_pct"]},
-    }
-    horizons = [nowcast]
-    # v2 has no next-quarter forecast, so the forecast horizon is v3's alone.
-    fc = next((x for x in v3["horizons"] if x["kind"] == "forecast"), None)
-    if fc and asof is None:
-        horizons.append({**fc, "source": "v3 only"})
-    latest = {
-        "schema": SCHEMA, "status": "ok", "basis": "abs_first_print", "target": "first_print",
-        "method": "equal-weight average of v2 and v3",
-        "generated_at": (asof.strftime("%Y-%m-%dT00:00:00+00:00") if asof is not None
-                         else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")),
-        "as_of": latest_run["run_date"], "target_quarter": target,
-        "data_through": latest_run["data_through"],
-        "prev_level": {"value": prev_level, "quarter": prev_q},
-        "horizons": horizons, "vintages": vintages,
-        "next_gdp_release_date": nowcast["release_date"],
-        "bias_correction": v3.get("bias_correction"),
-        "ci_basis": ci_basis,
-        "band_pp": {"p68": round(q68, 4), "p95": round(q95, 4), "n": int(len(err))},
-        "panel": v3.get("panel"), "diagnostics": v3.get("diagnostics"), "estimate": v3.get("estimate"),
-        "components": {"v2": {"as_of": latest_run["v2_run_date"], "schema": v2.get("schema")},
-                       "v3": {"as_of": v3["as_of"], "schema": v3.get("schema")}},
-    }
+    rows = with_bands(pair_runs(history, v2_vintage_rows(v2)), params,
+                      is_current=is_current)
+    if not rows:
+        payload = refusal_payload(
+            reason="no combination", generated_at=generated_at,
+            detail="no run date has both models nowcasting the same quarter",
+            asof=v3["as_of"])
+        (out / "latest_combo.json").write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"refused: {payload['refusal_detail']}")
+        return 0
+
+    try:
+        latest = latest_payload(rows, v3_latest=v3, v2_latest=v2, gdp_series=gdp,
+                                params=params, generated_at=generated_at,
+                                is_current=is_current)
+    except ValueError as exc:
+        payload = refusal_payload(
+            reason="no v2 figure for the current quarter", detail=str(exc),
+            generated_at=generated_at, asof=v3["as_of"])
+        (out / "latest_combo.json").write_text(json.dumps(payload, indent=2) + "\n")
+        print(f"refused: {payload['refusal_detail']}")
+        return 0
+
+    perf = track_record(backtest, rows, gdp, read_first_release(), read_somp())
+
     (out / "latest_combo.json").write_text(json.dumps(latest, indent=2) + "\n")
-    (out / "nowcast_history_combo.json").write_text(json.dumps({"schema": "combo-history-1", "runs": runs}, indent=2) + "\n")
-
-    # ---- track record from the backtest's final pre-print Monday ------------
-    first = pd.read_csv(FIRST); fp = {qlabel(r.quarter): float(r.qoq_pct) for r in first.itertuples()}
-    somp = pd.read_csv(SOMP).set_index("target_quarter")
-    bt["release"] = pd.to_datetime(bt["release"]) if "release" in bt else None
-    errors = []
-    for tq, g in bt.groupby("target"):
-        label = qlabel(tq)
-        g = g[g.as_of < g.release].sort_values("as_of") if g.release.notna().all() else g.sort_values("as_of")
-        last = g.iloc[-1]
-        i = quarters.index(label)
-        base_prev = lvl[quarters[i - 1]]
-        nc, ac = float(last.combo), fp[label]
-        nowcast_lvl, actual_lvl = base_prev * (1 + nc / 100), base_prev * (1 + ac / 100)
-        yoy_nc = yoy_ac = yoy_rba = edge = release = None
-        if i >= 4:
-            base = lvl[quarters[i - 4]]
-            yoy_nc = round(100 * (nowcast_lvl / base - 1), 2); yoy_ac = round(100 * (actual_lvl / base - 1), 2)
-            if label in somp.index:
-                yoy_rba = float(somp.loc[label, "yoy_forecast_pct"]); release = str(somp.loc[label, "somp_release"])
-                edge = round(abs(yoy_nc - yoy_ac) - abs(yoy_rba - yoy_ac), 2)
-        errors.append({
-            "target_quarter": label, "final_nowcast": round(nowcast_lvl), "actual": round(actual_lvl),
-            "error_millions": round(nowcast_lvl - actual_lvl),
-            "error_pct": round(100 * (nowcast_lvl - actual_lvl) / actual_lvl, 3),
-            "qoq_nowcast_pct": round(nc, 2), "qoq_model_nowcast_pct": round(nc, 2),
-            "bias_correction_pp": None, "qoq_actual_pct": round(ac, 2),
-            "qoq_error_pp": round(nc - ac, 2),
-            "qoq_latest_vintage_pct": next((x["qoq_pct"] for x in gdp if x["quarter"] == label), None),
-            "v2_qoq_nowcast_pct": round(float(last.v2), 2), "v3_qoq_nowcast_pct": round(float(last.v3), 2),
-            "model": "combination", "is_live": False, "live_run_date": None,
-            "final_run_date": str(last.as_of.date()),
-            "yoy_nowcast": yoy_nc, "yoy_actual": yoy_ac, "yoy_rba": yoy_rba, "somp_release": release, "edge_pp": edge,
-        })
-    errors.sort(key=lambda x: (int(x["target_quarter"][:4]), x["target_quarter"][-1]))
-    e = pd.DataFrame(errors); er = e.qoq_nowcast_pct - e.qoq_actual_pct
-    paired = pd.DataFrame([{"our": abs(x["yoy_nowcast"] - x["yoy_actual"]), "rba": abs(x["yoy_rba"] - x["yoy_actual"]), "edge": x["edge_pp"]}
-                           for x in errors if x["edge_pp"] is not None])
-    perf = {
-        "basis": "abs_first_print", "target": "first_print", "method": "equal-weight average of v2 and v3",
-        "n": len(errors), "mae_millions": round(float(e.error_millions.abs().mean())),
-        "mae_pct": round(float(er.abs().mean()), 2), "bias_millions": round(float(e.error_millions.mean())),
-        "bias_pct": round(float(er.mean()), 2),
-        "v2_mae_pct": round(float((e.v2_qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
-        "v3_mae_pct": round(float((e.v3_qoq_nowcast_pct - e.qoq_actual_pct).abs().mean()), 2),
-        "rba_comparison": {"n": int(len(paired)), "avg_edge_pp": round(float(paired.edge.mean()), 2),
-                           "ours_mae": round(float(paired.our.mean()), 2), "rba_mae": round(float(paired.rba.mean()), 2),
-                           "we_were_closer": int((paired.our < paired.rba).sum())},
-        "errors": errors,
-    }
+    (out / "nowcast_history_combo.json").write_text(
+        json.dumps({"schema": HISTORY_SCHEMA, "runs": rows}, indent=2) + "\n")
     (out / "performance_combo.json").write_text(json.dumps(perf, indent=2) + "\n")
-    print(f"{target}: combination {q:+.3f} (v2 {latest_run['v2_qoq_growth_pct']:+.3f} at {latest_run['v2_run_date']}, "
-          f"v3 {latest_run['v3_qoq_growth_pct']:+.3f}) band68 ±{q68:.3f} band95 ±{q95:.3f}; "
-          f"{len(vintages)} vintages for {target}, {len(runs)} runs; track record {len(errors)} q MAE {perf['mae_pct']} bias {perf['bias_pct']:+} "
-          f"(v2 {perf['v2_mae_pct']}, v3 {perf['v3_mae_pct']}); RBA n={perf['rba_comparison']['n']} ours {perf['rba_comparison']['ours_mae']} rba {perf['rba_comparison']['rba_mae']}")
+
+    for h in latest["horizons"]:
+        c = h["components"]
+        print(f"{h['quarter']} ({h['kind']}): combination {h['qoq_growth_pct']:+.3f}% "
+              f"= mean(v2 {c['v2']:+.3f}, v3 {c['v3']:+.3f}); "
+              f"68% band [{h['ci_68_low']:+.2f}, {h['ci_68_high']:+.2f}], "
+              f"{h.get('months_with_data', '?')} month(s) of data")
+    stale = latest["components"]["v2"].get("stale_days")
+    print(f"as of {latest['as_of']} (v2 run {latest['components']['v2']['run_date']}"
+          f"{f', {stale} days old' if stale else ''}, v3 run "
+          f"{latest['components']['v3']['as_of']}); "
+          f"{len(latest['horizons'])} horizon(s), {len(latest['vintages'])} vintages "
+          f"for {latest['target_quarter']} and after, {len(rows)} paired runs")
+    rba = perf["rba_comparison"]
+    print(f"track record: {perf['n']} quarters ({perf['n_live']} live) "
+          f"MAE {perf['mae_pct']} bias {perf['bias_pct']:+} "
+          f"(v2 {perf['v2_mae_pct']}, v3 {perf['v3_mae_pct']}); "
+          f"RBA n={rba['n']} ours {rba['ours_mae']} rba {rba['rba_mae']}")
     return 0
 
 

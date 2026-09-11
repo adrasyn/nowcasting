@@ -124,6 +124,17 @@ authoritative list, with each series' transformation code, is `nowcasting_v2/see
 
 **Target** for both: ABS National Accounts (5206.0) quarterly chain volume GDP.
 
+**v2 targets the ABS's *initial* estimate of each quarter, not the latest vintage** (since
+2026-09). RDP 2024-04 estimates and evaluates on the figure the ABS published on the day, and for
+v2 the target turned out to be most of the error: retrained on the initial estimates, bias against
+the print falls +0.31 → +0.10pp and MAE 0.33 → 0.17pp, with correlation to the print rising 0.12 →
+0.43 — see `docs/measurements/2026-09-11-v2-first-print-ab.md`. `R/fetch_rt_gdp.R` therefore builds
+`data_raw/rt_dgdp_qtr.csv` from the first-release series the v3 pipeline maintains
+(`nowcasting_v3/data/gdp_first_release.csv`) and appends any quarter newer than that file from the
+live ABS fetch. That append matters on one day a quarter: the v2 step runs at 02:00 UTC and the v3
+job that writes the new print runs at 03:30, and for a just-printed quarter the latest vintage is
+the initial estimate.
+
 Survey data (NAB, ANZ, Westpac) sits behind WAF-protected sites and cannot be fetched from CI. It
 is refreshed by a separate local task — see `docs/cowork-weekly-refresh.md`.
 

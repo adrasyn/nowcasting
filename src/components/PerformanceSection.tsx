@@ -34,9 +34,9 @@ interface Props {
   // basis and a different number of quarters. Without each saying which,
   // 0.26 beside 0.27 reads as one of them being wrong.
   tileBasis?: string;
-  // The header over the actual column. v3 scores against the ABS's initial
-  // estimate of the quarter rather than the latest vintage, so the page can
-  // override this. Default keeps v1 and v2 as they are.
+  // The header over the actual column. v2 and v3 both score against the ABS's
+  // initial estimate of the quarter rather than the latest vintage; "Actual" is
+  // still the right word for it, and the notes below say which figure it is.
   actualLabel?: string;
   // What sits in the first tile slot. Default: the MAE tile. `false` drops
   // it; a node replaces it (v3 puts the RBA comparison there, because the
@@ -133,11 +133,13 @@ export default function PerformanceSection({
         <p className="text-xs text-label mb-3">{notes}</p>
       ) : isBacktest ? (
         <p className="text-xs text-label mb-3">
-          MAE (mean absolute error) is the average size of the miss, ignoring direction. Bias is the
-          average signed miss, so a positive value means the model tends to come in a little high. The
-          RBA column shows the RBA&rsquo;s forecast published mid-quarter (about two months before our
-          full-quarter estimate) for each June and December quarter. We use more within-quarter data
-          than that RBA forecast, and both are measured against later-revised GDP.
+          Actual is the ABS&rsquo;s initial estimate of quarterly GDP growth, the figure the model is
+          estimated on. MAE (mean absolute error) is the average size of the miss, ignoring direction.
+          Bias is the average signed miss, so a positive value means the model tends to come in a
+          little high. The RBA column shows the RBA&rsquo;s forecast published mid-quarter (about two
+          months before our full-quarter estimate) for each June and December quarter. We use more
+          within-quarter data than that RBA forecast. That year-ended comparison is the one place
+          measured against later-revised GDP, for both of us.
         </p>
       ) : (
         <p className="text-xs text-label mb-3">

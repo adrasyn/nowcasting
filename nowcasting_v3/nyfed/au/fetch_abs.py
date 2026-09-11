@@ -103,6 +103,27 @@ def parse_abs_frame(frame: pd.DataFrame, series_id: str) -> pd.Series:
     return series
 
 
+# Catalogues fetched as ONE TABLE rather than the whole release.
+#
+# `read_abs_series` defaults to downloading every spreadsheet in the catalogue
+# as a single zip. For 6202.0 (Labour Force) that zip is about 30 MB, and
+# readabs fetches it under a fixed 60-second request timeout. From this Mac it
+# arrives in three seconds; from a GitHub runner it sat near the limit and
+# crossed it on 10 and 11 September 2026, three attempts each time, which is
+# what took the quarterly estimate down twice (issues #41, #42). Both series
+# the registry needs from 6202.0 live in table 1, which is about 1 MB and
+# arrives in under a second. readabs' own docstring for `read_abs_series`
+# shows exactly this call, `single_excel_only="62020001"`.
+#
+# Keyed by catalogue, applied to every series from it. Adding a series that
+# lives in another table means adding its catalogue's table here or dropping
+# the entry -- `parse_abs_frame` refuses a frame that lacks the series id, so
+# a wrong table fails loudly rather than returning the wrong column.
+SINGLE_TABLE: dict[str, str] = {
+    "6202.0": "62020001",
+}
+
+
 def fetch_abs_series(locator: str) -> pd.Series:
     """Retrieve one ABS series. ``locator`` is ``"<catalogue>:<series id>"``.
 
@@ -114,7 +135,10 @@ def fetch_abs_series(locator: str) -> pd.Series:
     import readabs as ra  # imported lazily: tests never need it
 
     cat, series_id = locator.split(":", 1)
+    kwargs = {}
+    if cat in SINGLE_TABLE:
+        kwargs["single_excel_only"] = SINGLE_TABLE[cat]
     frame, _meta = ra.read_abs_series(
-        cat=cat, series_id=series_id, url=CEASED_CATALOGUE_URLS.get(cat, "")
+        cat=cat, series_id=series_id, url=CEASED_CATALOGUE_URLS.get(cat, ""), **kwargs
     )
     return parse_abs_frame(frame, series_id)

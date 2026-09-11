@@ -268,3 +268,25 @@ def test_the_cpi_fetch_still_begins_at_its_short_history_bound():
         "backwards, the splice in `deflator.long_monthly_cpi` may no longer "
         "be needed and sources.py should say so"
     )
+
+
+def test_labour_force_is_fetched_as_its_first_table_only(monkeypatch):
+    """6202.0 comes from table 1, not the 30 MB catalogue zip that timed out
+    on the GitHub runner (issues #41, #42). Other catalogues are unchanged."""
+    import sys, types
+    import pandas as pd
+    from nyfed.au import fetch_abs
+
+    calls = []
+
+    def fake_read_abs_series(**kwargs):
+        calls.append(kwargs)
+        idx = pd.PeriodIndex(["2026-06", "2026-07"], freq="M")
+        return pd.DataFrame({kwargs["series_id"]: [1.0, 2.0]}, index=idx), None
+
+    monkeypatch.setitem(sys.modules, "readabs",
+                        types.SimpleNamespace(read_abs_series=fake_read_abs_series))
+    fetch_abs.fetch_abs_series("6202.0:A84423043C")
+    fetch_abs.fetch_abs_series("8731.0:A422070J")
+    assert calls[0]["single_excel_only"] == "62020001"
+    assert "single_excel_only" not in calls[1]

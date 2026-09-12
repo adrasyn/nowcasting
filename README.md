@@ -66,8 +66,8 @@ which pairs v3's fresh run with v2's latest run for the same quarter (at most a 
 `data/latest_combo.json`, `data/nowcast_history_combo.json` and `data/performance_combo.json` in
 v3's schemas. The payload checker runs against the combination payload the same way it does against
 v3's own. If v3 refuses to publish, the combination shows v3's refusal rather than half an average;
-if v2's run is missing that week, last week's v2 run is carried forward for up to 7 days and the
-payload flags it as stale.
+if v2's run is missing that week, last week's v2 run is carried for up to 7 days and the payload
+records how old it is (`components.v2.stale_days`).
 
 The published bands are empirical quantiles of the combination's own backtest errors, calculated
 separately for the current and next-quarter horizons and stored in `pipeline/seed/ci_params_combo.json`.

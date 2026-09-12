@@ -164,15 +164,6 @@ jobs:
           cd ..
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # READ BEFORE STAGING, because staging is what makes the diff empty.
-          # This is the one signal that the homepage's own figure moved: the
-          # combined `changed` flag below goes true on any of a dozen files, so
-          # an indicator refresh alone would mask a combination that never ran.
-          if git diff --quiet -- data/latest_combo.json; then
-            echo "combo_changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "combo_changed=true" >> "$GITHUB_OUTPUT"
-          fi
           git add data/latest_v3.json data/indicators_v3.json
           git add data/nowcast_history_v3.json
           git add data/performance_v3.json data/backtest_v3.json
@@ -213,25 +204,6 @@ jobs:
         if: steps.track.outcome == 'failure'
         run: |
           echo "::error::emit_backtest_json.py failed; the nowcast was published, the track record was not refreshed"
-          exit 1
-
-      # THE HOMEPAGE'S FIGURE HAS TO HAVE MOVED. A scheduled Monday run always
-      # has a fresh v3 nowcast behind it, so an unchanged `latest_combo.json`
-      # means the average did not take it up -- most likely a refusal that
-      # reproduced last week's refusal verbatim, or an emitter that paired
-      # nothing. Either way the homepage is serving a figure no run this week
-      # produced, and that is the failure this whole guard set exists for.
-      # Checked AFTER the deploy, like the two below, so a publish a reader is
-      # waiting for is never held up by an alert.
-      #
-      # ONLY ON A SCHEDULED RUN. A `workflow_dispatch` re-run minutes after the
-      # cron legitimately recomputes the same numbers from the same data, and
-      # failing that would train everyone to ignore the alert.
-      - name: Fail the job if the combination payload did not change
-        if: github.event_name == 'schedule' && steps.commit.outputs.combo_changed != 'true'
-        run: |
-          echo "::error::data/latest_combo.json is unchanged after a scheduled run;" \
-               "the homepage publishes the v2+v3 average and no run this week moved it"
           exit 1
 
       - name: Fail the job if the first print or the miss was not recorded

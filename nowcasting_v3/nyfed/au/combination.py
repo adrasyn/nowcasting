@@ -129,6 +129,22 @@ def v2_vintage_rows(v2_latest: dict) -> list[dict]:
     return sorted(rows.values(), key=lambda r: (r["run_date"], r["target_quarter"]))
 
 
+def _months_with_data(row: dict, quarter: str):
+    """The row's own count, or one derived from ``data_through`` for a history
+    row written before the field existed (rows up to 2026-08-31). ``quarter``
+    is "2026 Q2"; ``data_through`` is "2026-05". A month is counted once the
+    panel carries data for it, so 2026-05 against 2026 Q2 is two months."""
+    if row.get("months_with_data") is not None:
+        return int(row["months_with_data"])
+    dt = row.get("data_through")
+    if not dt:
+        return None
+    y, q = int(quarter[:4]), int(quarter[-1])
+    first = y * 12 + (q - 1) * 3            # index of the quarter's first month
+    through = int(dt[:4]) * 12 + int(dt[5:7]) - 1
+    return max(0, min(3, through - first + 1))
+
+
 def pair_runs(v3_runs: list[dict], v2_vintages: list[dict], *,
               max_age_days: int = MAX_AGE_DAYS) -> list[dict]:
     """One combined row per v3 run that has a v2 partner for the same quarter.
@@ -165,7 +181,7 @@ def pair_runs(v3_runs: list[dict], v2_vintages: list[dict], *,
             "v2_qoq_growth_pct": round(v2q, 4),
             "v2_run_date": partner["run_date"],
             "v3_qoq_growth_pct": round(v3q, 4),
-            "months_with_data": r.get("months_with_data"),
+            "months_with_data": _months_with_data(r, quarter),
             "data_through": r.get("data_through"),
         }
         out.append(row)

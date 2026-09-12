@@ -421,3 +421,12 @@ def test_the_quarter_in_flight_is_not_scored():
 def test_track_record_needs_a_first_print_for_every_scored_quarter():
     with pytest.raises(ValueError, match="no ABS initial estimate"):
         track_record(_BT, [], _GDP_TR, {"2026 Q1": 0.30}, _SOMP)
+
+
+def test_months_with_data_derived_from_data_through_for_old_rows():
+    from nyfed.au.combination import _months_with_data
+    assert _months_with_data({"months_with_data": 1, "data_through": "2026-05"}, "2026 Q2") == 1
+    assert _months_with_data({"data_through": "2026-05"}, "2026 Q2") == 2
+    assert _months_with_data({"data_through": "2026-03"}, "2026 Q2") == 0
+    assert _months_with_data({"data_through": "2026-08"}, "2026 Q2") == 3
+    assert _months_with_data({}, "2026 Q2") is None

@@ -265,7 +265,7 @@
       "v2_qoq_growth_pct": 0.53,
       "v2_run_date": "2026-08-31",
       "v3_qoq_growth_pct": 0.5365,
-      "months_with_data": null,
+      "months_with_data": 3,
       "data_through": "2026-08",
       "horizon": "current",
       "ci_68_low": 0.3894,

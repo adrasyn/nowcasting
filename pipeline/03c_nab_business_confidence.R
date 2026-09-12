@@ -20,9 +20,18 @@ library(glue)
 #' @return Tibble with standardized columns: date, value, series_id, series_name
 #' @details NAB releases data on the 2nd Tuesday of each month for the PREVIOUS month.
 #'          Function will error if data is stale and skip_freshness_check = FALSE.
+# SIX DAYS OF GRACE, NOT ZERO. NAB publishes on the second Tuesday, and the
+# scheduled laptop routine that scrapes it (docs/cowork-weekly-refresh.md) runs
+# on Sunday. With no grace, any run between the Tuesday and that Sunday -- a
+# manual dispatch, or a quarter-month Tuesday-evening run that lands on the
+# second Tuesday -- demanded data nobody had fetched yet and halted the whole
+# job, v2 emit included (2026-09-12). Tuesday plus six is the following Monday,
+# so the weekly Monday run still insists on the fresh month.
+NAB_GRACE_PERIOD_DAYS <- 6L
+
 load_nab_business_confidence <- function(start_date = "2000-01-01",
                                          skip_freshness_check = FALSE,
-                                         grace_period_days = 0) {
+                                         grace_period_days = NAB_GRACE_PERIOD_DAYS) {
   message("Loading NAB Business Confidence data...")
 
   # Read the CSV file

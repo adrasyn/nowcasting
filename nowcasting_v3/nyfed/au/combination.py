@@ -607,6 +607,132 @@ def merge_indicators(v3: dict, v2: dict | None) -> dict:
             "indicators": out}
 
 
+# v3-only series that publish on the same day as another series in the panel.
+# The sibling's `next_release_estimate` -- scraped by v2's ABS calendar, or
+# already filled by a rule below -- is copied rather than re-derived.
+_SIBLING_NEXT_RELEASE = {
+    "imports": "exports",
+    "household_spending": "household_spending_nominal",
+}
+
+# The three national accounts series: one ABS release date for all of them.
+_NATIONAL_ACCOUNTS_IDS = {"gdp", "gdi", "unit_labour_cost"}
+
+
+def _last_series_month(entry: dict) -> tuple[int, int] | None:
+    series = entry.get("series") or []
+    if not series:
+        return None
+    year_s, month_s = str(series[-1]["date"]).split("-")[:2]
+    return int(year_s), int(month_s)
+
+
+def _add_months(year: int, month: int, n: int) -> tuple[int, int]:
+    i = year * 12 + (month - 1) + n
+    return i // 12, i % 12 + 1
+
+
+def _days_in_month(year: int, month: int) -> int:
+    y, m = _add_months(year, month, 1)
+    return (_dt.date(y, m, 1) - _dt.timedelta(days=1)).day
+
+
+def _last_weekday_of_month(year: int, month: int, weekday: int) -> _dt.date:
+    """The last date in ``year``-``month`` that falls on ``weekday`` (Mon=0)."""
+    if month == 12:
+        d = _dt.date(year, 12, 31)
+    else:
+        d = _dt.date(year, month + 1, 1) - _dt.timedelta(days=1)
+    return d - _dt.timedelta(days=(d.weekday() - weekday) % 7)
+
+
+def _first_weekday_of_month(year: int, month: int) -> _dt.date:
+    """The first date in ``year``-``month`` that is a Monday-Friday."""
+    return _roll_to_weekday(_dt.date(year, month, 1))
+
+
+def _roll_to_weekday(d: _dt.date) -> _dt.date:
+    """``d``, moved forward to the next Monday-Friday if it lands on a weekend."""
+    return d + _dt.timedelta(days={5: 2, 6: 1}.get(d.weekday(), 0))
+
+
+def fill_next_release(indicators: list[dict], *,
+                      next_gdp_release_date: str | None) -> list[dict]:
+    """Fill `next_release_estimate` for the v3-only series that lack one.
+
+    v2's entries carry `next_release_estimate` from an ABS calendar scrape;
+    v3's `emit_indicators.py` has never estimated one, so every v3-only series
+    -- the eight with no v2 counterpart -- reaches the merged panel without it
+    and the homepage prints "--" in the "Next release" column. This fills that
+    gap, ONLY where the field is missing: a scraped date always wins over a
+    derived one.
+
+    THREE KINDS OF RULE, in the order tried:
+    1. SIBLING. `imports`/`exports` and the two `household_spending` series
+       are one ABS release each; the sibling's date is copied verbatim. If the
+       sibling has none either, the field is left missing rather than guessed.
+    2. NATIONAL ACCOUNTS. `gdp`, `gdi` and `unit_labour_cost` print together on
+       the ABS's national accounts day, which `latest_v3.json` already carries
+       as `next_gdp_release_date` -- v3's own forecast target, not a rule
+       re-derived here.
+    3. A PUBLICATION RULE, for the three series with a fixed monthly schedule
+       and no sibling: the ABS's monthly CPI (last Wednesday of the month
+       after next), the RBA's commodity price index (first business day of
+       the month after next) and the Ai Group PMI (one calendar month after
+       its last release, rolled off a weekend).
+
+    Anything else -- a series with neither a sibling nor a known schedule --
+    stays without a date, same as today.
+
+    Returns new dicts; ``indicators`` is not modified. Rows the function fills
+    gain `next_release_basis` ("sibling", "national_accounts" or "rule") so a
+    reader of the JSON can tell an estimate from a scraped date.
+    """
+    by_id = {e["id"]: e for e in indicators}
+    out = []
+    for entry in indicators:
+        if entry.get("next_release_estimate"):
+            out.append(dict(entry))
+            continue
+        id_ = entry["id"]
+        est: str | None = None
+        basis: str | None = None
+        if id_ in _SIBLING_NEXT_RELEASE:
+            sibling = by_id.get(_SIBLING_NEXT_RELEASE[id_])
+            sib_date = sibling.get("next_release_estimate") if sibling else None
+            if sib_date:
+                est, basis = sib_date, "sibling"
+        elif id_ in _NATIONAL_ACCOUNTS_IDS:
+            if next_gdp_release_date:
+                est, basis = next_gdp_release_date, "national_accounts"
+        elif id_ == "cpi":
+            last = _last_series_month(entry)
+            if last:
+                y, m = _add_months(*last, 2)
+                est = _last_weekday_of_month(y, m, weekday=2).isoformat()  # Wed
+                basis = "rule"
+        elif id_ == "commodity_prices":
+            last = _last_series_month(entry)
+            if last:
+                y, m = _add_months(*last, 2)
+                est = _first_weekday_of_month(y, m).isoformat()
+                basis = "rule"
+        elif id_ == "aig_pmi":
+            lrd = entry.get("last_release_date")
+            if lrd:
+                d = _dt.date.fromisoformat(lrd)
+                y, m = _add_months(d.year, d.month, 1)
+                day = min(d.day, _days_in_month(y, m))
+                est = _roll_to_weekday(_dt.date(y, m, day)).isoformat()
+                basis = "rule"
+        merged = dict(entry)
+        if est:
+            merged["next_release_estimate"] = est
+            merged["next_release_basis"] = basis
+        out.append(merged)
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # The track record
 # --------------------------------------------------------------------------- #

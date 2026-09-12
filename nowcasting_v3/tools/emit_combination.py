@@ -39,11 +39,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from nyfed.au.combination import (HISTORY_SCHEMA, _spaced, latest_payload,
-                                  make_is_current, merge_indicators, pair_runs,
-                                  quarter_shift, refusal_from_v3,
-                                  refusal_payload, track_record,
-                                  v2_vintage_rows, with_bands)
+from nyfed.au.combination import (HISTORY_SCHEMA, _spaced, fill_next_release,
+                                  latest_payload, make_is_current,
+                                  merge_indicators, pair_runs, quarter_shift,
+                                  refusal_from_v3, refusal_payload,
+                                  track_record, v2_vintage_rows, with_bands)
 from nyfed.au.emit import gdp_release_date
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -121,7 +121,7 @@ def load_params(path: Path = CI_PARAMS) -> dict:
     return params
 
 
-def emit_indicators(out: Path) -> None:
+def emit_indicators(out: Path, *, next_gdp_release_date: str | None = None) -> None:
     """Write `data/indicators_combo.json`: the union of the two input panels.
 
     WRITTEN BEFORE ANY REFUSAL CAN RETURN, and independently of whether the two
@@ -129,6 +129,12 @@ def emit_indicators(out: Path) -> None:
     which is a fact about the week's data even when no figure is published, and
     the homepage renders it from its own file -- so a refusal that skipped this
     would leave yesterday's merged panel beside today's refusal, or none.
+
+    `next_gdp_release_date` comes from `latest_v3.json` -- v3's own next
+    national-accounts target -- and is passed through to `fill_next_release`
+    for the three series (`gdp`, `gdi`, `unit_labour_cost`) that print on that
+    day. Every other v3-only series without a scraped date is filled by
+    `fill_next_release`'s sibling or publication-schedule rules.
     """
     v3_path, v2_path = DATA / "indicators_v3.json", DATA / "indicators_v2.json"
     if not v3_path.exists():
@@ -137,12 +143,18 @@ def emit_indicators(out: Path) -> None:
     v3 = json.loads(v3_path.read_text())
     v2 = json.loads(v2_path.read_text()) if v2_path.exists() else None
     merged = merge_indicators(v3, v2)
+    merged["indicators"] = fill_next_release(
+        merged["indicators"], next_gdp_release_date=next_gdp_release_date)
     (out / "indicators_combo.json").write_text(json.dumps(merged, indent=2) + "\n")
     n3 = len(v3.get("indicators") or [])
     n2 = len((v2 or {}).get("indicators") or [])
     n = len(merged["indicators"])
+    missing = [i["id"] for i in merged["indicators"]
+              if not i.get("next_release_estimate")]
     print(f"indicators: v3 {n3} + v2 {n2} -> {n} published "
           f"({n3 + n2 - n} pair(s) merged as the same series)")
+    if missing:
+        print(f"indicators: no next_release_estimate for {missing}")
 
 
 def main() -> int:
@@ -156,10 +168,11 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     asof = args.asof
 
-    emit_indicators(out)
+    v3 = json.loads((DATA / "latest_v3.json").read_text())
+
+    emit_indicators(out, next_gdp_release_date=v3.get("next_gdp_release_date"))
 
     v2 = json.loads((DATA / "latest_v2.json").read_text())
-    v3 = json.loads((DATA / "latest_v3.json").read_text())
     history = json.loads((DATA / "nowcast_history_v3.json").read_text())["runs"]
     gdp = json.loads((DATA / "gdp.json").read_text())["series"]
 

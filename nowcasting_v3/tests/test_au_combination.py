@@ -10,9 +10,10 @@ check by eye.
 
 import pytest
 
-from nyfed.au.combination import (SAME_SERIES, SCHEMA, latest_payload,
-                                  make_is_current, merge_indicators, pair_runs,
-                                  quarter_shift, refusal_from_v3, track_record,
+from nyfed.au.combination import (SAME_SERIES, SCHEMA, fill_next_release,
+                                  latest_payload, make_is_current,
+                                  merge_indicators, pair_runs, quarter_shift,
+                                  refusal_from_v3, track_record,
                                   v2_vintage_rows, with_bands)
 
 # --------------------------------------------------------------------------- #
@@ -732,3 +733,115 @@ def test_a_missing_v2_panel_leaves_v3s_intact(capsys):
     assert all(i["models"] == ["v3"] for i in out["indicators"])
     assert out["sources"] == {"v3": "2026-09-12T03:30:00+00:00", "v2": None}
     assert "v2" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------- #
+# Filling in a missing next_release_estimate
+# --------------------------------------------------------------------------- #
+
+
+def _row(id_, *, series=(), last_release_date=None, next_release_estimate=None):
+    row = {"id": id_, "series": [{"date": d, "value": 1.0} for d in series]}
+    if last_release_date is not None:
+        row["last_release_date"] = last_release_date
+    if next_release_estimate is not None:
+        row["next_release_estimate"] = next_release_estimate
+    return row
+
+
+def test_present_estimates_are_left_untouched():
+    rows = [_row("gdp", series=["2026-06"], next_release_estimate="2026-09-02")]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert out[0]["next_release_estimate"] == "2026-09-02"
+    assert "next_release_basis" not in out[0]
+
+
+def test_input_is_not_mutated():
+    rows = [_row("exports", series=["2026-07"], next_release_estimate="2026-10-01"),
+            _row("imports", series=["2026-07"])]
+    before = [dict(r) for r in rows]
+    fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert rows == before
+
+
+def test_imports_takes_exports_date():
+    rows = [_row("exports", series=["2026-07"], next_release_estimate="2026-10-01"),
+            _row("imports", series=["2026-07"])]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    imports = next(r for r in out if r["id"] == "imports")
+    assert imports["next_release_estimate"] == "2026-10-01"
+    assert imports["next_release_basis"] == "sibling"
+
+
+def test_household_spending_real_takes_the_nominal_sibling():
+    rows = [_row("household_spending", series=["2026-07"]),
+            _row("household_spending_nominal", series=["2026-07"],
+                 next_release_estimate="2026-09-29")]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    hs = next(r for r in out if r["id"] == "household_spending")
+    assert hs["next_release_estimate"] == "2026-09-29"
+    assert hs["next_release_basis"] == "sibling"
+
+
+def test_a_missing_sibling_date_leaves_the_field_absent():
+    rows = [_row("exports", series=["2026-07"]),
+            _row("imports", series=["2026-07"])]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    imports = next(r for r in out if r["id"] == "imports")
+    assert "next_release_estimate" not in imports
+    assert "next_release_basis" not in imports
+
+
+def test_gdp_gdi_and_ulc_take_the_next_gdp_release_date():
+    rows = [_row("gdp", series=["2026-06"]), _row("gdi", series=["2026-06"]),
+            _row("unit_labour_cost", series=["2026-06"])]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    for r in out:
+        assert r["next_release_estimate"] == "2026-12-02"
+        assert r["next_release_basis"] == "national_accounts"
+
+
+def test_national_accounts_rows_left_alone_when_no_next_gdp_date():
+    rows = [_row("gdp", series=["2026-06"])]
+    out = fill_next_release(rows, next_gdp_release_date=None)
+    assert "next_release_estimate" not in out[0]
+
+
+def test_cpi_next_release_is_the_last_wednesday_two_months_after_latest():
+    """Latest observation 2026-07, published in August; the next observation
+    (2026-08) is due the last Wednesday of September 2026."""
+    rows = [_row("cpi", series=["2026-06", "2026-07"])]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert out[0]["next_release_estimate"] == "2026-09-30"
+    assert out[0]["next_release_basis"] == "rule"
+
+
+def test_commodity_prices_next_release_is_the_first_weekday_two_months_after():
+    """Latest observation 2026-08, published early September; the next
+    observation (2026-09) is due the first business day of October 2026."""
+    rows = [_row("commodity_prices", series=["2026-07", "2026-08"])]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert out[0]["next_release_estimate"] == "2026-10-01"
+    assert out[0]["next_release_basis"] == "rule"
+
+
+def test_aig_pmi_next_release_is_one_month_after_the_last_release():
+    """2026-09-01 + one month = 2026-10-01, a Thursday: no roll needed."""
+    rows = [_row("aig_pmi", series=["2026-08"], last_release_date="2026-09-01")]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert out[0]["next_release_estimate"] == "2026-10-01"
+    assert out[0]["next_release_basis"] == "rule"
+
+
+def test_aig_pmi_next_release_rolls_a_weekend_forward_to_monday():
+    """2026-09-04 + one month = 2026-10-04, a Sunday; rolled to 2026-10-05."""
+    rows = [_row("aig_pmi", series=["2026-08"], last_release_date="2026-09-04")]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert out[0]["next_release_estimate"] == "2026-10-05"
+
+
+def test_series_without_a_rule_or_sibling_stays_untouched():
+    rows = [_row("nab_conf", series=["2026-08"])]
+    out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
+    assert "next_release_estimate" not in out[0]
+    assert "next_release_basis" not in out[0]

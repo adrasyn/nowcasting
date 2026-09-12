@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import nyfed.au.build as build
 from nyfed.au.build import target_periods
 from nyfed.au.panel import Panel
 
@@ -40,6 +41,33 @@ def _panel(n_months: int, gdp_last: int) -> Panel:
     return Panel(Y=Y, y_location=np.zeros((3, 1)), y_scale=np.ones((3, 1)),
                  dates=pd.date_range("1980-01-01", periods=n_months, freq="MS"),
                  series_id=["a", "b", "gdp"], i_now=2)
+
+
+def test_the_helpers_live_in_build_and_the_tool_uses_those():
+    """One definition, two callers.
+
+    The weekly tool and the Plan C backtest both need the second horizon, and
+    the backtest cannot import the tool (the tool fetches, loads a saved
+    estimate and writes the site's payload on import-adjacent paths). So the
+    two helpers moved into `nyfed.au.build`, which both already import. This
+    pins that the move was a move and not a copy: a second definition would
+    drift, and the backtest's padding would stop being the padding the site
+    ships.
+    """
+    assert pad_to_next_quarter is build.pad_to_next_quarter
+    assert months_with_data is build.months_with_data
+
+
+def test_build_helpers_behave_on_a_fixture_panel():
+    """The same shape as `test_padding_buys_exactly_one_more_horizon`, called
+    through `build` rather than through the tool's re-export."""
+    p = _panel(n_months=10, gdp_last=4)
+    assert len(target_periods(p)) == 1
+    assert build.pad_to_next_quarter(p) == 1
+    t = target_periods(p)
+    assert len(t) == 2
+    assert build.months_with_data(p, int(t[0])) == 3
+    assert build.months_with_data(p, int(t[1])) == 0
 
 
 def test_without_padding_there_is_only_one_horizon():

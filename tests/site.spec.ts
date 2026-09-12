@@ -20,6 +20,10 @@ import { test, expect } from "@playwright/test";
 
 const V3_INDICATOR = /Labor · Thousands/;
 const V2_INDICATOR = /Jobs & labour · 000s persons/;
+// A series only v2's panel carries: v3 has no financial block at all, and the
+// merge maps v2's "Financial & credit" onto this name. Chosen over an
+// employment series because nothing in v3 could ever produce this line.
+const V2_ONLY_INDICATOR = /Financial and credit · %/;
 
 /** Open the first Employment indicator and read its metadata line. */
 async function indicatorMeta(page: import("@playwright/test").Page) {
@@ -44,11 +48,24 @@ test.describe("homepage", () => {
     await expect(page.getByText("Actual", { exact: true }).first()).toBeVisible();
   });
 
-  test("serves v3, not v2", async ({ page }) => {
+  // THE HOMEPAGE'S PANEL IS BOTH MODELS', because its figure is both models'.
+  // This test used to assert that nothing of v2's appeared here, which was
+  // right while the page published v3 alone and is wrong now: the panel is the
+  // union of the two, merged where they carry the same series. What must still
+  // hold is that v3's own entries are unchanged — same group names, same units
+  // — so the merge added to the panel rather than restating it in v2's terms.
+  test("shows both models' indicators", async ({ page }) => {
     await page.goto("/");
     await indicatorMeta(page);
     await expect(page.getByText(V3_INDICATOR)).toBeVisible();
+    // v2's copy of Employment is merged INTO v3's, so v2's group and unit for
+    // it never reach the page.
     await expect(page.getByText(V2_INDICATOR)).toHaveCount(0);
+    await page
+      .getByRole("button", { name: /10yr govt bond yield/ })
+      .first()
+      .click();
+    await expect(page.getByText(V2_ONLY_INDICATOR)).toBeVisible();
   });
 
   test("the methodology panel opens", async ({ page }) => {

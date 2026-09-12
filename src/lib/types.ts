@@ -80,6 +80,13 @@ export interface VintageSeries {
 
 // v1 used a fixed 4-group set; v2 adds its own (Financial & credit, etc.), so
 // this is an open string. IndicatorGrid orders known groups first, then the rest.
+//
+// The homepage's merged panel (`data/indicators_combo.json`) speaks v3's
+// vocabulary — "Labor", "Surveys", "Housing and Construction", "Retail and
+// Consumption", "International Trade", "Prices", "Income" — plus one group v3
+// has no series in at all: "Financial and credit", v2's credit aggregates,
+// yields and spreads. It is not in GROUP_PREF, so it appends last, which is
+// where it belongs.
 export type IndicatorGroup = string;
 
 export interface IndicatorPoint {
@@ -102,6 +109,11 @@ export interface Indicator {
   updated_this_run?: boolean;
   prev_period?: string;
   latest_period?: string;
+  // Which model's input panel this series belongs to, on the merged file only
+  // (`data/indicators_combo.json`): ["v3"], ["v2"], or both where the two
+  // panels carry the same series under different ids. Provenance — nothing
+  // renders it — so the grid shows one list and does not know there were two.
+  models?: ("v2" | "v3")[];
 }
 
 export interface IndicatorData {
@@ -489,6 +501,11 @@ export interface DashboardData {
   latestV3?: LatestV3;
   backtestV3?: V3Backtest;
   indicatorsV3?: IndicatorData; // the v3 model's input panel
+  // Both models' panels as one list — what the homepage shows, because the
+  // homepage publishes an average of the two. Optional for the same reason the
+  // combination payloads are: a checkout from before the emitter has v3's file
+  // and not this one, and the page falls back to v3's panel.
+  indicatorsCombo?: IndicatorData;
   performanceV3?: Performance;  // v3's backtest track record
   // The equal-weight average of v2 and v3 — what the homepage publishes when
   // these are present. SEPARATE FIELDS RATHER THAN AN OVERRIDE OF latestV3,

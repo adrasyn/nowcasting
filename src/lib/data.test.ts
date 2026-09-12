@@ -197,6 +197,39 @@ describe("loadDashboardData", () => {
     }
   });
 
+  // The homepage's indicator panel is the union of the two models' panels,
+  // written by the same emitter as the figure. What can go wrong here is
+  // duplication: the same series appearing twice under two ids, which would
+  // give React two keys for one thing and the reader two answers.
+  it("the merged indicator panel is the union of both models', deduplicated", () => {
+    const data = loadDashboardData();
+    const combo = data.indicatorsCombo;
+    if (!combo) return; // a checkout from before the emitter
+    const ids = combo.indicators.map((i) => i.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBeGreaterThan(data.indicatorsV3!.indicators.length);
+    // The six series both panels carry are published once, under v3's id.
+    for (const v2Id of ["emp", "ue", "anz_ads", "nab_cond", "building_app", "export"]) {
+      expect(ids).not.toContain(v2Id);
+    }
+    for (const v3Id of ["employment", "unemployment_rate", "job_ads",
+      "nab_conditions", "building_approvals", "exports"]) {
+      expect(ids).toContain(v3Id);
+    }
+    // v2's household spending is NOMINAL and v3's is REAL — different numbers,
+    // so both are published and v2's says which it is.
+    expect(ids).toContain("household_spending");
+    expect(ids).toContain("household_spending_nominal");
+    expect(
+      combo.indicators.find((i) => i.id === "household_spending_nominal")!.name,
+    ).toMatch(/nominal/);
+    // v2's group names are mapped onto the homepage's vocabulary.
+    expect(combo.indicators.some((i) => i.group === "Jobs & labour")).toBe(false);
+    expect(combo.indicators.some((i) => i.group === "Financial and credit")).toBe(
+      true,
+    );
+  });
+
   it("every combination track-record row says it is the combination", () => {
     const data = loadDashboardData();
     const p = data.performanceCombo;

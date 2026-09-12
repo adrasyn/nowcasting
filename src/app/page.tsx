@@ -108,7 +108,15 @@ export default function Home() {
         />
       )}
 
-      {data.indicatorsV3 && <IndicatorGrid indicators={data.indicatorsV3} />}
+      {/* BOTH MODELS' INPUTS, not v3's. The figure above is the average of v2
+          and v3, so the panel that answers "what is this built on?" is the
+          union of the two panels — v3's fourteen series in their own order,
+          then v2's, merged where the two carry the same series. The file is
+          written by the same emitter; v3's own panel is the fallback for a
+          checkout from before it existed. */}
+      {(data.indicatorsCombo ?? data.indicatorsV3) && (
+        <IndicatorGrid indicators={(data.indicatorsCombo ?? data.indicatorsV3)!} />
+      )}
 
       {performance && (
         <PerformanceSection

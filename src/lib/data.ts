@@ -91,6 +91,9 @@ export function loadDashboardData(): DashboardData {
     // one line in one component rather than a `??` buried in a file reader,
     // and `latestV3` still means v3's own payload wherever it is read.
     latestCombo: readJsonOptional<LatestV3>("latest_combo.json"),
+    // The union of the two models' input panels, written by the same emitter.
+    // The homepage's figure is half v2's, so its indicator panel must be too.
+    indicatorsCombo: readJsonOptional<IndicatorData>("indicators_combo.json"),
     performanceCombo: readJsonOptional<Performance>("performance_combo.json"),
   };
 }

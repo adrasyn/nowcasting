@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { loadDashboardData } from "./data";
+import type { LatestV2, V2Model } from "./types";
 
 describe("loadDashboardData", () => {
   it("loads all five JSON files and returns a DashboardData object", () => {
@@ -42,23 +43,89 @@ describe("loadDashboardData", () => {
   });
 
   // v2 publishes two horizons: the quarter the ABS has not printed, and the one
-  // after it once that quarter has a month of data. The second is absent early in
-  // a quarter, which is not an error, so the shape is only checked when it is
-  // there. What must always hold is that /v2's evolution chart sees no
-  // next-quarter row: those rows outlive their horizon, and after a print they
-  // carry the current quarter's own target_quarter.
-  it("v2's next-quarter model targets the quarter after the headline", () => {
-    const data = loadDashboardData();
-    const v2 = data.latestV2;
-    if (!v2?.models.next_quarter) return;
-    const nq = v2.models.next_quarter;
-    const after = (q: string) => {
-      const [y, n] = q.split(" Q").map(Number);
-      return n === 4 ? `${y + 1} Q1` : `${y} Q${n + 1}`;
+  // after it once that quarter has a month of data. The second is absent early
+  // in a quarter, which is the ordinary state and not an error — so a test that
+  // read the committed payload and returned when the field was missing checked
+  // nothing at all in most weeks, including this one. The payload is hand-built
+  // here instead: what is being asserted is the contract between the emitter
+  // and /v2, and that holds whether or not this week's file exercises it.
+  //
+  // WHAT MUST NEVER REGRESS is /v2's chart selection. A next-quarter row
+  // OUTLIVES its horizon: once the ABS prints, the quarter it targeted becomes
+  // the current one, so selecting on `target_quarter` alone would silently
+  // extend the current quarter's line backwards with figures made before the
+  // quarter had begun.
+  it("a next-quarter v2 row never reaches /v2's evolution chart", () => {
+    const vintage = (
+      run_date: string,
+      target_quarter: string,
+      horizon: string,
+      qoq: number,
+    ) => ({
+      run_date,
+      target_quarter,
+      horizon,
+      point: 700000,
+      qoq_growth_pct: qoq,
+      days_until_release: -60,
+      ci_68_low: qoq - 0.3,
+      ci_68_high: qoq + 0.3,
+      ci_95_low: qoq - 0.6,
+      ci_95_high: qoq + 0.6,
+      data_through: "2026-08",
+    });
+    const model = (target_quarter: string, over: Partial<V2Model> = {}) => ({
+      model_id: "qa",
+      model_name: "QA-UMIDAS",
+      target_quarter,
+      gdp_chain_volume_millions: 703205,
+      qoq_growth_pct: 0.61,
+      yoy_growth_pct: 2.1,
+      ci_68_low: 0.3,
+      ci_68_high: 0.9,
+      ci_95_low: 0.0,
+      ci_95_high: 1.2,
+      n_months_in_quarter: 2,
+      ci_basis: "empirical",
+      ci_n: 40,
+      ci_sd_pp: 0.3,
+      ci_bias_pp: 0.05,
+      ...over,
+    });
+    const v2: LatestV2 = {
+      generated_at: "2026-09-07T02:00:00+00:00",
+      schema: "v2-staged-2",
+      target_quarter: "2026 Q3",
+      data_through: "2026-08",
+      prev_level: { value: 699461, date: null, source: "ABS" },
+      models: {
+        headline: model("2026 Q3"),
+        next_quarter: model("2026 Q4", {
+          horizon: "next",
+          current_quarter: "2026 Q3",
+          n_months_in_quarter: 0,
+        }),
+      },
+      vintages: [
+        // Written while 2026 Q3 was still the NEXT quarter, before Q2 printed.
+        vintage("2026-08-24", "2026 Q3", "next", 0.56),
+        vintage("2026-09-07", "2026 Q3", "current", 0.61),
+        vintage("2026-09-07", "2026 Q4", "next", 0.3),
+      ],
+      v1_comparison: null,
+      note: "",
     };
-    expect(nq.target_quarter).toBe(after(v2.models.headline.target_quarter));
-    expect(nq.horizon).toBe("next");
+
+    const nq = v2.models.next_quarter!;
+    expect(nq.target_quarter).toBe("2026 Q4");
     expect(nq.current_quarter).toBe(v2.models.headline.target_quarter);
+
+    // The selection in src/app/v2/page.tsx.
+    const drawn = v2.vintages.filter((vt) => vt.horizon !== "next");
+    expect(drawn.map((vt) => vt.run_date)).toEqual(["2026-09-07"]);
+    expect(drawn.every((vt) => vt.target_quarter === v2.target_quarter)).toBe(
+      true,
+    );
   });
 
   it("v2's vintage log separates the two horizons", () => {
@@ -115,7 +182,17 @@ describe("loadDashboardData", () => {
     expect(combo.horizons.length).toBeGreaterThan(0);
     for (const h of combo.horizons) {
       expect(h.components).toBeDefined();
-      const mean = (h.components!.v2 + h.components!.v3) / 2;
+      const v2 = h.components!.v2;
+      if (v2 === null) {
+        // The next quarter before v2 has a figure for it: v3's own forecast,
+        // kept so the next-quarter card and the chart toggle stay on the page.
+        // It publishes no month of data, so nothing renders the figure.
+        expect(h.kind).toBe("forecast");
+        expect(h.months_with_data).toBe(0);
+        expect(h.qoq_growth_pct).toBe(h.components!.v3);
+        continue;
+      }
+      const mean = (v2 + h.components!.v3) / 2;
       expect(Math.abs(h.qoq_growth_pct - mean)).toBeLessThan(1e-4);
     }
   });

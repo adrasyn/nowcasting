@@ -331,7 +331,19 @@ export interface V3Horizon {
   // `check_payload.py` asserts that identity to four decimals on every horizon,
   // so these are the audit trail for the published figure and not a second
   // view of it. Absent on v3's own payload.
-  components?: { v2: number; v3: number };
+  //
+  // `v2` IS NULL ON ONE HORIZON AND ONLY ONE. The combination keeps a forecast
+  // horizon for the next quarter even in the weeks when v2 has no figure for
+  // it, so this page's next-quarter card and the evolution chart's toggle do
+  // not disappear for the two months in three when that quarter is empty. That
+  // horizon is v3's figure alone, published with `months_with_data: 0` so the
+  // card renders its waiting state and never shows the number.
+  components?: { v2: number | null; v3: number };
+  // The real month count behind a v3-only forecast, whose own
+  // `months_with_data` is forced to 0. Nothing renders it.
+  v3_months_with_data?: number;
+  // Why this horizon is not an average, on the one horizon that is not.
+  source?: string;
 }
 
 export interface LatestV3 {

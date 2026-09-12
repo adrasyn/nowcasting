@@ -98,7 +98,7 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
             Monday from 2023, their errors were close to uncorrelated and the
             average missed the ABS figure by about a quarter less than either
             model on its own, which is the standard case for combining
-            forecasts with equal weights. The probability bands are the range of
+            forecasts with equal weights. The error bands are the range of
             the average&rsquo;s own past misses at any point in the quarter, so
             68% and 95% of them fell inside the two bands.
           </p>

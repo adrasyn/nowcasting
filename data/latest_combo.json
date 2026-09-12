@@ -4,7 +4,7 @@
   "basis": "abs_first_print",
   "target": "first_print",
   "method": "equal-weight average of v2 and v3",
-  "generated_at": "2026-09-12T07:44:07+00:00",
+  "generated_at": "2026-09-12T10:31:25+00:00",
   "as_of": "2026-09-07",
   "target_quarter": "2026 Q3",
   "data_through": "2026-08",
@@ -142,7 +142,7 @@
     "last_quarter": "2026Q2",
     "basis": "mean of the model's final nowcast minus the ABS first print over the last 8 printed quarters"
   },
-  "ci_basis": "probability band: empirical absolute-error quantiles of the equal-weight v2+v3 average against the ABS's initial estimate, weekly vintages, targets 2022Q4 onward, centred on the point. Not a posterior and not a confidence interval.",
+  "ci_basis": "error band: empirical absolute-error quantiles of the equal-weight v2+v3 average against the ABS's initial estimate, weekly vintages, targets 2022Q4 onward, centred on the point. Not a posterior and not a confidence interval.",
   "band_pp": {
     "current": {
       "p68": 0.1439,

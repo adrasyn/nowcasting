@@ -34,7 +34,7 @@ import V3NextQuarter from "@/components/V3NextQuarter";
 // and only the model differs.
 //
 // The one section with no v2 counterpart is the evolution chart, because it
-// carries a probability band the v2 payload cannot support. The v3-vs-v2
+// carries an error band the v2 payload cannot support. The v3-vs-v2
 // comparison and the calibration table that used to sit here were removed: they
 // are analysis of the model rather than the nowcast a reader came for, and they
 // live in `docs/measurements/` and the PR instead.

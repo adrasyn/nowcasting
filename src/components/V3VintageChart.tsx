@@ -22,22 +22,25 @@ const LABEL_GAP_X = 12;
 const DAY = 86_400_000;
 
 // One target quarter's weekly nowcasts against days until its ABS release,
-// with the model's probability interval drawn around the path.
+// with the error band drawn around the path.
 //
 // WHY THIS CHART CAN SHOW A BAND AND THE v2 ONE CANNOT. They are not the same
 // object. v2's is the point estimate plus or minus one standard deviation of its
 // own past errors — a frequentist coverage claim, labelled "about a 2-in-3
 // chance", which it did not achieve; it was removed for that reason.
 //
-// v3's is a PROBABILITY BAND: the 68% and 95% mass of the model's posterior,
-// which the Staff Nowcast 2.0 paper names as one of the reasons the model was
-// rebuilt Bayesian, and which the NY Fed's own figures label exactly that. It is
-// computed by `density_nowcast` — their function — on the same chain as the
-// point estimate, and it NARROWS as data arrives, which an error-dispersion band
-// cannot. Coverage was measured before this shipped (`tools/band_coverage.py`,
-// rows in `docs/measurements/`); the page reports the band, not the audit.
+// The combination's is an ERROR BAND: the range that held 68% and 95% of its
+// past misses at that stage of the quarter (`pipeline/seed/ci_params_combo.json`,
+// from `tools/combination_backtest.py`). v3's own payload carried something
+// else, the 68% and 95% mass of the model's posterior, computed by
+// `density_nowcast` on the same chain as the point estimate; that band narrows
+// as data arrives, which an error band cannot, and its coverage was audited
+// before it shipped (`tools/band_coverage.py`, rows in `docs/measurements/`).
+// The component draws whichever the payload carries; the copy calls them error
+// bands because that is what the homepage publishes.
 //
-// The label matters: this is a probability interval, not a confidence interval.
+// The label matters: an error band is a statement about the track record, not
+// a probability the model assigns to the outcome.
 //
 // ONE TARGET PER CHART. A two-target version of this drew both quarters on one
 // pair of axes; four translucent bands overlapped into a colour that belonged to
@@ -110,7 +113,7 @@ export default function V3VintageChart({
               {only.point > 0 ? "+" : ""}
               {only.point.toFixed(2)}%
               <span className="text-label">
-                {" "}· 68% probability band {only.band68[0].toFixed(2)}% to{" "}
+                {" "}· 68% error band {only.band68[0].toFixed(2)}% to{" "}
                 {only.band68[1].toFixed(2)}%
               </span>
             </div>
@@ -198,8 +201,8 @@ export default function V3VintageChart({
                 if (name === "point") return [`${Number(value).toFixed(2)}%`, "Point estimate"];
                 const [lo, hi] = value as unknown as [number, number];
                 return [`${lo.toFixed(2)}% to ${hi.toFixed(2)}%`,
-                        name === "band68" ? "68% probability band"
-                                          : "95% probability band"];
+                        name === "band68" ? "68% error band"
+                                          : "95% error band"];
               }}
             />
             {/* The theme's own green (`--color-green`, chartColors.accent), the

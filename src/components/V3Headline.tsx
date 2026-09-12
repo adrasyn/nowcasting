@@ -7,7 +7,7 @@ import { formatPct, formatQuarterLabel } from "@/lib/format";
 
 // The homepage headline card, with v3's numbers.
 //
-// Deliberately just the numbers. The probability band is on the evolution
+// Deliberately just the numbers. The error band is on the evolution
 // chart, where its width can be seen changing week to week — printed here it was
 // a second row of digits competing with the figure it qualifies. The track
 // record moved to Methodology, which is where a reader goes to ask how much to

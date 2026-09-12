@@ -273,7 +273,7 @@ def _ci_basis(params: dict) -> str:
         "the range holding 68% and 95% of the combination's own backtest "
         "misses against the ABS's initial estimate, weekly vintages, centred "
         "on the point")
-    text = f"probability band: {basis} Not a posterior and not a confidence interval."
+    text = f"error band: {basis} Not a posterior and not a confidence interval."
     if params.get("provisional_next"):
         text += (" The next-quarter band is provisional: it reuses the "
                  "current-quarter parameters until the two-horizon backtest "

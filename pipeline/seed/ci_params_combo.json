@@ -1,0 +1,29 @@
+{
+  "schema": "combo-ci-1",
+  "basis": "empirical absolute-error quantiles of the equal-weight v2+v3 average against the ABS's initial estimate, weekly vintages, targets 2022Q4 onward, centred on the point.",
+  "current": {
+    "p68": 0.1439,
+    "p95": 0.3513,
+    "n": 181,
+    "mae": 0.1291,
+    "bias": 0.0592
+  },
+  "next": {
+    "p68": 0.1939,
+    "p95": 0.3999,
+    "n": 51,
+    "mae": 0.1601,
+    "bias": 0.0975
+  },
+  "source": {
+    "v2": "docs/measurements/2026-09-12-v2-backtest-initial-estimate-target-two-horizons.csv",
+    "v3": [
+      "docs/measurements/2026-09-12-v3-weekly-two-horizons-seed4.csv",
+      "docs/measurements/2026-09-12-v3-weekly-two-horizons-seed13.csv",
+      "docs/measurements/2026-09-12-v3-weekly-two-horizons-seed19.csv"
+    ],
+    "joined": "docs/measurements/2026-09-12-v2-v3-weekly-combination-two-horizons.csv",
+    "target": "nowcasting_v3/data/gdp_first_release.csv"
+  },
+  "computed_at": "2026-09-12T01:18:45+00:00"
+}

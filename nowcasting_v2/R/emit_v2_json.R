@@ -480,8 +480,10 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     gdp_chain_volume_millions = jlatest$nowcast$gdp_chain_volume_millions, source = "data/latest.json") else NULL
 
   out <- list(
-    # The data vintage = the latest Monday (matches the production cron), not the
-    # wall-clock time this script happened to run.
+    # The data vintage = the latest Monday, not the wall-clock time this script
+    # happened to run. A FIXED HOUR, deliberately: it labels the vintage, and the
+    # cron that produces it moved to 19:00 UTC Sunday (05:00 AEST Monday) in
+    # September 2026 without the label needing to move with it.
     generated_at   = paste0(latest_m, "T02:00:00Z"),
     schema         = "v2-staged-2",
     as_of          = latest_m,

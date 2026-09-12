@@ -31,13 +31,18 @@ panel with different weights.
 ## How it works
 
 ```
-Mondays 02:00 UTC  →  GH Actions runs pipeline/run_complete_nowcast.R   (v1)
-                   →  then nowcasting_v2 fetch + emit + indicators      (v2)
-                   →  Emits JSON to data/
+Sundays 19:00 UTC  →  GH Actions runs pipeline/run_complete_nowcast.R   (v1)
+(Mon 05:00 AEST /  →  then nowcasting_v2 fetch + emit + indicators      (v2)
+ 06:00 AEDT)       →  Emits JSON to data/
                    →  Commits to main
                    →  Triggers deploy workflow
                    →  Next.js static build published to GitHub Pages
 ```
+
+The crons fire on Sunday in UTC and Monday morning in Sydney, and that is the point: the whole
+sequence (v2, then v3, then the combination, then the deploy) is finished before 9 am Sydney, year
+round. Both jobs run with `TZ=Australia/Sydney`, so R's `Sys.Date()` and the Python tools' as-of
+date are the Monday the vintages are keyed on, not the Sunday the cron fired in UTC.
 
 A second cron runs in Mar/Jun/Sep/Dec, gated to fire only the day before an ABS GDP release. The v2
 step is `continue-on-error` so a v2 failure cannot stale the v1 headline — it opens a `v2-failure`
@@ -60,8 +65,10 @@ months and lagging into the completed current quarter, so the evolution chart ca
 horizons for both models.
 
 The weekly flow runs the two models separately and combines their outputs at the end. The v2 job
-runs at 02:00 UTC Monday on a Windows runner and writes `data/latest_v2.json`. The v3 job runs at
-03:30 UTC, produces the nowcast and its track record, then runs `nowcasting_v3/tools/emit_combination.py`,
+runs at 19:00 UTC Sunday (05:00 AEST Monday, 06:00 AEDT) on a Windows runner and writes
+`data/latest_v2.json`. The v3 job runs at 20:30 UTC (06:30 AEST, 07:30 AEDT) and takes about 40
+minutes, so the combination is live by roughly 07:15 AEST / 08:15 AEDT. It produces the nowcast and
+its track record, then runs `nowcasting_v3/tools/emit_combination.py`,
 which pairs v3's fresh run with v2's latest run for the same quarter (at most a week old) and writes
 `data/latest_combo.json`, `data/nowcast_history_combo.json` and `data/performance_combo.json` in
 v3's schemas. The same emitter writes `data/indicators_combo.json`, the homepage's indicator panel:
@@ -162,8 +169,8 @@ the print falls +0.31 → +0.10pp and MAE 0.33 → 0.17pp, with correlation to t
 0.43 — see `docs/measurements/2026-09-11-v2-first-print-ab.md`. `R/fetch_rt_gdp.R` therefore builds
 `data_raw/rt_dgdp_qtr.csv` from the first-release series the v3 pipeline maintains
 (`nowcasting_v3/data/gdp_first_release.csv`) and appends any quarter newer than that file from the
-live ABS fetch. That append matters on one day a quarter: the v2 step runs at 02:00 UTC and the v3
-job that writes the new print runs at 03:30, and for a just-printed quarter the latest vintage is
+live ABS fetch. That append matters on one day a quarter: the v2 step runs at 19:00 UTC Sunday and
+the v3 job that writes the new print runs at 20:30, and for a just-printed quarter the latest vintage is
 the initial estimate.
 
 Survey data (NAB, ANZ, Westpac) sits behind WAF-protected sites and cannot be fetched from CI. It

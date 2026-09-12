@@ -58,6 +58,7 @@ from nyfed.au.build import (
     load_vintage,
     state_space,
 )
+from nyfed.au.clock import today_str
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.sources import SPEC_PATH
 from nyfed.parameters import map_parameter
@@ -92,7 +93,8 @@ def main() -> int:
         except Exception as exc:                                # noqa: BLE001
             print(f"FETCH FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 1
-        asof = str(pd.Timestamp.now(tz="UTC").date())
+        # Sydney, like every other as-of the pipeline stamps.
+        asof = today_str()
 
     # A REFUSAL HERE IS A HARD FAILURE, unlike in the weekly job. The weekly job
     # emits `status: "refused"` and the site renders it, because a stale feed is

@@ -20,8 +20,9 @@
 #
 #   2. Any quarter NEWER than that file, taken from a live ABS fetch of the
 #      latest vintage (series A2304402X). This matters on exactly one day a
-#      quarter: the v2 step of the weekly workflow runs at 02:00 UTC, the v3
-#      job that appends the print runs at 03:30 UTC, so on a print Monday the
+#      quarter: the v2 step of the weekly workflow runs at 19:00 UTC Sunday
+#      (05:00 AEST Monday) and the v3 job that appends the print runs at 20:30
+#      UTC (06:30 AEST Monday), so on a print Monday the
 #      first-release file is one quarter short. For a just-printed quarter the
 #      latest vintage IS the initial estimate, so appending it is exact, not an
 #      approximation -- and it stops being used the moment v3 writes the row.

@@ -12,10 +12,10 @@
       "months_with_data": 1,
       "data_through": "2026-04",
       "horizon": "next",
-      "ci_68_low": 0.2994,
-      "ci_68_high": 0.5872,
-      "ci_95_low": 0.092,
-      "ci_95_high": 0.7946
+      "ci_68_low": 0.2494,
+      "ci_68_high": 0.6372,
+      "ci_95_low": 0.0434,
+      "ci_95_high": 0.8432
     },
     {
       "run_date": "2026-06-08",
@@ -188,10 +188,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.4669,
-      "ci_68_high": 0.7547,
-      "ci_95_low": 0.2595,
-      "ci_95_high": 0.9621
+      "ci_68_low": 0.4169,
+      "ci_68_high": 0.8047,
+      "ci_95_low": 0.2109,
+      "ci_95_high": 1.0107
     },
     {
       "run_date": "2026-08-17",
@@ -220,10 +220,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.3683,
-      "ci_68_high": 0.6561,
-      "ci_95_low": 0.1609,
-      "ci_95_high": 0.8635
+      "ci_68_low": 0.3183,
+      "ci_68_high": 0.7061,
+      "ci_95_low": 0.1123,
+      "ci_95_high": 0.9121
     },
     {
       "run_date": "2026-08-24",
@@ -252,10 +252,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.3682,
-      "ci_68_high": 0.656,
-      "ci_95_low": 0.1608,
-      "ci_95_high": 0.8634
+      "ci_68_low": 0.3182,
+      "ci_68_high": 0.706,
+      "ci_95_low": 0.1122,
+      "ci_95_high": 0.912
     },
     {
       "run_date": "2026-08-31",
@@ -284,10 +284,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.3674,
-      "ci_68_high": 0.6552,
-      "ci_95_low": 0.16,
-      "ci_95_high": 0.8626
+      "ci_68_low": 0.3174,
+      "ci_68_high": 0.7052,
+      "ci_95_low": 0.1114,
+      "ci_95_high": 0.9112
     },
     {
       "run_date": "2026-09-07",

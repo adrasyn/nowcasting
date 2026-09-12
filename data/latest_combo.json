@@ -4,7 +4,7 @@
   "basis": "abs_first_print",
   "target": "first_print",
   "method": "equal-weight average of v2 and v3",
-  "generated_at": "2026-09-11T22:56:53+00:00",
+  "generated_at": "2026-09-12T01:19:40+00:00",
   "as_of": "2026-09-07",
   "target_quarter": "2026 Q3",
   "data_through": "2026-08",
@@ -44,10 +44,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.4669,
-      "ci_68_high": 0.7547,
-      "ci_95_low": 0.2595,
-      "ci_95_high": 0.9621
+      "ci_68_low": 0.4169,
+      "ci_68_high": 0.8047,
+      "ci_95_low": 0.2109,
+      "ci_95_high": 1.0107
     },
     {
       "run_date": "2026-08-17",
@@ -60,10 +60,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.3683,
-      "ci_68_high": 0.6561,
-      "ci_95_low": 0.1609,
-      "ci_95_high": 0.8635
+      "ci_68_low": 0.3183,
+      "ci_68_high": 0.7061,
+      "ci_95_low": 0.1123,
+      "ci_95_high": 0.9121
     },
     {
       "run_date": "2026-08-24",
@@ -76,10 +76,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.3682,
-      "ci_68_high": 0.656,
-      "ci_95_low": 0.1608,
-      "ci_95_high": 0.8634
+      "ci_68_low": 0.3182,
+      "ci_68_high": 0.706,
+      "ci_95_low": 0.1122,
+      "ci_95_high": 0.912
     },
     {
       "run_date": "2026-08-31",
@@ -92,10 +92,10 @@
       "months_with_data": 1,
       "data_through": "2026-07",
       "horizon": "next",
-      "ci_68_low": 0.3674,
-      "ci_68_high": 0.6552,
-      "ci_95_low": 0.16,
-      "ci_95_high": 0.8626
+      "ci_68_low": 0.3174,
+      "ci_68_high": 0.7052,
+      "ci_95_low": 0.1114,
+      "ci_95_high": 0.9112
     },
     {
       "run_date": "2026-09-07",
@@ -124,7 +124,7 @@
     "last_quarter": "2026Q2",
     "basis": "mean of the model's final nowcast minus the ABS first print over the last 8 printed quarters"
   },
-  "ci_basis": "probability band: empirical absolute-error quantiles of the equal-weight v2+v3 average against the ABS's initial estimate, weekly vintages, pooled over the current-quarter horizon and centred on the point. Not a posterior and not a confidence interval. The next-quarter band is provisional: it reuses the current-quarter parameters until the two-horizon backtest has calibrated its own.",
+  "ci_basis": "probability band: empirical absolute-error quantiles of the equal-weight v2+v3 average against the ABS's initial estimate, weekly vintages, targets 2022Q4 onward, centred on the point. Not a posterior and not a confidence interval.",
   "band_pp": {
     "current": {
       "p68": 0.1439,
@@ -134,13 +134,12 @@
       "bias": 0.0592
     },
     "next": {
-      "p68": 0.1439,
-      "p95": 0.3513,
-      "n": 181,
-      "mae": 0.1291,
-      "bias": 0.0592
-    },
-    "provisional_next": true
+      "p68": 0.1939,
+      "p95": 0.3999,
+      "n": 51,
+      "mae": 0.1601,
+      "bias": 0.0975
+    }
   },
   "components": {
     "v2": {

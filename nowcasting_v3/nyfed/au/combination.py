@@ -498,6 +498,116 @@ def refusal_payload(*, reason: str, detail: str, generated_at: str,
 
 
 # --------------------------------------------------------------------------- #
+# The indicator panel
+# --------------------------------------------------------------------------- #
+#
+# WHY THE PANEL IS A UNION. The homepage publishes an average of two models, so
+# the question "what data is this built on?" has two answers and the panel must
+# give both. Showing v3's fourteen series alone under a figure half of which is
+# v2's describes the input set of one component as if it were the whole.
+#
+# STARTING FROM v3 IS DELIBERATE. v3's entries keep their order, their group
+# names and their units, so the panel a reader already knows is unchanged and
+# v2's series arrive after it. The alternative -- one flat re-grouped list --
+# would have renamed and reordered the existing panel to no reader's benefit.
+
+INDICATORS_SCHEMA = "combo-indicators-1"
+
+# The series BOTH panels carry, v2's id -> v3's. Fixed by id and never by
+# comparing values: two different series agree for months at a time, and a
+# panel that silently merged them would drop one model's input on the strength
+# of a quiet quarter. v2's `household_spending` is deliberately NOT here -- it
+# is the nominal series and v3's is the real one, different numbers under one
+# name -- see `V2_RENAMED`.
+SAME_SERIES = {
+    "emp": "employment",
+    "ue": "unemployment_rate",
+    "anz_ads": "job_ads",
+    "nab_cond": "nab_conditions",
+    "building_app": "building_approvals",
+    "export": "exports",
+}
+
+# v2's group names onto the homepage's. The two pipelines named the same
+# concepts differently; mapping here rather than in the browser keeps the page
+# rendering one vocabulary. "Financial and credit" is new to the homepage --
+# v3's panel has no financial block at all -- and `IndicatorGrid` appends an
+# unlisted group in encounter order, which puts it last, where it belongs.
+V2_GROUP_MAP = {
+    "Jobs & labour": "Labor",
+    "Business surveys": "Surveys",
+    "Households": "Retail and Consumption",
+    "Trade": "International Trade",
+    "Financial & credit": "Financial and credit",
+}
+
+# v2 ids that clash with a v3 id while being a DIFFERENT series. Both are
+# published; v2's is renamed so the ids stay unique and so the page says which
+# of the two it is showing.
+V2_RENAMED = {
+    "household_spending": ("household_spending_nominal",
+                           "Household spending (nominal)"),
+}
+
+# What a merged entry takes from v2: the release metadata v3's emitter does not
+# write. Everything the page renders -- name, group, unit, the series itself --
+# stays v3's, because the entry IS v3's series.
+V2_EXTRA_FIELDS = ("next_release_estimate", "updated_this_run", "prev_period",
+                   "latest_period")
+
+
+def merge_indicators(v3: dict, v2: dict | None) -> dict:
+    """The union of the two models' input panels, in v3's order.
+
+    A v2 entry that is the same series as a v3 entry is merged into it rather
+    than published twice; every other v2 entry is appended with its group
+    mapped onto the homepage's names. Each entry gains `models`, saying which
+    panel(s) it belongs to -- provenance, which nothing renders yet.
+
+    A MISSING v2 PANEL IS NOT A FAILURE. v2's job runs on its own runner and
+    can miss a Monday; when it does, the homepage keeps v3's panel and loses
+    only the v2 half. Losing the whole panel because one of two jobs failed
+    would be a much larger regression than the one it reports.
+    """
+    out = [{**e, "models": ["v3"]} for e in (v3.get("indicators") or [])]
+    if not v2:
+        print("indicators: no v2 panel; publishing v3's 14 series alone")
+        return {"schema": INDICATORS_SCHEMA,
+                "generated_at": v3.get("generated_at"),
+                "sources": {"v3": v3.get("generated_at"), "v2": None},
+                "indicators": out}
+
+    by_id = {e["id"]: e for e in out}
+    for entry in v2.get("indicators") or []:
+        v2_id = entry["id"]
+        target = by_id.get(SAME_SERIES.get(v2_id, ""))
+        if target is not None:
+            target["models"] = ["v2", "v3"]
+            for field in V2_EXTRA_FIELDS:
+                if field not in target and field in entry:
+                    target[field] = entry[field]
+            continue
+        new_id, new_name = V2_RENAMED.get(v2_id, (v2_id, entry["name"]))
+        if new_id in by_id:
+            raise ValueError(
+                f"v2's indicator {v2_id!r} collides with a v3 id ({new_id!r}) "
+                "without being declared the same series or renamed; add it to "
+                "SAME_SERIES or V2_RENAMED rather than publishing two entries "
+                "under one id")
+        merged = {**entry, "id": new_id, "name": new_name,
+                  "group": V2_GROUP_MAP.get(entry["group"], entry["group"]),
+                  "models": ["v2"]}
+        by_id[new_id] = merged
+        out.append(merged)
+
+    return {"schema": INDICATORS_SCHEMA,
+            "generated_at": v3.get("generated_at"),
+            "sources": {"v3": v3.get("generated_at"),
+                        "v2": v2.get("generated_at")},
+            "indicators": out}
+
+
+# --------------------------------------------------------------------------- #
 # The track record
 # --------------------------------------------------------------------------- #
 

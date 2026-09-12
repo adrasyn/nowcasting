@@ -10,9 +10,10 @@ check by eye.
 
 import pytest
 
-from nyfed.au.combination import (SCHEMA, latest_payload, make_is_current,
-                                  pair_runs, quarter_shift, refusal_from_v3,
-                                  track_record, v2_vintage_rows, with_bands)
+from nyfed.au.combination import (SAME_SERIES, SCHEMA, latest_payload,
+                                  make_is_current, merge_indicators, pair_runs,
+                                  quarter_shift, refusal_from_v3, track_record,
+                                  v2_vintage_rows, with_bands)
 
 # --------------------------------------------------------------------------- #
 # Quarters and the current/next rule
@@ -563,3 +564,171 @@ def test_months_with_data_derived_from_data_through_for_old_rows():
     assert _months_with_data({"data_through": "2026-03"}, "2026 Q2") == 0
     assert _months_with_data({"data_through": "2026-08"}, "2026 Q2") == 3
     assert _months_with_data({}, "2026 Q2") is None
+
+
+# --------------------------------------------------------------------------- #
+# The indicator panel the homepage shows
+# --------------------------------------------------------------------------- #
+#
+# The homepage publishes a combination of two models, so its indicator panel
+# has to be the union of the two models' inputs: showing v3's fourteen series
+# under a figure half of which came from v2 tells the reader the wrong thing
+# about what fed it. The union is built here, on the two emitted files, rather
+# than in the browser -- the page renders one list and does not know there were
+# ever two.
+
+
+def _ind(id_, name, group, unit, source="ABS", **kw):
+    return {"id": id_, "name": name, "group": group, "unit": unit,
+            "source": source, "series": [{"date": "2026-07", "value": 1.0}],
+            "last_release_date": "2026-08-20", **kw}
+
+
+def _v3_indicators():
+    return {"schema": "v3-indicators-1", "generated_at": "2026-09-12T03:30:00+00:00",
+            "indicators": [
+                _ind("employment", "Employment", "Labor", "Thousands"),
+                _ind("household_spending", "Household Spending (real)",
+                     "Retail and Consumption", "Millions of Dollars"),
+                _ind("cpi", "Monthly CPI", "Prices", "Index"),
+            ]}
+
+
+def _v2_indicators():
+    return {"indicators": [
+        _ind("emp", "Employment", "Jobs & labour", "000s persons",
+             next_release_estimate="2026-09-24", updated_this_run=False,
+             prev_period="2026-06", latest_period="2026-07"),
+        _ind("household_spending", "Household spending", "Households", "$m"),
+        _ind("fcmygbag10", "10yr govt bond yield", "Financial & credit", "%",
+             source="RBA"),
+        _ind("nab_conf", "Business confidence", "Business surveys",
+             "net balance", source="NAB"),
+    ]}
+
+
+def test_merge_keeps_v3s_order_and_appends_v2s_extras():
+    """v3 first, in v3's order: the homepage's panel is the one it already had,
+    with v2's series added after it rather than interleaved."""
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    assert out["schema"] == "combo-indicators-1"
+    assert [i["id"] for i in out["indicators"]] == [
+        "employment", "household_spending", "cpi",
+        "household_spending_nominal", "fcmygbag10", "nab_conf"]
+
+
+def test_a_shared_series_is_merged_not_duplicated():
+    """`emp` and `employment` are one series under two ids. The v3 entry wins on
+    everything the page renders -- id, name, group, unit, series -- and takes
+    from v2 only the release fields v3 does not emit."""
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    emp = next(i for i in out["indicators"] if i["id"] == "employment")
+    assert emp["name"] == "Employment"
+    assert emp["group"] == "Labor" and emp["unit"] == "Thousands"
+    assert emp["series"] == [{"date": "2026-07", "value": 1.0}]
+    assert emp["next_release_estimate"] == "2026-09-24"
+    assert emp["prev_period"] == "2026-06" and emp["latest_period"] == "2026-07"
+    assert emp["updated_this_run"] is False
+    assert emp["models"] == ["v2", "v3"]
+    assert not any(i["id"] == "emp" for i in out["indicators"])
+
+
+def test_v3s_own_fields_are_never_overwritten_by_v2s():
+    """The merge fills gaps. Where both models carry a field, v3's stands: the
+    entry is v3's series, and a release date from the other panel's copy of it
+    would describe a different vintage of the same numbers."""
+    v3 = _v3_indicators()
+    v3["indicators"][0]["next_release_estimate"] = "2026-09-25"
+    out = merge_indicators(v3, _v2_indicators())
+    emp = next(i for i in out["indicators"] if i["id"] == "employment")
+    assert emp["next_release_estimate"] == "2026-09-25"
+
+
+def test_every_pair_in_the_registry_merges():
+    """All six same-series pairs, fixed by id. Matching on values instead would
+    pair two series that happen to agree in a quiet month."""
+    v3 = {"generated_at": "x", "indicators": [
+        _ind(v3id, v3id, "Labor", "Index") for v3id in SAME_SERIES.values()]}
+    v2 = {"indicators": [_ind(v2id, v2id, "Jobs & labour", "index")
+                         for v2id in SAME_SERIES]}
+    out = merge_indicators(v3, v2)
+    assert len(out["indicators"]) == len(SAME_SERIES)
+    assert all(i["models"] == ["v2", "v3"] for i in out["indicators"])
+
+
+def test_household_spending_is_two_series_not_one():
+    """v2's is NOMINAL and v3's is REAL. They are different numbers under one
+    name, so both are published and v2's is renamed to say which it is."""
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    ids = [i["id"] for i in out["indicators"]]
+    assert ids.count("household_spending") == 1
+    nominal = next(i for i in out["indicators"]
+                   if i["id"] == "household_spending_nominal")
+    assert nominal["name"] == "Household spending (nominal)"
+    assert nominal["unit"] == "$m"
+    assert nominal["models"] == ["v2"]
+
+
+def test_v2s_groups_are_mapped_onto_the_homepages_names():
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    by_id = {i["id"]: i for i in out["indicators"]}
+    assert by_id["household_spending_nominal"]["group"] == "Retail and Consumption"
+    assert by_id["fcmygbag10"]["group"] == "Financial and credit"
+    assert by_id["nab_conf"]["group"] == "Surveys"
+    # Everything else about a v2-only entry is v2's.
+    assert by_id["fcmygbag10"]["name"] == "10yr govt bond yield"
+    assert by_id["fcmygbag10"]["unit"] == "%"
+    assert by_id["fcmygbag10"]["source"] == "RBA"
+
+
+def test_an_unknown_v2_group_travels_unchanged():
+    v2 = {"indicators": [_ind("mystery", "Mystery", "Something new", "index")]}
+    out = merge_indicators(_v3_indicators(), v2)
+    assert out["indicators"][-1]["group"] == "Something new"
+
+
+def test_every_entry_says_which_panels_it_belongs_to():
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    assert {i["id"]: i["models"] for i in out["indicators"]} == {
+        "employment": ["v2", "v3"],
+        "household_spending": ["v3"],
+        "cpi": ["v3"],
+        "household_spending_nominal": ["v2"],
+        "fcmygbag10": ["v2"],
+        "nab_conf": ["v2"],
+    }
+
+
+def test_the_merged_ids_are_unique():
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    ids = [i["id"] for i in out["indicators"]]
+    assert len(ids) == len(set(ids))
+
+
+def test_an_undeclared_id_collision_is_an_error():
+    """A v2 id that equals a v3 id without being declared the same series, or
+    renamed, is registry drift: publishing it would give the page two entries
+    under one key. Better to fail the run than to render one of them."""
+    v2 = {"indicators": [_ind("cpi", "CPI", "Prices", "index")]}
+    with pytest.raises(ValueError, match="cpi"):
+        merge_indicators(_v3_indicators(), v2)
+
+
+def test_the_payload_names_both_sources():
+    out = merge_indicators(_v3_indicators(), _v2_indicators())
+    assert out["generated_at"] == "2026-09-12T03:30:00+00:00"
+    assert out["sources"] == {"v3": "2026-09-12T03:30:00+00:00", "v2": None}
+    v2 = dict(_v2_indicators(), generated_at="2026-09-12T02:00:00+00:00")
+    assert merge_indicators(_v3_indicators(), v2)["sources"]["v2"] == \
+        "2026-09-12T02:00:00+00:00"
+
+
+def test_a_missing_v2_panel_leaves_v3s_intact(capsys):
+    """v2's job can fail on a Monday v3's does not. The homepage must lose the
+    v2 half of its panel, not the panel."""
+    out = merge_indicators(_v3_indicators(), None)
+    assert [i["id"] for i in out["indicators"]] == [
+        "employment", "household_spending", "cpi"]
+    assert all(i["models"] == ["v3"] for i in out["indicators"])
+    assert out["sources"] == {"v3": "2026-09-12T03:30:00+00:00", "v2": None}
+    assert "v2" in capsys.readouterr().out

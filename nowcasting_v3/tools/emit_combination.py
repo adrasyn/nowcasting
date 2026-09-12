@@ -19,6 +19,8 @@ ever fire on a broken checkout, where publishing a next-quarter band that
 understates a forecast's uncertainty is worse than not publishing.
 
 INPUTS
+  data/indicators_v2.json                v2's input panel, for the merged one
+  data/indicators_v3.json                v3's input panel
   data/latest_v2.json                    v2's published week (models + vintages)
   data/latest_v3.json                    v3's published week
   data/nowcast_history_v3.json           v3's weekly runs, both horizons
@@ -38,9 +40,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from nyfed.au.combination import (HISTORY_SCHEMA, _spaced, latest_payload,
-                                  make_is_current, pair_runs, quarter_shift,
-                                  refusal_from_v3, refusal_payload,
-                                  track_record, v2_vintage_rows, with_bands)
+                                  make_is_current, merge_indicators, pair_runs,
+                                  quarter_shift, refusal_from_v3,
+                                  refusal_payload, track_record,
+                                  v2_vintage_rows, with_bands)
 from nyfed.au.emit import gdp_release_date
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -118,6 +121,30 @@ def load_params(path: Path = CI_PARAMS) -> dict:
     return params
 
 
+def emit_indicators(out: Path) -> None:
+    """Write `data/indicators_combo.json`: the union of the two input panels.
+
+    WRITTEN BEFORE ANY REFUSAL CAN RETURN, and independently of whether the two
+    models' figures pair this week. The panel describes what the models READ,
+    which is a fact about the week's data even when no figure is published, and
+    the homepage renders it from its own file -- so a refusal that skipped this
+    would leave yesterday's merged panel beside today's refusal, or none.
+    """
+    v3_path, v2_path = DATA / "indicators_v3.json", DATA / "indicators_v2.json"
+    if not v3_path.exists():
+        print(f"indicators: no {v3_path.name}; nothing to merge")
+        return
+    v3 = json.loads(v3_path.read_text())
+    v2 = json.loads(v2_path.read_text()) if v2_path.exists() else None
+    merged = merge_indicators(v3, v2)
+    (out / "indicators_combo.json").write_text(json.dumps(merged, indent=2) + "\n")
+    n3 = len(v3.get("indicators") or [])
+    n2 = len((v2 or {}).get("indicators") or [])
+    n = len(merged["indicators"])
+    print(f"indicators: v3 {n3} + v2 {n2} -> {n} published "
+          f"({n3 + n2 - n} pair(s) merged as the same series)")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--asof", default=None,
@@ -128,6 +155,8 @@ def main() -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     asof = args.asof
+
+    emit_indicators(out)
 
     v2 = json.loads((DATA / "latest_v2.json").read_text())
     v3 = json.loads((DATA / "latest_v3.json").read_text())

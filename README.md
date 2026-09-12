@@ -64,8 +64,11 @@ runs at 02:00 UTC Monday on a Windows runner and writes `data/latest_v2.json`. T
 03:30 UTC, produces the nowcast and its track record, then runs `nowcasting_v3/tools/emit_combination.py`,
 which pairs v3's fresh run with v2's latest run for the same quarter (at most a week old) and writes
 `data/latest_combo.json`, `data/nowcast_history_combo.json` and `data/performance_combo.json` in
-v3's schemas. The payload checker runs against the combination payload the same way it does against
-v3's own. If v3 refuses to publish, the combination shows v3's refusal rather than half an average;
+v3's schemas. The same emitter writes `data/indicators_combo.json`, the homepage's indicator panel:
+the union of both models' input panels — v3's 14 series in their own order, then v2's 31 with their
+groups mapped onto v3's names, the six series both models read merged into one entry each (39 in
+all) — because the figure above the panel is the average of the two. The payload checker runs
+against the combination payload the same way it does against v3's own. If v3 refuses to publish, the combination shows v3's refusal rather than half an average;
 if v2's run is missing that week, last week's v2 run is carried for up to 7 days and the payload
 records how old it is (`components.v2.stale_days`).
 

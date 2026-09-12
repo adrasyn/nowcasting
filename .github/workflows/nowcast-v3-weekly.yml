@@ -167,11 +167,14 @@ jobs:
           git add data/latest_v3.json data/indicators_v3.json
           git add data/nowcast_history_v3.json
           git add data/performance_v3.json data/backtest_v3.json
-          # The combination is what the homepage publishes. Its three files are
+          # The combination is what the homepage publishes. Its four files are
           # written by `emit_combination.py` from v2's and v3's payloads, so
           # they are committed in the same commit as the v3 half they average.
+          # `indicators_combo.json` is the homepage's indicator panel: the
+          # union of the two models' inputs, because the figure above it is the
+          # average of the two models.
           git add data/latest_combo.json data/nowcast_history_combo.json
-          git add data/performance_combo.json
+          git add data/performance_combo.json data/indicators_combo.json
           # The first print of a newly released quarter is recorded by
           # record_first_print.py on the Monday after the ABS prints, along
           # with the model's miss against it, before the nowcast reads them.

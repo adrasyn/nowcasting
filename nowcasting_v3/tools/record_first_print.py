@@ -49,9 +49,8 @@ import argparse
 import json
 from pathlib import Path
 
-import pandas as pd
-
 from nyfed.au.bias_correction import MISSES_CSV, append_miss
+from nyfed.au.clock import today_str
 from nyfed.au.first_release import (
     FIRST_RELEASE_CSV, append_first_print, load_first_release, published_gdp,
 )
@@ -83,9 +82,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--history", type=Path, default=HISTORY_JSON,
                     help="the run log the model's final nowcast is read from")
     ap.add_argument("--asof", default=None,
-                    help="the run date; defaults to today, UTC")
+                    help="the run date; defaults to today in Sydney")
     args = ap.parse_args(argv)
-    asof = args.asof or str(pd.Timestamp.now(tz="UTC").date())
+    # Sydney, not UTC: the weekly job runs Sunday evening UTC and the print it
+    # records belongs to the Monday the rest of the run is keyed on.
+    asof = args.asof or today_str()
 
     try:
         gdp = published_gdp(FALLBACK_VINTAGE)

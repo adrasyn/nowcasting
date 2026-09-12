@@ -2,10 +2,17 @@ name: Weekly Nowcast
 
 on:
   schedule:
-    # 02:00 UTC Monday = 12:00 AEST Monday (13:00 AEDT during daylight savings).
-    # Sits ~30 min after the 11:30 AEST ABS release window so Monday's drops
-    # (e.g. Building Approvals) get ingested in the same run.
-    - cron: "0 2 * * 1"
+    # 19:00 UTC SUNDAY = 05:00 AEST Monday (06:00 AEDT during daylight saving).
+    # The whole Monday sequence -- this job, the v3 job at 20:30 UTC, the
+    # combination and the deploy -- has to be finished before 9 am Sydney, so
+    # the v2 half starts first and the v3 half follows it. The run is Sunday in
+    # UTC and Monday in Sydney, which is why the job sets TZ below: R's
+    # Sys.Date() has to see the Monday or emit_v2_json.R computes last week's
+    # vintage.
+    # It no longer waits behind Monday's 11:30 AEST ABS release window: those
+    # drops are picked up by the following week's run, and a published figure
+    # before the working day starts is worth more than half a day of freshness.
+    - cron: "0 19 * * 0"
     # Tuesday 21:00 UTC in Mar/Jun/Sep/Dec — gated below so it only actually runs
     # when tomorrow is the first Wednesday of the month (i.e. the ABS GDP release day).
     - cron: "0 21 * 3,6,9,12 2"
@@ -21,6 +28,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # NO TZ HERE, DELIBERATELY. This gate reads `date -u -d "tomorrow"` to decide
+  # whether tomorrow is the first Wednesday of the month, and the 21:00 UTC
+  # Tuesday cron it gates is already the evening before a Sydney release
+  # morning. Give this job Sydney time and "tomorrow" lands a day late.
   gate:
     runs-on: ubuntu-latest
     outputs:
@@ -51,6 +62,15 @@ jobs:
     if: needs.gate.outputs.run == 'true'
     runs-on: windows-latest
     timeout-minutes: 60
+    env:
+      # THE JOB'S "TODAY" IS SYDNEY'S. The cron fires 19:00 UTC Sunday, which is
+      # Monday morning in Sydney, and `emit_v2_json.R` builds its vintage list
+      # from the latest Monday at or before Sys.Date(). With a UTC clock that
+      # date is Sunday and the run re-emits LAST week's vintage. R honours TZ on
+      # Windows as well as on Linux (Sys.Date() reads the local zone), so this
+      # one variable is enough; `date -u` calls in the run blocks below are
+      # explicitly UTC and are unaffected.
+      TZ: Australia/Sydney
     defaults:
       run:
         shell: bash
@@ -135,9 +155,9 @@ jobs:
           # or v2 keeps targeting a superseded quarter. Since 2026-09 it reads the
           # first-release series maintained by the v3 pipeline
           # (nowcasting_v3/data/gdp_first_release.csv, in this same checkout) and
-          # tops it up from the live ABS fetch. This step runs at 02:00 UTC and the
-          # v3 job that appends a new print runs at 03:30, so on a print Monday the
-          # top-up is what supplies the just-printed quarter.
+          # tops it up from the live ABS fetch. This step runs at 19:00 UTC Sunday
+          # and the v3 job that appends a new print runs at 20:30, so on a print
+          # Monday the top-up is what supplies the just-printed quarter.
           Rscript R/fetch_rt_gdp.R
           Rscript R/emit_v2_json.R
           # Refresh the indicator-grid display (data/indicators_v2.json) from the
@@ -199,7 +219,9 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "data: weekly nowcast $(date -u +%Y-%m-%d)"
+          # Local date, and TZ is Sydney: the commit is labelled with the
+          # Monday vintage it carries, not the Sunday it fired in UTC.
+          git commit -m "data: weekly nowcast $(date +%Y-%m-%d)"
           # Name whatever is still dirty BEFORE the rebase. The failure this
           # replaces said only "You have unstaged changes" and cost a diagnosis
           # to turn into a filename; the next one should say it outright.

@@ -44,6 +44,7 @@ from nyfed.au.build import (
     target_periods,
 )
 from nyfed.au.bias_correction import load_misses, rolling_miss
+from nyfed.au.clock import today_str
 from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
                            migrate_history_runs_v3, nowcast_payload,
                            refusal_payload)
@@ -104,8 +105,11 @@ def main() -> int:
     args = ap.parse_args()
 
     started = time.perf_counter()
+    # `now` is an absolute instant and stays UTC (it carries its offset).
+    # The AS-OF DATE is Sydney's: the job fires Sunday evening UTC, which is
+    # Monday morning in Sydney, and every vintage is keyed on the Monday.
     now = datetime.now(UTC).isoformat(timespec="seconds")
-    asof = str(pd.Timestamp.now(tz="UTC").date())
+    asof = today_str()
     out = Path(args.out)
 
     def write(payload: dict) -> None:

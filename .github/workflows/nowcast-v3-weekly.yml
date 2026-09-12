@@ -17,10 +17,14 @@ name: Weekly Nowcast (v3)
 
 on:
   schedule:
-    # 03:30 UTC Monday, an hour and a half after the R pipeline starts, so the
-    # two rarely queue behind each other even though the group would serialise
-    # them if they did.
-    - cron: "30 3 * * 1"
+    # 20:30 UTC SUNDAY = 06:30 AEST Monday (07:30 AEDT during daylight saving),
+    # an hour and a half after the R pipeline starts, so the two rarely queue
+    # behind each other even though the group would serialise them if they did.
+    # This job takes about 40 minutes, so the combination -- the figure the
+    # homepage publishes -- is live by roughly 07:15 AEST / 08:15 AEDT, which
+    # leaves margin for GitHub's habitual cron delay and still lands the whole
+    # sequence before 9 am Sydney.
+    - cron: "30 20 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -36,6 +40,13 @@ jobs:
   nowcast:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      # The run fires Sunday evening UTC and is Monday morning in Sydney. The
+      # Python tools take their as-of date from `nyfed.au.clock`, which names
+      # the zone itself, so this is belt and braces: it keeps `date` in the run
+      # blocks below, and anything else that reads the system clock, on the same
+      # Monday the payloads are keyed to.
+      TZ: Australia/Sydney
     defaults:
       run:
         working-directory: nowcasting_v3
@@ -187,7 +198,9 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "data: v3 nowcast $(date -u +%Y-%m-%d)"
+          # Local date, and TZ is Sydney: the commit carries the Monday
+          # vintage, not the Sunday the cron fired in UTC.
+          git commit -m "data: v3 nowcast $(date +%Y-%m-%d)"
           echo "--- working tree before rebase ---"
           git status --porcelain
           git pull --rebase --autostash origin main

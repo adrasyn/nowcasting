@@ -22,6 +22,12 @@ Schedule Claude Code headless on the laptop (Windows Task Scheduler), weekly —
 e.g. **Sunday ~9am** (before Monday's cron emit), laptop on. The scheduled action
 runs Claude Code in the repo with the prompt below, e.g.:
 
+**It must finish before the v2 cron starts: Monday 05:00 AEST (06:00 AEDT), i.e.
+19:00 UTC Sunday.** The cron only reads whatever survey CSVs are already on
+`main`, so anything this routine pushes after that time waits a week to reach the
+site. Sunday ~9am Sydney leaves about 20 hours of slack, which is ample; the
+thing to avoid is moving this routine to Sunday evening or Monday.
+
 ```
 claude -p "<the prompt below>" --allowedTools "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch"
 ```

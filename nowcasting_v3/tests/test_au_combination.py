@@ -391,7 +391,8 @@ def test_a_stale_v2_carries_the_last_paired_monday_forward():
 
 
 def test_stale_days_records_any_gap_not_only_a_carried_run():
-    """v2 runs at 02:00 on the Monday and v3 at 03:30, so a normal week pairs
+    """v2 runs at 19:00 UTC Sunday and v3 at 20:30, both the same Monday
+    morning in Sydney, so a normal week pairs
     two runs of the same date and the field is absent. ANY earlier v2 run is
     recorded, not only one past the seven-day pairing cutoff: the published
     figure then averages two different days, and 'stale' is the only word the

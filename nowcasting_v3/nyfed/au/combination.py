@@ -16,8 +16,9 @@ functions and writes the payloads. Keeping the rules here is what lets them be
 tested on six-row inputs instead of on a week of real data.
 
 THE PAIRING RULE. A combination exists for a run date and a quarter only where
-BOTH models have a figure for that quarter at that date. v2 runs at 02:00 UTC
-on Monday and v3 at 03:30, so they normally share a run date; when v2 skips a
+BOTH models have a figure for that quarter at that date. v2 runs at 19:00 UTC
+Sunday and v3 at 20:30 -- 05:00 and 06:30 on the Monday in Sydney, which is the
+date both are keyed on -- so they normally share a run date; when v2 skips a
 Monday its most recent run up to `max_age_days` old is used instead, and beyond
 that the pair is dropped rather than averaging in a stale information set. The
 two rows must also be at the same HORIZON: both models publish the same quarter

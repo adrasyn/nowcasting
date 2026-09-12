@@ -69,6 +69,7 @@ import pandas as pd
 from nyfed.au.bias_correction import (
     BIAS_WINDOW_QUARTERS, MISSES_CSV, append_miss, load_misses, rolling_miss,
 )
+from nyfed.au.clock import today_str
 from nyfed.au.first_release import (
     FIRST_RELEASE_CSV, append_first_print, load_first_release, published_gdp,
     quarter_end_month,
@@ -142,7 +143,8 @@ def main() -> int:
     # fails the job in a step of its own. So a bad first-print file costs the
     # track record a week — the table keeps the numbers it already had — and
     # the nowcast still reaches the site.
-    today = str(pd.Timestamp.now(tz="UTC").date())
+    # Sydney: same Monday as the nowcast this table scores.
+    today = today_str()
     try:
         append_first_print(FIRST_RELEASE_CSV, gdp, asof=today)
         first = load_first_release()

@@ -445,8 +445,9 @@ export interface V3Vintage {
   ci_95_high: number;
   data_through: string;
   // On a combination vintage, the two figures this row averages and the v2 run
-  // it took (v2 runs at 02:00 UTC and v3 at 03:30, and a quiet v2 week is
-  // carried forward up to seven days, so the two dates need not match).
+  // it took (v2 runs at 19:00 UTC Sunday and v3 at 20:30, both Monday morning
+  // in Sydney, and a quiet v2 week is carried forward up to seven days, so the
+  // two dates need not match).
   v2_qoq_growth_pct?: number;
   v2_run_date?: string;
   v3_qoq_growth_pct?: number;

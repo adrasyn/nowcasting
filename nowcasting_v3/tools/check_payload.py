@@ -45,8 +45,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
+
+from nyfed.au.clock import today as sydney_today
 
 __all__ = ["check_payload", "quarter_key"]
 
@@ -289,7 +290,9 @@ def check_payload(d: dict, *, today: str | None = None) -> list[str]:
     # `data_through` names the last month carrying an observation. A month in
     # the future means the panel was padded into the payload, which is the bug
     # that had the page claiming August data while August was empty.
-    now = today or datetime.now(UTC).strftime("%Y-%m")
+    # Sydney's month, not UTC's: the run happens on a Sydney Monday, and on
+    # the first of a month a UTC "now" would still be in the month before.
+    now = today or sydney_today().strftime("%Y-%m")
     through = d.get("data_through")
     if through and through > now:
         bad.append(f"data_through {through} is in the future (now {now})")

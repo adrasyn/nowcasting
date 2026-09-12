@@ -93,9 +93,9 @@ def test_pairing_drops_a_v2_run_older_than_the_max_age():
     assert len(kept) == 1 and kept[0]["v2_run_date"] == "2026-08-30"
 
 
-def test_pairing_matches_on_the_quarter_not_the_horizon():
+def test_pairing_matches_the_horizon_as_well_as_the_quarter():
     """A v3 forecast row pairs with v2's next-quarter vintage for the same
-    quarter, and the combined row keeps v3's `kind`."""
+    quarter, and the combined row keeps v3's `kind` and records its horizon."""
     v3 = [_v3("2026-09-07", "2026 Q3", 0.46),
           _v3("2026-09-07", "2026 Q4", 0.48, kind="forecast",
               months_with_data=0)]
@@ -103,7 +103,34 @@ def test_pairing_matches_on_the_quarter_not_the_horizon():
           _v2("2026-09-07", "2026 Q4", 0.30, horizon="next")]
     rows = pair_runs(v3, v2)
     assert [r["kind"] for r in rows] == ["nowcast", "forecast"]
+    assert [r["horizon"] for r in rows] == ["current", "next"]
     assert rows[1]["qoq_growth_pct"] == pytest.approx(0.39)
+
+
+def test_a_v2_next_row_does_not_pair_with_a_quarter_that_is_now_current():
+    """THE ROW OUTLIVES ITS HORIZON. v2 writes a next-quarter row for 2026 Q3
+    every Monday before 2026 Q2 prints. On 2026-09-07 Q2 has printed and Q3 is
+    the CURRENT quarter, so v3's Q3 figure is a two-month nowcast; averaging it
+    with a figure v2 made when Q3 had barely begun would put two different
+    information sets under one date. Only a v2 row made at the same horizon
+    pairs -- here there is none, so nothing is published for the Monday."""
+    stale_next = [_v2("2026-09-07", "2026 Q3", 0.78, horizon="next")]
+    assert pair_runs([_v3("2026-09-07", "2026 Q3", 0.46)], stale_next) == []
+    both = stale_next + [_v2("2026-09-07", "2026 Q3", 0.61, horizon="current")]
+    rows = pair_runs([_v3("2026-09-07", "2026 Q3", 0.46)], both)
+    assert len(rows) == 1 and rows[0]["v2_qoq_growth_pct"] == 0.61
+
+
+def test_the_horizon_of_a_paired_row_is_the_one_it_had_on_its_own_day():
+    """2026 Q3 is 'next' on the Mondays before 2026 Q2 prints and 'current'
+    after, whatever `kind` the v3 row carries: a backfilled v3 row is written
+    with today's horizon index, so `kind` says 'nowcast' on rows made when the
+    quarter was still the next one."""
+    v2 = [_v2("2026-08-24", "2026 Q3", 0.56, horizon="next"),
+          _v2("2026-09-07", "2026 Q3", 0.61, horizon="current")]
+    rows = pair_runs([_v3("2026-08-24", "2026 Q3", 0.40),
+                      _v3("2026-09-07", "2026 Q3", 0.46)], v2)
+    assert [r["horizon"] for r in rows] == ["next", "current"]
 
 
 def test_a_v3_row_without_kind_is_a_nowcast():
@@ -219,9 +246,18 @@ _GDP = [{"quarter": "2025 Q4", "value": 694551, "qoq_pct": 0.91},
         {"quarter": "2026 Q1", "value": 696539, "qoq_pct": 0.29},
         {"quarter": "2026 Q2", "value": 699461, "qoq_pct": 0.42}]
 
+_V3_FORECAST = {"quarter": "2026 Q4", "kind": "forecast",
+                "qoq_growth_pct": 0.4784, "annualised_growth_pct": 1.9268,
+                "months_with_data": 0, "release_date": "2027-03-03",
+                "ci_68_low": 0.0348, "ci_68_high": 0.8807,
+                "ci_95_low": -0.3691, "ci_95_high": 1.3323}
+
 _V3_LATEST = {"schema": "v3-preview-3", "status": "ok", "as_of": "2026-09-10",
+              "target_quarter": "2026 Q3",
               "bias_correction": {"pp": 0.0631}, "panel": {"n_series": 14},
-              "diagnostics": {"seed": 4}, "estimate": {"asof": "2026-09-10"}}
+              "diagnostics": {"seed": 4}, "estimate": {"asof": "2026-09-10"},
+              "horizons": [{"quarter": "2026 Q3", "kind": "nowcast",
+                            "qoq_growth_pct": 0.4603}, _V3_FORECAST]}
 
 _V2_LATEST = {"schema": "v2-1", "as_of": "2026-09-07"}
 
@@ -231,7 +267,8 @@ def _paired(run_date="2026-09-07"):
         [_v3(run_date, "2026 Q3", 0.4603),
          _v3(run_date, "2026 Q4", 0.4784, kind="forecast",
              months_with_data=0)],
-        [_v2(run_date, "2026 Q3", 0.61), _v2(run_date, "2026 Q4", 0.30)])
+        [_v2(run_date, "2026 Q3", 0.61),
+         _v2(run_date, "2026 Q4", 0.30, horizon="next")])
     return with_bands(rows, _PARAMS, is_current=make_is_current())
 
 
@@ -256,22 +293,89 @@ def test_latest_payload_publishes_both_horizons():
     assert p["bias_correction"] == _V3_LATEST["bias_correction"]
     assert p["components"]["v2"]["run_date"] == "2026-09-07"
     assert p["components"]["v3"]["as_of"] == "2026-09-10"
-    assert "stale_days" not in p["components"]["v2"]
+    # v3's run here is three days after v2's, which the payload says outright.
+    assert p["components"]["v2"]["stale_days"] == 3
     assert len(p["vintages"]) == 2
 
 
-def test_the_next_horizon_is_omitted_when_only_v3_forecasts_it():
-    """Until v2 publishes a next-quarter figure there is no average to take,
-    and v3's own forecast is not a combination."""
-    rows = with_bands(
-        pair_runs([_v3("2026-09-07", "2026 Q3", 0.4603),
-                   _v3("2026-09-07", "2026 Q4", 0.4784, kind="forecast")],
+def _unpaired_next():
+    """The ordinary state: v3 forecasts the next quarter, v2 has no figure for
+    it, so nothing pairs and only the current quarter is averaged."""
+    return with_bands(
+        pair_runs([_v3("2026-09-07", "2026 Q3", 0.4603)],
                   [_v2("2026-09-07", "2026 Q3", 0.61)]),
         _PARAMS, is_current=make_is_current())
-    p = latest_payload(rows, v3_latest=_V3_LATEST, v2_latest=_V2_LATEST,
+
+
+def test_the_next_horizon_is_copied_from_v3_when_v2_has_no_figure():
+    """THE PAGE KEEPS ITS NEXT-QUARTER CARD. v3's payload always carries a
+    forecast horizon, and the homepage reads it for the waiting card and the
+    evolution chart's toggle. Dropping the horizon because there was no v2 half
+    to average would make both vanish for the two months in three when the next
+    quarter has no data, which is the disappearance commit 7e4bed7 removed."""
+    p = latest_payload(_unpaired_next(), v3_latest=_V3_LATEST,
+                       v2_latest=_V2_LATEST, gdp_series=_GDP, params=_PARAMS,
+                       generated_at="2026-09-12T00:00:00+00:00")
+    assert [(h["quarter"], h["kind"]) for h in p["horizons"]] == [
+        ("2026 Q3", "nowcast"), ("2026 Q4", "forecast")]
+    fc = p["horizons"][1]
+    assert fc["qoq_growth_pct"] == 0.4784
+    assert fc["components"] == {"v2": None, "v3": 0.4784}
+    assert fc["months_with_data"] == 0
+    assert fc["v3_months_with_data"] == 0
+    assert fc["release_date"] == "2027-03-03"
+    assert (fc["ci_68_low"], fc["ci_68_high"]) == (0.0348, 0.8807)
+    assert fc["source"] == "v3 only; no v2 figure for this quarter yet"
+    # No vintage row: an unpaired figure is v3's, and the evolution chart draws
+    # combinations.
+    assert all(v["target_quarter"] == "2026 Q3" for v in p["vintages"])
+
+
+def test_a_copied_forecast_with_data_still_shows_as_waiting():
+    """v3 gains the next quarter's first month a week or two before v2 does.
+    The copy's own month count is zeroed so the card keeps waiting rather than
+    printing a v3-only figure under the combination's name; the true count
+    travels as `v3_months_with_data` so nothing is lost."""
+    v3 = {**_V3_LATEST,
+          "horizons": [_V3_LATEST["horizons"][0],
+                       {**_V3_FORECAST, "months_with_data": 1}]}
+    p = latest_payload(_unpaired_next(), v3_latest=v3, v2_latest=_V2_LATEST,
                        gdp_series=_GDP, params=_PARAMS,
                        generated_at="2026-09-12T00:00:00+00:00")
-    assert [h["quarter"] for h in p["horizons"]] == ["2026 Q3"]
+    fc = p["horizons"][1]
+    assert fc["months_with_data"] == 0
+    assert fc["v3_months_with_data"] == 1
+
+
+def test_no_forecast_is_copied_when_v3_forecasts_a_different_quarter():
+    """A preview replays an old Monday against today's v3 payload, whose
+    forecast is for a later quarter than that Monday's next one. Copying it
+    would label one quarter's figure with another's."""
+    v3 = {**_V3_LATEST, "target_quarter": "2026 Q2",
+          "horizons": [_V3_LATEST["horizons"][0], _V3_FORECAST]}
+    rows = with_bands(pair_runs([_v3("2026-08-31", "2026 Q2", 0.5)],
+                                [_v2("2026-08-31", "2026 Q2", 0.5)]),
+                      _PARAMS, is_current=make_is_current())
+    p = latest_payload(rows, v3_latest=v3, v2_latest=_V2_LATEST,
+                       gdp_series=_GDP, params=_PARAMS,
+                       generated_at="2026-09-01T00:00:00+00:00")
+    assert [h["quarter"] for h in p["horizons"]] == ["2026 Q2"]
+
+
+def test_the_current_quarter_is_v3s_own_target():
+    """v3's target comes from the data the ABS has actually released, which is
+    the fact the calendar rule only approximates. When the two disagree -- a
+    release moved, or a print landed early -- the payload follows v3."""
+    v3 = {**_V3_LATEST, "as_of": "2026-09-01", "target_quarter": "2026 Q3",
+          "horizons": [_V3_LATEST["horizons"][0], _V3_FORECAST]}
+    # The calendar says 2026 Q2 is still current on 2026-09-01 (it prints on
+    # the 2nd); v3 has already rolled forward.
+    assert make_is_current()("2026-09-01", "2026 Q2")
+    p = latest_payload(_paired(), v3_latest=v3, v2_latest=_V2_LATEST,
+                       gdp_series=_GDP, params=_PARAMS,
+                       generated_at="2026-09-01T00:00:00+00:00")
+    assert p["target_quarter"] == "2026 Q3"
+    assert [h["quarter"] for h in p["horizons"]] == ["2026 Q3", "2026 Q4"]
 
 
 def test_a_stale_v2_carries_the_last_paired_monday_forward():
@@ -282,6 +386,32 @@ def test_a_stale_v2_carries_the_last_paired_monday_forward():
     assert p["as_of"] == "2026-09-07"
     assert p["components"]["v2"]["stale_days"] == 21
     assert p["target_quarter"] == "2026 Q3"
+
+
+def test_stale_days_records_any_gap_not_only_a_carried_run():
+    """v2 runs at 02:00 on the Monday and v3 at 03:30, so a normal week pairs
+    two runs of the same date and the field is absent. ANY earlier v2 run is
+    recorded, not only one past the seven-day pairing cutoff: the published
+    figure then averages two different days, and 'stale' is the only word the
+    payload has for that. The cutoff decides what may be paired at all; this
+    field only reports what was."""
+    v3_latest = {**_V3_LATEST, "as_of": "2026-09-07"}
+    same_day = with_bands(pair_runs([_v3("2026-09-07", "2026 Q3", 0.4603)],
+                                    [_v2("2026-09-07", "2026 Q3", 0.61)]),
+                          _PARAMS, is_current=make_is_current())
+    p = latest_payload(same_day, v3_latest=v3_latest, v2_latest=_V2_LATEST,
+                       gdp_series=_GDP, params=_PARAMS,
+                       generated_at="2026-09-12T00:00:00+00:00")
+    assert "stale_days" not in p["components"]["v2"]
+
+    earlier = with_bands(pair_runs([_v3("2026-09-07", "2026 Q3", 0.4603)],
+                                   [_v2("2026-09-04", "2026 Q3", 0.61)]),
+                         _PARAMS, is_current=make_is_current())
+    p = latest_payload(earlier, v3_latest=v3_latest, v2_latest=_V2_LATEST,
+                       gdp_series=_GDP, params=_PARAMS,
+                       generated_at="2026-09-12T00:00:00+00:00")
+    assert p["components"]["v2"]["run_date"] == "2026-09-04"
+    assert p["components"]["v2"]["stale_days"] == 3
 
 
 def test_no_paired_monday_for_the_current_quarter_is_a_refusal():
@@ -379,11 +509,14 @@ def test_a_live_row_supersedes_the_backtest_row():
     assert q2["is_live"] is False
 
 
-def test_a_forecast_row_is_never_the_live_track_record_figure():
-    """A forecast was made before the quarter began; scoring it as the final
-    nowcast would score a different and much harder call."""
+def test_a_next_horizon_row_is_never_the_live_track_record_figure():
+    """A next-horizon row was made before the previous quarter printed;
+    scoring it as the final nowcast would score a different and much harder
+    call. The row's HORIZON decides that, not its `kind`: v3 writes `kind` from
+    the horizon index of the run that produced it, so a backfilled row carries
+    today's index rather than the one it had on its own Monday."""
     history = [{"run_date": "2026-06-01", "target_quarter": "2026 Q1",
-                "kind": "forecast", "qoq_growth_pct": 9.9,
+                "kind": "nowcast", "horizon": "next", "qoq_growth_pct": 9.9,
                 "v2_qoq_growth_pct": 9.9, "v3_qoq_growth_pct": 9.9}]
     perf = track_record(_BT, history, _GDP_TR, _FIRST, _SOMP)
     q1 = next(e for e in perf["errors"] if e["target_quarter"] == "2026 Q1")

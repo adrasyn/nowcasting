@@ -18,7 +18,10 @@ equal-weight average of v2 and v3 that the homepage publishes — is written in
 this same schema and goes through this same function; the weekly job runs it
 twice, once per file. Everything above holds for both, and the combination adds
 two facts of its own: that the published figure really is the mean of the two
-component figures, and that it sits inside its own 68% band.
+component figures, and that it sits inside its own 68% band. One horizon is
+exempt from the first and fenced in by three other conditions instead — the
+next quarter, in the weeks when v2 has no figure for it; `_combination_problems`
+says why.
 
 ONE INVARIANT HAD TO BE GATED, AND HERE IS WHY. v3's headline is arithmetic:
 the model's figure less its rolling miss. The combination's is not. It averages
@@ -69,6 +72,17 @@ def is_combination(d: dict) -> bool:
         isinstance(method, str) and method.startswith(COMBO_METHOD_PREFIX))
 
 
+def _band(bad: list[str], where: str, qoq, lo, hi) -> None:
+    """The point must sit inside its own 68% band, and there must be one."""
+    if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and \
+            isinstance(qoq, (int, float)):
+        if not (lo < qoq < hi):
+            bad.append(f"{where}: the point {qoq!r} is outside its own 68% band "
+                       f"[{lo!r}, {hi!r}]")
+    else:
+        bad.append(f"{where}: no 68% band, which the page draws around every point")
+
+
 def _combination_problems(d: dict) -> list[str]:
     """The two invariants that belong to an average and not to a single model.
 
@@ -84,8 +98,37 @@ def _combination_problems(d: dict) -> list[str]:
     errors placed either side of the point, so a point outside its own 68% band
     is not a wide interval but a band computed from something other than the
     figure it is drawn around.
+
+    ONE HORIZON IS ALLOWED NOT TO BE AN AVERAGE, AND IT IS FENCED IN. The next
+    quarter keeps a horizon even in the weeks when v2 has no figure for it, so
+    that the homepage's next-quarter card and its chart toggle do not vanish
+    for the two months in three when that quarter is empty (commit 7e4bed7).
+    That horizon is v3's own figure with `components.v2` null, and the three
+    conditions below are what stop it being a way to publish one model as two:
+    it must be the FORECAST, never the headline nowcast; it must carry no month
+    of data, so the card renders its waiting state instead of the number; and
+    its figure must be v3's to the digit, so nothing can be invented in the gap
+    where the average used to be. A vintage row gets no such exemption: those
+    are the points on the evolution chart, and a point that was never an
+    average does not belong on it.
     """
     bad: list[str] = []
+
+    def unpaired(where: str, h: dict, parts: dict) -> None:
+        qoq, v3 = h.get("qoq_growth_pct"), parts.get("v3")
+        if h.get("kind") != "forecast":
+            bad.append(f"{where}: kind is {h.get('kind')!r} with no v2 component; "
+                       "only the forecast horizon may be published unpaired, and "
+                       "the nowcast is the page's headline")
+        if h.get("months_with_data") != 0:
+            bad.append(f"{where}: months_with_data is {h.get('months_with_data')!r} "
+                       "on an unpaired horizon; it is forced to 0 so the page shows "
+                       "the waiting card rather than a v3-only figure")
+        if not isinstance(v3, (int, float)) or isinstance(v3, bool) or \
+                not isinstance(qoq, (int, float)) or isinstance(qoq, bool) or \
+                abs(qoq - v3) > 1e-4:
+            bad.append(f"{where}: qoq_growth_pct {qoq!r} is not components.v3 "
+                       f"({v3!r}); with no v2 half there is no arithmetic left to do")
 
     def check(where: str, qoq, parts: dict, lo, hi) -> None:
         missing = [k for k in ("v2", "v3")
@@ -101,17 +144,17 @@ def _combination_problems(d: dict) -> list[str]:
                 bad.append(f"{where}: qoq_growth_pct {qoq!r} is not the mean of its "
                            f"components (v2 {parts['v2']!r}, v3 {parts['v3']!r} -> "
                            f"{mean}); the page claims equal weights")
-        if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and \
-                isinstance(qoq, (int, float)):
-            if not (lo < qoq < hi):
-                bad.append(f"{where}: the point {qoq!r} is outside its own 68% band "
-                           f"[{lo!r}, {hi!r}]")
-        else:
-            bad.append(f"{where}: no 68% band, which the page draws around every point")
+        _band(bad, where, qoq, lo, hi)
 
     for h in d.get("horizons") or []:
-        check(h.get("quarter", "?"), h.get("qoq_growth_pct"),
-              h.get("components") or {}, h.get("ci_68_low"), h.get("ci_68_high"))
+        where, parts = h.get("quarter", "?"), h.get("components") or {}
+        if "components" in h and parts.get("v2") is None:
+            unpaired(where, h, parts)
+            _band(bad, where, h.get("qoq_growth_pct"),
+                  h.get("ci_68_low"), h.get("ci_68_high"))
+            continue
+        check(where, h.get("qoq_growth_pct"), parts,
+              h.get("ci_68_low"), h.get("ci_68_high"))
     for v in d.get("vintages") or []:
         parts = {"v2": v.get("v2_qoq_growth_pct"), "v3": v.get("v3_qoq_growth_pct")}
         check(f"vintage {v.get('run_date', '?')} for {v.get('target_quarter', '?')}",

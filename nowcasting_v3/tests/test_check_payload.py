@@ -299,6 +299,69 @@ def test_a_combination_vintage_outside_its_own_68_band_fails():
     assert any("68% band" in b for b in bad), bad
 
 
+# ---- the v3-only forecast horizon ------------------------------------------
+# The combination keeps a forecast horizon even when v2 has no figure for that
+# quarter, so the homepage's next-quarter card and its chart toggle survive the
+# two months in three when the next quarter is empty. That horizon is v3's
+# figure, not an average, and it is published with `components.v2` null and no
+# month of data so the card renders its waiting state.
+
+def _v3_only_forecast(**over):
+    h = {"quarter": "2026 Q4", "kind": "forecast", "months_with_data": 0,
+         "v3_months_with_data": 0, "qoq_growth_pct": 0.4784,
+         "components": {"v2": None, "v3": 0.4784},
+         "source": "v3 only; no v2 figure for this quarter yet",
+         "ci_68_low": 0.0348, "ci_68_high": 0.8807,
+         "ci_95_low": -0.3691, "ci_95_high": 1.3323}
+    h.update(over)
+    return h
+
+
+def test_a_v3_only_forecast_horizon_passes():
+    d = _combo()
+    d["horizons"].append(_v3_only_forecast())
+    assert check_payload(d, today="2026-09") == []
+
+
+def test_a_v3_only_horizon_that_is_not_a_forecast_fails():
+    """Only a forecast may go unpaired. The nowcast IS the page's headline, and
+    publishing v3's alone under the combination's name would put one model's
+    figure where the average belongs with nothing on the page saying so."""
+    d = _combo()
+    d["horizons"].append(_v3_only_forecast(kind="nowcast"))
+    bad = check_payload(d, today="2026-09")
+    assert any("kind" in b and "2026 Q4" in b for b in bad), bad
+
+
+def test_a_v3_only_forecast_with_a_month_of_data_fails():
+    """v3 gains the next quarter's first month before v2 does. The copy's month
+    count is zeroed for exactly that window, so a non-zero count means the card
+    would print a v3-only figure as the combination's."""
+    d = _combo()
+    d["horizons"].append(_v3_only_forecast(months_with_data=1))
+    bad = check_payload(d, today="2026-09")
+    assert any("months_with_data" in b and "2026 Q4" in b for b in bad), bad
+
+
+def test_a_v3_only_forecast_that_is_not_v3s_own_figure_fails():
+    """With no v2 half there is no arithmetic left to do: the published figure
+    has to BE v3's, or the payload has silently invented one."""
+    d = _combo()
+    d["horizons"].append(_v3_only_forecast(qoq_growth_pct=0.52))
+    bad = check_payload(d, today="2026-09")
+    assert any("components.v3" in b for b in bad), bad
+
+
+def test_a_vintage_with_no_v2_component_still_fails():
+    """The exemption is for the published horizon only. A vintage row is a
+    combination that was drawn on the evolution chart; one without a v2 half
+    was never an average."""
+    d = _combo()
+    d["vintages"][0]["v2_qoq_growth_pct"] = None
+    bad = check_payload(d, today="2026-09")
+    assert any("no v2" in b for b in bad), bad
+
+
 def test_the_combination_invariants_do_not_run_on_a_v3_payload():
     """v3's horizons carry no `components`, and must not be asked for one."""
     assert check_payload(_ok(), today="2026-09") == []

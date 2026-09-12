@@ -733,6 +733,59 @@ def fill_next_release(indicators: list[dict], *,
     return out
 
 
+def mark_updated(indicators: list[dict], previous: list[dict] | None) -> list[dict]:
+    """Flag `updated_this_run` on the v3-only entries; leave v2's alone.
+
+    v2's weekly job stamps `updated_this_run`/`prev_period`/`latest_period` on
+    its own 31 series (`V2_EXTRA_FIELDS`, copied in by `merge_indicators`); v3's
+    emitter never has. Without this, the eight v3-only series in the merged
+    panel (aig_pmi, household_spending, imports, commodity_prices, cpi,
+    unit_labour_cost, gdi, gdp) can never show the homepage's "updated this
+    week" dot, even on the week their own release landed.
+
+    THE COMPARISON IS AGAINST LAST WEEK'S MERGED PAYLOAD, not against the
+    entry's own prior state -- there is no prior state here, only two
+    snapshots the caller hands in. `previous` is `indicators_combo.json` as it
+    stood before this run overwrote it, i.e. last week's. An entry whose last
+    `series` date is newer than the same id's in `previous` gets both periods;
+    one that is the same, older, or missing from `previous` (including
+    `previous` being `None`, the first run or a missing file) gets the flag
+    set false and no periods at all -- never a stale pair left over from a
+    previous flagging.
+
+    AN ENTRY V2 COVERS IS RETURNED UNCHANGED, not recomputed: `models`
+    includes "v2" for both a shared series (merged with v2's own flag already
+    copied in) and a v2-only one, and either way v2's weekly job is the
+    authority on when its own series moved, which this function has no basis
+    to override.
+    """
+    prev_by_id = {p["id"]: p for p in (previous or []) if p.get("id")}
+    out = []
+    for entry in indicators:
+        if "v2" in (entry.get("models") or []):
+            out.append(entry)
+            continue
+        latest = _last_series_date(entry)
+        prev_entry = prev_by_id.get(entry.get("id"))
+        prev_date = _last_series_date(prev_entry) if prev_entry else None
+        new = dict(entry)
+        if prev_date is not None and latest is not None and latest > prev_date:
+            new["updated_this_run"] = True
+            new["prev_period"] = prev_date
+            new["latest_period"] = latest
+        else:
+            new["updated_this_run"] = False
+            new.pop("prev_period", None)
+            new.pop("latest_period", None)
+        out.append(new)
+    return out
+
+
+def _last_series_date(entry: dict) -> str | None:
+    series = entry.get("series") or []
+    return str(series[-1]["date"]) if series else None
+
+
 # --------------------------------------------------------------------------- #
 # The track record
 # --------------------------------------------------------------------------- #

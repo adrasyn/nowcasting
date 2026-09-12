@@ -41,9 +41,10 @@ from pathlib import Path
 
 from nyfed.au.combination import (HISTORY_SCHEMA, _spaced, fill_next_release,
                                   latest_payload, make_is_current,
-                                  merge_indicators, pair_runs, quarter_shift,
-                                  refusal_from_v3, refusal_payload,
-                                  track_record, v2_vintage_rows, with_bands)
+                                  mark_updated, merge_indicators, pair_runs,
+                                  quarter_shift, refusal_from_v3,
+                                  refusal_payload, track_record,
+                                  v2_vintage_rows, with_bands)
 from nyfed.au.emit import gdp_release_date
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -135,24 +136,44 @@ def emit_indicators(out: Path, *, next_gdp_release_date: str | None = None) -> N
     for the three series (`gdp`, `gdi`, `unit_labour_cost`) that print on that
     day. Every other v3-only series without a scraped date is filled by
     `fill_next_release`'s sibling or publication-schedule rules.
+
+    THE "UPDATED THIS WEEK" DOT, FOR THE EIGHT v3-ONLY SERIES. v2's job stamps
+    `updated_this_run` on its own 31 series; v3's emitter never has, so those
+    eight could never show the dot even on the week their own release landed.
+    `mark_updated` fixes that by comparing this run's merged panel against the
+    file this run is about to overwrite -- i.e. LAST WEEK'S merged panel, on
+    the weekly runner where the existing file is last Monday's commit. That is
+    exactly the comparison wanted. A re-run on the same day instead compares
+    against the same day's own file, so nothing looks newer and no dot shows;
+    that is an acceptable gap, not a bug, since a same-day re-run means the
+    input data hasn't changed either.
     """
     v3_path, v2_path = DATA / "indicators_v3.json", DATA / "indicators_v2.json"
     if not v3_path.exists():
         print(f"indicators: no {v3_path.name}; nothing to merge")
         return
+    combo_path = out / "indicators_combo.json"
+    previous = None
+    if combo_path.exists():
+        previous = (json.loads(combo_path.read_text()) or {}).get("indicators")
     v3 = json.loads(v3_path.read_text())
     v2 = json.loads(v2_path.read_text()) if v2_path.exists() else None
     merged = merge_indicators(v3, v2)
     merged["indicators"] = fill_next_release(
         merged["indicators"], next_gdp_release_date=next_gdp_release_date)
-    (out / "indicators_combo.json").write_text(json.dumps(merged, indent=2) + "\n")
+    merged["indicators"] = mark_updated(merged["indicators"], previous)
+    combo_path.write_text(json.dumps(merged, indent=2) + "\n")
     n3 = len(v3.get("indicators") or [])
     n2 = len((v2 or {}).get("indicators") or [])
     n = len(merged["indicators"])
     missing = [i["id"] for i in merged["indicators"]
               if not i.get("next_release_estimate")]
+    flagged = [i["id"] for i in merged["indicators"]
+              if "v2" not in (i.get("models") or []) and i.get("updated_this_run")]
     print(f"indicators: v3 {n3} + v2 {n2} -> {n} published "
           f"({n3 + n2 - n} pair(s) merged as the same series)")
+    print(f"indicators: {len(flagged)} v3-only series flagged updated_this_run "
+          f"{flagged if flagged else ''}")
     if missing:
         print(f"indicators: no next_release_estimate for {missing}")
 

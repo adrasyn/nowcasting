@@ -12,8 +12,8 @@ import pytest
 
 from nyfed.au.combination import (SAME_SERIES, SCHEMA, fill_next_release,
                                   latest_payload, make_is_current,
-                                  merge_indicators, pair_runs, quarter_shift,
-                                  refusal_from_v3, track_record,
+                                  mark_updated, merge_indicators, pair_runs,
+                                  quarter_shift, refusal_from_v3, track_record,
                                   v2_vintage_rows, with_bands)
 
 # --------------------------------------------------------------------------- #
@@ -845,3 +845,71 @@ def test_series_without_a_rule_or_sibling_stays_untouched():
     out = fill_next_release(rows, next_gdp_release_date="2026-12-02")
     assert "next_release_estimate" not in out[0]
     assert "next_release_basis" not in out[0]
+
+
+# --------------------------------------------------------------------------- #
+# Flagging updated_this_run on the v3-only indicators
+# --------------------------------------------------------------------------- #
+
+
+def _mi(id_, *, series, models=("v3",)):
+    return {"id": id_, "series": [{"date": d, "value": 1.0} for d in series],
+            "models": list(models)}
+
+
+def test_a_newer_last_series_date_is_flagged_with_both_periods():
+    current = [_mi("imports", series=["2026-06", "2026-07"])]
+    previous = [_mi("imports", series=["2026-05", "2026-06"])]
+    out = mark_updated(current, previous)
+    assert out[0]["updated_this_run"] is True
+    assert out[0]["prev_period"] == "2026-06"
+    assert out[0]["latest_period"] == "2026-07"
+
+
+def test_the_same_last_series_date_is_not_flagged():
+    current = [_mi("imports", series=["2026-06", "2026-07"])]
+    previous = [_mi("imports", series=["2026-06", "2026-07"])]
+    out = mark_updated(current, previous)
+    assert out[0]["updated_this_run"] is False
+    assert "prev_period" not in out[0]
+    assert "latest_period" not in out[0]
+
+
+def test_an_older_last_series_date_is_not_flagged():
+    current = [_mi("imports", series=["2026-05"])]
+    previous = [_mi("imports", series=["2026-06", "2026-07"])]
+    out = mark_updated(current, previous)
+    assert out[0]["updated_this_run"] is False
+    assert "prev_period" not in out[0]
+
+
+def test_an_id_missing_from_previous_is_not_flagged():
+    current = [_mi("imports", series=["2026-07"])]
+    out = mark_updated(current, previous=[_mi("exports", series=["2026-07"])])
+    assert out[0]["updated_this_run"] is False
+    assert "prev_period" not in out[0]
+
+
+def test_no_previous_payload_at_all_is_not_flagged():
+    current = [_mi("imports", series=["2026-07"])]
+    out = mark_updated(current, previous=None)
+    assert out[0]["updated_this_run"] is False
+
+
+def test_a_v2_covered_entry_is_left_exactly_as_it_is():
+    """v2's flag already lives on this entry; mark_updated must not touch it,
+    even when the series itself has moved on."""
+    entry = _mi("employment", series=["2026-06", "2026-07"], models=("v2", "v3"))
+    entry["updated_this_run"] = False
+    previous = [_mi("employment", series=["2026-05"], models=("v2", "v3"))]
+    out = mark_updated([entry], previous)
+    assert out[0] is entry
+    assert out[0]["updated_this_run"] is False
+
+
+def test_input_lists_are_not_mutated():
+    current = [_mi("imports", series=["2026-06", "2026-07"])]
+    previous = [_mi("imports", series=["2026-05", "2026-06"])]
+    before = [dict(r) for r in current]
+    mark_updated(current, previous)
+    assert current == before

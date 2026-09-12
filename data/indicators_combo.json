@@ -873,7 +873,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-10-05",
-      "next_release_basis": "rule"
+      "next_release_basis": "rule",
+      "updated_this_run": false
     },
     {
       "id": "nab_conditions",
@@ -1524,7 +1525,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-09-29",
-      "next_release_basis": "sibling"
+      "next_release_basis": "sibling",
+      "updated_this_run": false
     },
     {
       "id": "exports",
@@ -1957,7 +1959,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-10-01",
-      "next_release_basis": "sibling"
+      "next_release_basis": "sibling",
+      "updated_this_run": false
     },
     {
       "id": "commodity_prices",
@@ -2172,7 +2175,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-10-01",
-      "next_release_basis": "rule"
+      "next_release_basis": "rule",
+      "updated_this_run": false
     },
     {
       "id": "cpi",
@@ -2299,7 +2303,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-09-30",
-      "next_release_basis": "rule"
+      "next_release_basis": "rule",
+      "updated_this_run": false
     },
     {
       "id": "unit_labour_cost",
@@ -2514,7 +2519,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-12-02",
-      "next_release_basis": "national_accounts"
+      "next_release_basis": "national_accounts",
+      "updated_this_run": false
     },
     {
       "id": "gdi",
@@ -2729,7 +2735,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-12-02",
-      "next_release_basis": "national_accounts"
+      "next_release_basis": "national_accounts",
+      "updated_this_run": false
     },
     {
       "id": "gdp",
@@ -2944,7 +2951,8 @@
         "v3"
       ],
       "next_release_estimate": "2026-12-02",
-      "next_release_basis": "national_accounts"
+      "next_release_basis": "national_accounts",
+      "updated_this_run": false
     },
     {
       "id": "ft_emp",

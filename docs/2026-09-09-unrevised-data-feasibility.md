@@ -171,3 +171,7 @@ and where its intercept sits; they do not teach it that output per hour has stop
 - New quarter each release: first print = the q/q growth in the release for that quarter, which
   is one `read_abs_series(..., url=<that release page>)` call, or the weekly job can store the
   print on the day it lands.
+
+See `docs/measurements/2026-09-12-v2-v3-weekly-combination.md` for what scoring both models
+against these initial estimates enabled: an equal-weight combination that beats either model
+alone.

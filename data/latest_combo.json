@@ -1,0 +1,208 @@
+{
+  "schema": "combo-1",
+  "status": "ok",
+  "basis": "abs_first_print",
+  "target": "first_print",
+  "method": "equal-weight average of v2 and v3",
+  "generated_at": "2026-09-12T07:44:07+00:00",
+  "as_of": "2026-09-07",
+  "target_quarter": "2026 Q3",
+  "data_through": "2026-08",
+  "prev_level": {
+    "value": 699461,
+    "quarter": "2026 Q2"
+  },
+  "horizons": [
+    {
+      "quarter": "2026 Q3",
+      "kind": "nowcast",
+      "qoq_growth_pct": 0.5352,
+      "model_qoq_growth_pct": 0.5352,
+      "annualised_growth_pct": 2.158,
+      "ci_68_low": 0.3913,
+      "ci_68_high": 0.6791,
+      "ci_95_low": 0.1839,
+      "ci_95_high": 0.8865,
+      "components": {
+        "v2": 0.61,
+        "v3": 0.4603
+      },
+      "months_with_data": 2,
+      "release_date": "2026-12-02",
+      "gdp_chain_volume_millions": 703205
+    },
+    {
+      "quarter": "2026 Q4",
+      "kind": "forecast",
+      "qoq_growth_pct": 0.4784,
+      "annualised_growth_pct": 2.1836,
+      "months_with_data": 0,
+      "v3_months_with_data": 0,
+      "components": {
+        "v2": null,
+        "v3": 0.4784
+      },
+      "source": "v3 only; no v2 figure for this quarter yet",
+      "ci_68_low": 0.0348,
+      "ci_68_high": 0.8807,
+      "ci_95_low": -0.3691,
+      "ci_95_high": 1.3323,
+      "release_date": "2027-03-03"
+    }
+  ],
+  "vintages": [
+    {
+      "run_date": "2026-08-10",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "next",
+      "qoq_growth_pct": 0.6108,
+      "v2_qoq_growth_pct": 0.77,
+      "v2_run_date": "2026-08-10",
+      "v3_qoq_growth_pct": 0.4515,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "ci_68_low": 0.4169,
+      "ci_68_high": 0.8047,
+      "ci_95_low": 0.2109,
+      "ci_95_high": 1.0107
+    },
+    {
+      "run_date": "2026-08-17",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "next",
+      "qoq_growth_pct": 0.5122,
+      "v2_qoq_growth_pct": 0.56,
+      "v2_run_date": "2026-08-17",
+      "v3_qoq_growth_pct": 0.4644,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "ci_68_low": 0.3183,
+      "ci_68_high": 0.7061,
+      "ci_95_low": 0.1123,
+      "ci_95_high": 0.9121
+    },
+    {
+      "run_date": "2026-08-24",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "next",
+      "qoq_growth_pct": 0.5121,
+      "v2_qoq_growth_pct": 0.56,
+      "v2_run_date": "2026-08-24",
+      "v3_qoq_growth_pct": 0.4642,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "ci_68_low": 0.3182,
+      "ci_68_high": 0.706,
+      "ci_95_low": 0.1122,
+      "ci_95_high": 0.912
+    },
+    {
+      "run_date": "2026-08-31",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "next",
+      "qoq_growth_pct": 0.5113,
+      "v2_qoq_growth_pct": 0.56,
+      "v2_run_date": "2026-08-24",
+      "v3_qoq_growth_pct": 0.4627,
+      "months_with_data": 1,
+      "data_through": "2026-07",
+      "ci_68_low": 0.3174,
+      "ci_68_high": 0.7052,
+      "ci_95_low": 0.1114,
+      "ci_95_high": 0.9112
+    },
+    {
+      "run_date": "2026-09-07",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "current",
+      "qoq_growth_pct": 0.5352,
+      "v2_qoq_growth_pct": 0.61,
+      "v2_run_date": "2026-09-07",
+      "v3_qoq_growth_pct": 0.4603,
+      "months_with_data": 2,
+      "data_through": "2026-08",
+      "ci_68_low": 0.3913,
+      "ci_68_high": 0.6791,
+      "ci_95_low": 0.1839,
+      "ci_95_high": 0.8865
+    }
+  ],
+  "next_gdp_release_date": "2026-12-02",
+  "bias_correction": {
+    "pp": 0.0631,
+    "n": 8,
+    "window_quarters": 8,
+    "min_quarters": 4,
+    "first_quarter": "2024Q3",
+    "last_quarter": "2026Q2",
+    "basis": "mean of the model's final nowcast minus the ABS first print over the last 8 printed quarters"
+  },
+  "ci_basis": "probability band: empirical absolute-error quantiles of the equal-weight v2+v3 average against the ABS's initial estimate, weekly vintages, targets 2022Q4 onward, centred on the point. Not a posterior and not a confidence interval.",
+  "band_pp": {
+    "current": {
+      "p68": 0.1439,
+      "p95": 0.3513,
+      "n": 181,
+      "mae": 0.1291,
+      "bias": 0.0592
+    },
+    "next": {
+      "p68": 0.1939,
+      "p95": 0.3999,
+      "n": 51,
+      "mae": 0.1601,
+      "bias": 0.0975
+    }
+  },
+  "components": {
+    "v2": {
+      "as_of": "2026-09-07",
+      "run_date": "2026-09-07",
+      "schema": "v2-staged-2",
+      "stale_days": 3
+    },
+    "v3": {
+      "as_of": "2026-09-10",
+      "schema": "v3-preview-3"
+    }
+  },
+  "panel": {
+    "n_series": 14,
+    "n_months": 564,
+    "first_month": "1980-01",
+    "series": [
+      "employment",
+      "unemployment_rate",
+      "job_ads",
+      "aig_pmi",
+      "nab_conditions",
+      "building_approvals",
+      "household_spending",
+      "exports",
+      "imports",
+      "commodity_prices",
+      "cpi",
+      "unit_labour_cost",
+      "gdi",
+      "gdp"
+    ],
+    "deflator_skipped": {}
+  },
+  "diagnostics": {
+    "gdp_global_loading": 0.9284,
+    "collapse_floor": 0.5,
+    "n_gs": 10000,
+    "n_burn": 8000,
+    "seed": 4
+  },
+  "estimate": {
+    "estimated_at": "2026-09-10T15:15:25+00:00",
+    "asof": "2026-09-10",
+    "age_days": 0
+  }
+}

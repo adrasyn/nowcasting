@@ -46,6 +46,37 @@ issue instead.
 The R pipelines and the website communicate only via JSON files under `data/`. Site and pipelines
 can be developed, deployed, and moved independently.
 
+## The published nowcast
+
+The homepage figure is the equal-weight average of v2 and v3, the repo's second model
+(`nowcasting_v3/`, a Python port of the NY Fed's Bayesian dynamic factor model). The average beats
+either model alone: over 181 Monday vintages scored against the ABS's initial estimates, the
+combination's MAE is 0.13pp against 0.19 for v2 and 0.17 for v3, because the two models' weekly
+errors are close to uncorrelated. At the next-quarter horizon the same holds over 51 Mondays
+(0.16pp against 0.24 and 0.19). See `docs/measurements/2026-09-12-v2-v3-weekly-combination.md` for
+the full backtest. v2 now nowcasts the next quarter as well as the current one, the same two
+horizons v3 already published: RDP 2024-04's U-MIDAS model, run on the next quarter's partial MAI
+months and lagging into the completed current quarter, so the evolution chart carries both
+horizons for both models.
+
+The weekly flow runs the two models separately and combines their outputs at the end. The v2 job
+runs at 02:00 UTC Monday on a Windows runner and writes `data/latest_v2.json`. The v3 job runs at
+03:30 UTC, produces the nowcast and its track record, then runs `nowcasting_v3/tools/emit_combination.py`,
+which pairs v3's fresh run with v2's latest run for the same quarter (at most a week old) and writes
+`data/latest_combo.json`, `data/nowcast_history_combo.json` and `data/performance_combo.json` in
+v3's schemas. The same emitter writes `data/indicators_combo.json`, the homepage's indicator panel:
+the union of both models' input panels — v3's 14 series in their own order, then v2's 31 with their
+groups mapped onto v3's names, the six series both models read merged into one entry each (39 in
+all) — because the figure above the panel is the average of the two. The payload checker runs
+against the combination payload the same way it does against v3's own. If v3 refuses to publish, the combination shows v3's refusal rather than half an average;
+if v2's run is missing that week, last week's v2 run is carried for up to 7 days and the payload
+records how old it is (`components.v2.stale_days`).
+
+The published bands are empirical quantiles of the combination's own backtest errors, calculated
+separately for the current and next-quarter horizons and stored in `pipeline/seed/ci_params_combo.json`.
+They are refreshed by `nowcasting_v3/tools/combination_backtest.py`, not read off either model's own
+interval.
+
 ## Local development
 
 ```bash

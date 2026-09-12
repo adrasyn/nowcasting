@@ -77,9 +77,17 @@ load_ci_params <- function(path = "seed/ci_params.json") {
 #' params we look up `jt`; if that stage was too thin to calibrate (or `jt` is
 #' unknown) we fall back to the pooled figures. Flat/legacy params ignore `jt`.
 #'
+#' `horizon` picks WHICH estimator's calibration to read. "current" is the
+#' quarter the ABS has not printed yet; "next" is the one after it, nowcast off
+#' the same MAI a quarter further out, and it has its own error dispersion in the
+#' params' top-level `next` block. Params written before 2026-09-12 have no such
+#' block: rather than refuse, we fall back to the current-quarter POOLED figures
+#' and label the stage "pooled-current" so the caller can see the substitution.
+#'
 #' Returns list(bias_pp, sd_pp, z_68, z_95, n, stage) where `stage` is the stage
 #' actually used ("pooled" when falling back) so callers can surface it.
-ci_params_for_stage <- function(p, jt = NULL) {
+ci_params_for_stage <- function(p, jt = NULL, horizon = c("current", "next")) {
+  horizon <- match.arg(horizon)
   # `bias_pp` is the bias APPLIED to the interval centre (always 0 for v2).
   # `bias_measured_pp` and `mae_pp` are the track-record figures the site
   # publishes INSTEAD of a probability interval -- see compute_ci_params_v2.R.
@@ -96,14 +104,27 @@ ci_params_for_stage <- function(p, jt = NULL) {
                 bias_measured = p$qoq_bias_pp))
   }
 
+  # `next` is an R keyword, so the block is only reachable as p[["next"]].
+  blk <- p
+  fallback_stage <- "pooled"
+  if (horizon == "next") {
+    nx <- p[["next"]]
+    if (is.null(nx)) {
+      blk <- list(pooled = p$pooled, by_jt = NULL)
+      fallback_stage <- "pooled-current"
+    } else {
+      blk <- nx
+    }
+  }
+
   s <- NULL
-  if (!is.null(jt) && !is.na(jt) && !is.null(p$by_jt)) {
-    s <- p$by_jt[[as.character(jt)]]
+  if (!is.null(jt) && !is.na(jt) && !is.null(blk$by_jt)) {
+    s <- blk$by_jt[[as.character(jt)]]
   }
   stage <- as.character(jt)
   if (is.null(s)) {
-    s <- p$pooled
-    stage <- "pooled"
+    s <- blk$pooled
+    stage <- fallback_stage
   }
   # qoq_mae_pp is absent from params generated before 2026-08-08; NA is handled
   # downstream by omitting the disclosure rather than printing a blank.

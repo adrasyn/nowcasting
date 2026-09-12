@@ -107,14 +107,39 @@ jobs:
         continue-on-error: true
         run: python -u tools/emit_backtest_json.py
 
+      # WHAT THE HOMEPAGE PUBLISHES. The headline figure is the equal-weight
+      # average of v2 and v3, so this step reads both models' published
+      # payloads and writes the combination's. It runs AFTER the track record
+      # because it averages v2's and v3's own published numbers, and the
+      # track-record refresh is what turns a quarter the models called live
+      # into a scored row the combination's own performance file then restates.
+      #
+      # UNLIKE THE TWO STEPS ABOVE, THIS ONE STOPS THE JOB. Those tolerate a
+      # failure because the nowcast is already written and a stale table beats
+      # no publish at all. This step IS the publish: if it fails, the homepage
+      # would serve last week's average as if it were this week's, which is the
+      # exact failure the refusal payload exists to prevent. The emitter writes
+      # a refusal and exits 0 for every condition it can name (v3 refused, no
+      # v2 figure for the current quarter), so a non-zero exit here is a bug.
+      - name: Combine with v2
+        continue-on-error: false
+        run: python -u tools/emit_combination.py
+
       # The failure handler below covers a step that THROWS. This covers a run
       # that succeeds and publishes something incoherent — above all a target
       # that failed to roll forward after an ABS print, which would headline an
       # estimate of a quarter already measured. Invariants only, so a failure
       # here is a bug rather than a judgement call. Runs BEFORE the commit, so a
       # bad payload is never pushed.
+      # BOTH PAYLOADS, because both reach a reader: the homepage serves the
+      # combination and /v3 serves v3. Same invariants, one gated -- the
+      # combination's headline is a mean of two corrected figures rather than a
+      # model less a correction, and `check_payload` keys that on the payload's
+      # own schema.
       - name: Check the payload is coherent
-        run: python -u tools/check_payload.py
+        run: |
+          python -u tools/check_payload.py
+          python -u tools/check_payload.py --file ../data/latest_combo.json
 
       # A refusal is a successful run — the runner writes `status: "refused"` and
       # exits 0, and the site renders that rather than last week's number. Say so
@@ -142,6 +167,14 @@ jobs:
           git add data/latest_v3.json data/indicators_v3.json
           git add data/nowcast_history_v3.json
           git add data/performance_v3.json data/backtest_v3.json
+          # The combination is what the homepage publishes. Its four files are
+          # written by `emit_combination.py` from v2's and v3's payloads, so
+          # they are committed in the same commit as the v3 half they average.
+          # `indicators_combo.json` is the homepage's indicator panel: the
+          # union of the two models' inputs, because the figure above it is the
+          # average of the two models.
+          git add data/latest_combo.json data/nowcast_history_combo.json
+          git add data/performance_combo.json data/indicators_combo.json
           # The first print of a newly released quarter is recorded by
           # record_first_print.py on the Monday after the ABS prints, along
           # with the model's miss against it, before the nowcast reads them.

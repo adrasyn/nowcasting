@@ -2,7 +2,7 @@
   "schema": "v2-ci-by-stage-1",
   "basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
   "calibrated_from": "2022-01-01",
-  "method": "interval = point +/- t(df) * sd, centred on the model's raw output. The measured bias is reported (qoq_bias_pp, bias_t) but NOT applied: RDP 2024-04 does not bias-correct and evaluates on RMSE, which already penalises bias. Stages with fewer than MIN_N observations fall back to `pooled`.",
+  "method": "interval = point +/- t(df) * sd, centred on the model's raw output. The measured bias is reported (qoq_bias_pp, bias_t) but NOT applied: RDP 2024-04 does not bias-correct and evaluates on RMSE, which already penalises bias. Stages with fewer than MIN_N observations fall back to `pooled`. The top-level `next` block is the same calculation for the nowcast of the quarter AFTER the current one, at its own information stage.",
   "min_n": 12,
   "bias_alpha": 0.05,
   "pooled": {
@@ -45,7 +45,49 @@
       "stage": 3
     }
   },
+  "next": {
+    "pooled": {
+      "n": 34,
+      "qoq_bias_pp": 0.0992,
+      "bias_t": 1.931,
+      "bias_significant": false,
+      "qoq_bias_applied_pp": 0,
+      "qoq_sd_pp": 0.2995,
+      "qoq_rmse_pp": 0.3113,
+      "qoq_mae_pp": 0.2394,
+      "t_68": 1.0154,
+      "t_95": 2.0345
+    },
+    "by_jt": {
+      "1": {
+        "n": 17,
+        "qoq_bias_pp": 0.0623,
+        "bias_t": 0.735,
+        "bias_significant": false,
+        "qoq_bias_applied_pp": 0,
+        "qoq_sd_pp": 0.3494,
+        "qoq_rmse_pp": 0.3447,
+        "qoq_mae_pp": 0.266,
+        "t_68": 1.0322,
+        "t_95": 2.1199,
+        "stage": 1
+      },
+      "2": {
+        "n": 17,
+        "qoq_bias_pp": 0.1361,
+        "bias_t": 2.291,
+        "bias_significant": true,
+        "qoq_bias_applied_pp": 0,
+        "qoq_sd_pp": 0.245,
+        "qoq_rmse_pp": 0.2739,
+        "qoq_mae_pp": 0.2127,
+        "t_68": 1.0322,
+        "t_95": 2.1199,
+        "stage": 2
+      }
+    }
+  },
   "model": "qa_a10 (dfm_q=1)",
   "source": "cache/ci_recalib/qa_a10_acc.csv",
-  "computed_at": "2026-09-11T01:50:52Z"
+  "computed_at": "2026-09-11T22:38:17Z"
 }

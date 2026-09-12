@@ -132,5 +132,46 @@ check(length(unique(tq_seen)) == 1L,
       sprintf("target quarter stable as MAI lengthens (saw: %s)",
               paste(unique(tq_seen), collapse = ", ")))
 
+# ---- next-quarter horizon (2026-09-12) ------------------------------------
+# as_of 2019-08-15 with the 60-day GDP lag: 2019 Q2 GDP prints ~29 Aug, so the
+# CURRENT quarter is 2019 Q2 (complete, jt = 3) and the NEXT is 2019 Q3 with
+# July (and possibly August) MAI months.
+source(file.path(here, "backtest_v2.R"))   # .truncate_gdp
+cat("\n-- next-quarter horizon --\n")
+AS_OF_N <- as.Date("2019-08-15")
+gdp_n <- .truncate_gdp(transform(gdp, date = as.Date(date)), AS_OF_N, gdp_lag = 60L)
+cur <- nowcast_midas(mai, gdp_n, as_of = AS_OF_N, prev_level = PREV_LEVEL, horizon = "current")
+nxt <- nowcast_midas(mai, gdp_n, as_of = AS_OF_N, prev_level = PREV_LEVEL, horizon = "next")
+nxt2 <- nowcast_midas(mai, gdp_n, as_of = AS_OF_N, prev_level = PREV_LEVEL, horizon = "next")
+check(identical(cur$target_quarter, "2019 Q2") && cur$n_months_in_quarter == 3L,
+      "current horizon at 2019-08-15 is the complete 2019 Q2")
+check(identical(cur$horizon, "current") && identical(cur$current_quarter, "2019 Q2"),
+      "current horizon labels itself")
+check(identical(nxt$target_quarter, "2019 Q3"), "next horizon targets 2019 Q3")
+check(identical(nxt$horizon, "next") && identical(nxt$current_quarter, "2019 Q2"),
+      "next horizon names the current quarter it lags into")
+check(nxt$n_months_in_quarter %in% 1:2, sprintf("next horizon sees 1-2 months (saw %d)", nxt$n_months_in_quarter))
+check(identical(nxt$model, "UMIDAS-full"), "partial next quarter routes to U-MIDAS")
+check(is.finite(nxt$qoq_growth) && abs(nxt$qoq_growth) < 5, "next-quarter nowcast is finite and sane")
+check(identical(nxt$qoq_growth, nxt2$qoq_growth), "next-quarter nowcast is reproducible")
+check(abs(nxt$nowcast_level - PREV_LEVEL * (1 + nxt$qoq_growth / 100)) < 1e-6,
+      "next-quarter level = prev_level * (1 + qoq/100) (prev_level is the CURRENT quarter's level, supplied by the caller)")
+cat(sprintf("cur: %s qoq=%+.4f jt=%d   next: %s qoq=%+.4f jt=%d\n",
+            cur$target_quarter, cur$qoq_growth, cur$n_months_in_quarter,
+            nxt$target_quarter, nxt$qoq_growth, nxt$n_months_in_quarter))
+# The default is unchanged: the same call without `horizon` is the current quarter.
+dflt <- nowcast_midas(mai, gdp_n, as_of = AS_OF_N, prev_level = PREV_LEVEL)
+check(identical(dflt$qoq_growth, cur$qoq_growth), "default horizon is 'current' and bit-identical")
+# No next-quarter month yet: as_of 2019-07-05 under the 60-day lag has current = 2019 Q2
+# (June printed ~29 Aug) and the MAI may or may not reach July. Either the call
+# succeeds with target 2019 Q3, or it stops with the documented message.
+AS_OF_E <- as.Date("2019-07-05")
+gdp_e <- .truncate_gdp(transform(gdp, date = as.Date(date)), AS_OF_E, gdp_lag = 60L)
+r_e <- tryCatch(nowcast_midas(mai, gdp_e, as_of = AS_OF_E, horizon = "next"),
+                error = function(e) conditionMessage(e))
+check(is.list(r_e) && identical(r_e$target_quarter, "2019 Q3") ||
+        (is.character(r_e) && startsWith(r_e, "nowcast_midas(): no MAI month beyond the current quarter")),
+      "next horizon either nowcasts 2019 Q3 or refuses with the documented message")
+
 cat(sprintf("\n==> test_nowcast_midas: %s\n", if (pass) "PASS" else "FAIL"))
 if (!pass) quit(status = 1L)

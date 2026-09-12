@@ -63,15 +63,31 @@ suppressMessages({
 #   prev_level   : optional numeric. The released GDP chain-volume LEVEL of the quarter
 #                  immediately BEFORE the target quarter, used to express the growth nowcast as a
 #                  level. If NULL, nowcast_level is returned NA (growth is still produced).
+#                  For horizon = "next" the quarter before the target IS the current quarter,
+#                  whose level is itself a nowcast: the caller chains it (pass the headline
+#                  nowcast's `nowcast_level`), this function never invents it.
+#   horizon      : "current" (default) = the first quarter with MAI data but no released GDP,
+#                  i.e. exactly the behaviour this file has always had. "next" = the quarter
+#                  AFTER that one, nowcast from its partial MAI months as soon as it has any.
+#
+# The next-quarter horizon needs NO unpublished GDP. The U-MIDAS regression has no lagged-GDP
+# regressor: it maps monthly MAI onto quarterly growth, so a quarter can be nowcast from its own
+# partial months plus the months before them, whether or not the preceding quarter has printed.
+# The subtlety is that the lags k = (3 - jt):5 reach up to five months back from the target
+# quarter's last month, i.e. into the CURRENT quarter, which sits AFTER the estimation sample.
+# So the forecast newdata carries the current quarter's three months ahead of the next quarter's
+# partial months, `forecast()` returns two quarters, and we take the LAST one.
 #
 # Returns a list:
 #   target_quarter, qoq_growth, nowcast_level, model, n_obs,
-#   plus n_months_in_quarter (jt) and prev_level for transparency.
+#   plus n_months_in_quarter (jt), prev_level, horizon and current_quarter for transparency.
 ####################################################################################################
 nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
                           model = c("qa", "umidas"),
-                          qa_lag = 0L:1L) {   # QA quarterly lag (sweep knob; 0:1 = default)
-  model <- match.arg(model)
+                          qa_lag = 0L:1L,     # QA quarterly lag (sweep knob; 0:1 = default)
+                          horizon = c("current", "next")) {
+  model   <- match.arg(model)
+  horizon <- match.arg(horizon)
 
   mt <- 3L                          # months per quarter (high-freq ratio)
 
@@ -121,8 +137,31 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
                     as.character(last_gdp_q)), call. = FALSE)
   }
 
+  # `target_q` as computed above is the CURRENT quarter: the first with MAI data but no
+  # released GDP. The "next" horizon moves the target one quarter on and keeps the current
+  # quarter's three months as the lag block the U-MIDAS newdata needs (see the header).
+  current_q  <- target_q
+  cur_months <- m[.quarter_label(m$date) == current_q, , drop = FALSE]
+  if (horizon == "next") target_q <- seq(current_q, by = "3 months", length.out = 2L)[2L]
+
   # MAI months belonging to the target quarter (the "x_new" partial months).
   target_months <- m[.quarter_label(m$date) == target_q, , drop = FALSE]
+  if (horizon == "next") {
+    # Order matters. "No month beyond the current quarter" is the normal state for the
+    # first weeks after a print and the caller treats it as "not yet", so it is tested
+    # FIRST. Only once a month past the current quarter exists is a short current
+    # quarter a real anomaly: with a contiguous MAI it cannot happen, so the second
+    # check is an assertion, not an expected refusal. Testing it first would turn every
+    # ordinary "not yet" into a hard error and lose the as-of's headline row too.
+    if (nrow(target_months) == 0L)
+      stop(sprintf("nowcast_midas(): no MAI month beyond the current quarter %s yet\n",
+                   .quarter_name(current_q)), call. = FALSE)
+    if (nrow(cur_months) < mt)
+      stop(sprintf(paste("nowcast_midas(): current quarter incomplete -- %s has %d of %d MAI",
+                         "months, yet the MAI already reaches %s. Non-contiguous MAI?\n"),
+                   .quarter_name(current_q), nrow(cur_months), mt,
+                   .quarter_name(target_q)), call. = FALSE)
+  }
   jt <- nrow(target_months)
   if (jt > mt) stop("nowcast_midas(): more than 3 MAI months in target quarter (bad alignment).\n",
                     call. = FALSE)
@@ -138,7 +177,12 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
   # ---- Build the estimation sample honouring the data contract ----
   # Estimation must use only COMPLETE quarters that also have released GDP. Drop the
   # target quarter's (partial) months from the in-sample monthly block.
-  m_est_src <- m[m$date < target_q, , drop = FALSE]      # months strictly before target quarter
+  # The sample is the months strictly before the CURRENT quarter for BOTH horizons. For
+  # "current" that is today's behaviour verbatim (current_q == target_q). For "next" it is
+  # also what the GDP contiguity trim below would produce anyway -- `y` has no row for the
+  # current quarter by construction -- but making it explicit keeps the two horizons on one
+  # estimation sample, so the next-quarter figure never sees a quarter the headline did not.
+  m_est_src <- m[m$date < current_q, , drop = FALSE]     # months strictly before current quarter
 
   # Align monthly block: first month must be a quarter's first month (Jan/Apr/Jul/Oct),
   # length a multiple of 3, and matched 1:3 with the GDP quarters we hold.
@@ -219,9 +263,14 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
     # complete-quarter average the paper's QA expects -- never a partial mean.
     nxm <- mean(target_months$value, na.rm = TRUE)
 
-    qa_fc <- forecast(object = qa_md, newdata = list(xm_est = c(nxm)),
+    # For horizon = "next" the target quarter sits one quarter past the estimation sample,
+    # so the newdata has to step through the current quarter first and we take the LAST
+    # forecast. (jt == 3 on the next quarter only happens if the ABS is late with a print.)
+    nxm_block <- if (horizon == "next") c(mean(cur_months$value, na.rm = TRUE), nxm) else c(nxm)
+
+    qa_fc <- forecast(object = qa_md, newdata = list(xm_est = nxm_block),
                       se = FALSE, method = "static", add_ts_info = FALSE)
-    qoq_growth <- as.numeric(qa_fc$mean)
+    qoq_growth <- as.numeric(tail(qa_fc$mean, 1L))
     fit_md <- qa_md
     model_name <- "QA-UMIDAS"
   } else {
@@ -243,11 +292,16 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
       cat(sprintf("nowcast_midas(): jt=0 (no MAI months yet for %s); U-MIDAS uses k=(k1):k2 with no within-quarter input (1-step-ahead).\n",
                   .quarter_name(target_q)))
     }
+    # The lags k = (3 - jt):5 reach up to five months back from the target quarter's last
+    # month. For horizon = "next" that reaches into the CURRENT quarter, which is itself
+    # past the estimation sample, so the newdata block leads with the current quarter's
+    # three months and forecast() returns TWO quarters -- the next quarter is the last one.
+    lead_block <- if (horizon == "next") as.numeric(cur_months$value) else numeric(0)
     um_fc <- forecast(object = um_md,
-                      newdata = list(x_est = c(x_new,
+                      newdata = list(x_est = c(lead_block, x_new,
                                      rep_len(NA_real_, mt - jtf))),
                       se = FALSE, method = "static", add_ts_info = FALSE)
-    qoq_growth <- as.numeric(um_fc$mean)
+    qoq_growth <- as.numeric(tail(um_fc$mean, 1L))
     fit_md <- um_md
     model_name <- "UMIDAS-full"
   }
@@ -271,6 +325,8 @@ nowcast_midas <- function(mai, gdp_growth, as_of = NULL, prev_level = NULL,
     model               = model_name,
     n_obs               = n_obs,
     n_months_in_quarter = jt,
+    horizon             = horizon,
+    current_quarter     = .quarter_name(current_q),
     prev_level          = if (is.null(prev_level)) NA_real_ else prev_level,
     sample_start        = .quarter_name(.quarter_label(q_label[1L])),
     sample_end          = .quarter_name(q_label[nyt])

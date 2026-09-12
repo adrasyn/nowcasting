@@ -15,6 +15,18 @@ import V3NextQuarter from "@/components/V3NextQuarter";
 // check v2 fails. v2 is still built, still updated weekly, and still reachable
 // at /v2 — the comparison only stays honest while both keep running.
 //
+// AND SINCE THE COMBINATION LANDED, THE FIGURE IS THE AVERAGE OF THE TWO. The
+// two models miss in different quarters, so the equal-weight average beats both
+// of them. `data/latest_combo.json` is written in v3's schema on purpose: every
+// component below renders it without knowing, so the page is the same page and
+// only the payload behind it changed.
+//
+// THE FALLBACK IS NOT DECORATION. The combination needs v2's payload as well as
+// v3's, and v2 runs in a different workflow on a different runner; a checkout
+// from before the emitter existed has no combination file at all. In either
+// case the page serves v3 alone, exactly as it did before this change, rather
+// than serving nothing.
+//
 // SAME STRUCTURE AS /v2, ON PURPOSE. Banner, header, headline card, nowcast
 // evolution, indicator panel, track record, methodology — in that order, and
 // rendered by the same components wherever the payload shape allows. The site
@@ -55,7 +67,8 @@ function Refused({ reason, detail, asOf }: {
 
 export default function Home() {
   const data = loadDashboardData();
-  const v3 = data.latestV3;
+  const v3 = data.latestCombo ?? data.latestV3;
+  const performance = data.performanceCombo ?? data.performanceV3;
 
   if (!v3) {
     return (
@@ -95,13 +108,28 @@ export default function Home() {
         />
       )}
 
-      {data.indicatorsV3 && <IndicatorGrid indicators={data.indicatorsV3} />}
+      {/* BOTH MODELS' INPUTS, not v3's. The figure above is the average of v2
+          and v3, so the panel that answers "what is this built on?" is the
+          union of the two panels — v3's fourteen series in their own order,
+          then v2's, merged where the two carry the same series. The file is
+          written by the same emitter; v3's own panel is the fallback for a
+          checkout from before it existed. */}
+      {(data.indicatorsCombo ?? data.indicatorsV3) && (
+        <IndicatorGrid indicators={(data.indicatorsCombo ?? data.indicatorsV3)!} />
+      )}
 
-      {data.performanceV3 && (
+      {performance && (
         <PerformanceSection
-          performance={data.performanceV3}
+          performance={performance}
           isBacktest
-          sourceFile="data/backtest_v3.json"
+          // Where the runs behind the table live. `intro=""` below means this
+          // page does not currently print it, but it must still name the file
+          // the figures came from rather than the one they used to.
+          sourceFile={
+            data.performanceCombo
+              ? "data/nowcast_history_combo.json"
+              : "data/backtest_v3.json"
+          }
           title="Track record"
           intro=""
           actualLabel="Actual"
@@ -120,13 +148,13 @@ export default function Home() {
           showRbaTile={false}
           tileBasis="quarterly growth"
           maeTile={
-            <V3RbaCompare rba={data.performanceV3.rba_comparison} />
+            <V3RbaCompare rba={performance.rba_comparison} />
           }
         />
       )}
 
 
-      <V3MethodologyPanel performance={data.performanceV3} latest={v3} />
+      <V3MethodologyPanel performance={performance} latest={v3} />
       <Footer />
     </main>
   );

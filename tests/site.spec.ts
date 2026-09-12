@@ -20,6 +20,10 @@ import { test, expect } from "@playwright/test";
 
 const V3_INDICATOR = /Labor · Thousands/;
 const V2_INDICATOR = /Jobs & labour · 000s persons/;
+// A series only v2's panel carries: v3 has no financial block at all, and the
+// merge maps v2's "Financial & credit" onto this name. Chosen over an
+// employment series because nothing in v3 could ever produce this line.
+const V2_ONLY_INDICATOR = /Financial and credit · %/;
 
 /** Open the first Employment indicator and read its metadata line. */
 async function indicatorMeta(page: import("@playwright/test").Page) {
@@ -44,11 +48,24 @@ test.describe("homepage", () => {
     await expect(page.getByText("Actual", { exact: true }).first()).toBeVisible();
   });
 
-  test("serves v3, not v2", async ({ page }) => {
+  // THE HOMEPAGE'S PANEL IS BOTH MODELS', because its figure is both models'.
+  // This test used to assert that nothing of v2's appeared here, which was
+  // right while the page published v3 alone and is wrong now: the panel is the
+  // union of the two, merged where they carry the same series. What must still
+  // hold is that v3's own entries are unchanged — same group names, same units
+  // — so the merge added to the panel rather than restating it in v2's terms.
+  test("shows both models' indicators", async ({ page }) => {
     await page.goto("/");
     await indicatorMeta(page);
     await expect(page.getByText(V3_INDICATOR)).toBeVisible();
+    // v2's copy of Employment is merged INTO v3's, so v2's group and unit for
+    // it never reach the page.
     await expect(page.getByText(V2_INDICATOR)).toHaveCount(0);
+    await page
+      .getByRole("button", { name: /10yr govt bond yield/ })
+      .first()
+      .click();
+    await expect(page.getByText(V2_ONLY_INDICATOR)).toBeVisible();
   });
 
   test("the methodology panel opens", async ({ page }) => {
@@ -58,14 +75,26 @@ test.describe("homepage", () => {
       page.getByText(/New York Fed Staff Nowcast 2\.0/).first()
     ).toBeVisible();
     // The panel is the one place that explains what the published number is:
-    // a nowcast of the ABS's initial estimate, less a correction for the
-    // model's recent average error. The panel is closed by default, so this
-    // assertion lives here — and it is SCOPED TO #methodology because the
-    // track-record notes above also say "average error", so an unscoped
-    // match passes with the panel closed and would survive the panel's copy
-    // being deleted.
+    // the average of two models, each a nowcast of the ABS's initial estimate.
+    // The panel is closed by default, so this assertion lives here — and it is
+    // SCOPED TO #methodology because the track-record notes above also say
+    // "average error", so an unscoped match passes with the panel closed and
+    // would survive the panel's copy being deleted.
+    //
+    // `/average error/` rather than `/most recent average error/`: the copy
+    // now attaches the correction to the NY Fed model that owns it ("its own
+    // average error over the last 8 quarters") instead of to the published
+    // figure, which is an average of two already corrected models.
     await expect(
-      page.locator("#methodology").getByText(/most recent average error/)
+      page.locator("#methodology").getByText(/average error/).first()
+    ).toBeVisible();
+    // BOTH MODELS HAVE TO BE NAMED, because the published figure is their
+    // average. The NY Fed assertion above is one half; this is the other, and
+    // the paper number is the part a reader can look up. `ModelSwitch` is gone
+    // from the foot of the page (commit 2cf1e6d), so neither string can now
+    // reach this page from anywhere but the methodology copy.
+    await expect(
+      page.locator("#methodology").getByText(/Research Discussion Paper 2024-04/)
     ).toBeVisible();
   });
 });

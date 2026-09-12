@@ -141,7 +141,7 @@ export default function V3Evolution({ vintages, horizons, nowcastReleaseDate }: 
         <p className="mb-4 text-xs text-label">
           Each point is a weekly point estimate for {shown.quarter}.
           {!showing && (
-            <> The shaded areas are the 68% and 95% error bands: the range that held that share of past misses at this stage of the quarter.</>
+            <> The shaded areas are the 68% and 95% error bands.</>
           )}
         </p>
       )}

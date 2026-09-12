@@ -28,7 +28,6 @@ interface Props {
 
 export default function V3MethodologyPanel({ performance, latest }: Props) {
   const [open, setOpen] = useState(false);
-  const n = performance?.n ?? performance?.errors.length ?? 0;
   // The correction itself rides on `latest_v3.json`; the window it averages
   // over is also on `performance_v3.json`, which is the fallback when this
   // week's payload predates the field. Numbers are stated only from the
@@ -93,28 +92,6 @@ export default function V3MethodologyPanel({ performance, latest }: Props) {
             panel is limited to freely available data, so it is not the same as
             the paper&rsquo;s.
           </p>
-          <p>
-            The two models miss in different quarters. In a backtest of every
-            Monday from 2023, their errors were close to uncorrelated and the
-            average missed the ABS figure by about a quarter less than either
-            model on its own, which is the standard case for combining
-            forecasts with equal weights. The error bands are the range of
-            the average&rsquo;s own past misses at any point in the quarter, so
-            68% and 95% of them fell inside the two bands.
-          </p>
-          {performance && n > 0 && (
-            <p>
-              Over the last {n} quarters the published nowcast has missed the
-              ABS figure by {performance.mae_pct.toFixed(2)}pp on average
-              {performance.bias_pct > 0.05 &&
-                `, and has run ${performance.bias_pct.toFixed(2)}pp high`}
-              {performance.bias_pct < -0.05 &&
-                `, and has run ${Math.abs(performance.bias_pct).toFixed(2)}pp low`}
-              . For quarters before the average went live, the shaded rows in
-              the track record average the two models&rsquo; figures as each
-              was published that week.
-            </p>
-          )}
         </div>
       )}
     </section>

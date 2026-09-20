@@ -1,6 +1,6 @@
 {
   "schema": "v3-indicators-1",
-  "generated_at": "2026-09-13T22:36:48+00:00",
+  "generated_at": "2026-09-20T22:39:15+00:00",
   "indicators": [
     {
       "id": "employment",
@@ -430,10 +430,6 @@
       "source": "v2 panel",
       "series": [
         {
-          "date": "2022-06",
-          "value": 158.6
-        },
-        {
           "date": "2022-07",
           "value": 157.1
         },
@@ -628,9 +624,13 @@
         {
           "date": "2026-07",
           "value": 117.1
+        },
+        {
+          "date": "2026-08",
+          "value": 122.3
         }
       ],
-      "last_release_date": "2026-08-07"
+      "last_release_date": "2026-09-07"
     },
     {
       "id": "aig_pmi",

@@ -4,8 +4,8 @@
   "basis": "abs_first_print",
   "target": "first_print",
   "method": "equal-weight average of v2 and v3",
-  "generated_at": "2026-09-13T22:37:05+00:00",
-  "as_of": "2026-09-14",
+  "generated_at": "2026-09-20T22:39:29+00:00",
+  "as_of": "2026-09-21",
   "target_quarter": "2026 Q3",
   "data_through": "2026-08",
   "prev_level": {
@@ -16,37 +16,37 @@
     {
       "quarter": "2026 Q3",
       "kind": "nowcast",
-      "qoq_growth_pct": 0.5086,
-      "model_qoq_growth_pct": 0.5086,
-      "annualised_growth_pct": 2.05,
-      "ci_68_low": 0.3647,
-      "ci_68_high": 0.6525,
-      "ci_95_low": 0.1573,
-      "ci_95_high": 0.8599,
+      "qoq_growth_pct": 0.4517,
+      "model_qoq_growth_pct": 0.4517,
+      "annualised_growth_pct": 1.8191,
+      "ci_68_low": 0.3078,
+      "ci_68_high": 0.5956,
+      "ci_95_low": 0.1004,
+      "ci_95_high": 0.803,
       "components": {
-        "v2": 0.57,
-        "v3": 0.4472
+        "v2": 0.45,
+        "v3": 0.4535
       },
       "months_with_data": 2,
       "release_date": "2026-12-02",
-      "gdp_chain_volume_millions": 703018
+      "gdp_chain_volume_millions": 702620
     },
     {
       "quarter": "2026 Q4",
       "kind": "forecast",
-      "qoq_growth_pct": 0.4327,
-      "annualised_growth_pct": 1.9979,
+      "qoq_growth_pct": 0.438,
+      "annualised_growth_pct": 2.0196,
       "months_with_data": 0,
       "v3_months_with_data": 0,
       "components": {
         "v2": null,
-        "v3": 0.4327
+        "v3": 0.438
       },
       "source": "v3 only; no v2 figure for this quarter yet",
-      "ci_68_low": -0.0048,
-      "ci_68_high": 0.8346,
-      "ci_95_low": -0.4248,
-      "ci_95_high": 1.2888,
+      "ci_68_low": -0.0022,
+      "ci_68_high": 0.8381,
+      "ci_95_low": -0.419,
+      "ci_95_high": 1.2964,
       "release_date": "2027-03-03"
     }
   ],
@@ -136,16 +136,32 @@
       "target_quarter": "2026 Q3",
       "kind": "nowcast",
       "horizon": "current",
-      "qoq_growth_pct": 0.5086,
-      "v2_qoq_growth_pct": 0.57,
-      "v2_run_date": "2026-09-07",
+      "qoq_growth_pct": 0.4486,
+      "v2_qoq_growth_pct": 0.45,
+      "v2_run_date": "2026-09-14",
       "v3_qoq_growth_pct": 0.4472,
       "months_with_data": 2,
       "data_through": "2026-08",
-      "ci_68_low": 0.3647,
-      "ci_68_high": 0.6525,
-      "ci_95_low": 0.1573,
-      "ci_95_high": 0.8599
+      "ci_68_low": 0.3047,
+      "ci_68_high": 0.5925,
+      "ci_95_low": 0.0973,
+      "ci_95_high": 0.7999
+    },
+    {
+      "run_date": "2026-09-21",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "current",
+      "qoq_growth_pct": 0.4517,
+      "v2_qoq_growth_pct": 0.45,
+      "v2_run_date": "2026-09-14",
+      "v3_qoq_growth_pct": 0.4535,
+      "months_with_data": 2,
+      "data_through": "2026-08",
+      "ci_68_low": 0.3078,
+      "ci_68_high": 0.5956,
+      "ci_95_low": 0.1004,
+      "ci_95_high": 0.803
     }
   ],
   "next_gdp_release_date": "2026-12-02",
@@ -177,13 +193,13 @@
   },
   "components": {
     "v2": {
-      "as_of": "2026-09-07",
-      "run_date": "2026-09-07",
+      "as_of": "2026-09-14",
+      "run_date": "2026-09-14",
       "schema": "v2-staged-2",
       "stale_days": 7
     },
     "v3": {
-      "as_of": "2026-09-14",
+      "as_of": "2026-09-21",
       "schema": "v3-preview-3"
     }
   },
@@ -219,6 +235,6 @@
   "estimate": {
     "estimated_at": "2026-09-11T03:43:25+00:00",
     "asof": "2026-09-11",
-    "age_days": 3
+    "age_days": 10
   }
 }

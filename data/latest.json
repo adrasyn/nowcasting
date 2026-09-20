@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-09-13T21:34:23Z",
+  "generated_at": "2026-09-20T21:30:23Z",
   "target_quarter": "2026 Q3",
   "data_through": "2026-09",
   "next_gdp_release_date": "2026-12-02",
   "nowcast": {
-    "gdp_chain_volume_millions": 704453,
-    "qoq_growth_pct": 0.71,
-    "yoy_growth_pct": 2.35,
-    "ci_68_low": 701093,
-    "ci_68_high": 704927,
-    "ci_95_low": 699253,
-    "ci_95_high": 706766
+    "gdp_chain_volume_millions": 704307,
+    "qoq_growth_pct": 0.69,
+    "yoy_growth_pct": 2.33,
+    "ci_68_low": 700947,
+    "ci_68_high": 704781,
+    "ci_95_low": 699107,
+    "ci_95_high": 706620
   },
   "latest_actual": {
     "quarter": "2026 Q2",
@@ -19,13 +19,13 @@
     "released_days_before_next": -91
   },
   "data_updates": {
-    "run_date": "2026-09-13",
-    "nowcast_delta_pp": -0.01,
+    "run_date": "2026-09-20",
+    "nowcast_delta_pp": -0.02,
     "series": [
       {
-        "id": "bus_conf",
-        "name": "Business Confidence",
-        "prev_period": "2026-07",
+        "id": "cons_conf",
+        "name": "Consumer Confidence",
+        "prev_period": "2026-06",
         "latest_period": "2026-08"
       }
     ]

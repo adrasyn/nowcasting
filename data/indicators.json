@@ -7118,11 +7118,21 @@
         {
           "date": "2026-06",
           "value": -19
+        },
+        {
+          "date": "2026-07",
+          "value": -16
+        },
+        {
+          "date": "2026-08",
+          "value": -11
         }
       ],
-      "last_release_date": "2026-07-05",
+      "last_release_date": "2026-09-05",
       "next_release_estimate": "2026-10-05",
-      "updated_this_run": false
+      "updated_this_run": true,
+      "prev_period": "2026-06",
+      "latest_period": "2026-08"
     },
     {
       "id": "building_approvals",
@@ -9686,9 +9696,7 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
-      "latest_period": "2026-08"
+      "updated_this_run": false
     },
     {
       "id": "goods_exp",

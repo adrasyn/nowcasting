@@ -4606,8 +4606,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -4828,8 +4828,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -5014,8 +5014,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -5200,8 +5200,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -5386,8 +5386,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -5572,8 +5572,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -5916,8 +5916,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-07",
+      "updated_this_run": false,
+      "prev_period": "2026-08",
       "latest_period": "2026-08"
     },
     {
@@ -6134,13 +6134,17 @@
         {
           "date": "2026-07",
           "value": 117.1
+        },
+        {
+          "date": "2026-08",
+          "value": 122.3
         }
       ],
-      "last_release_date": "2026-08-04",
-      "next_release_estimate": "2026-09-07",
-      "updated_this_run": false,
+      "last_release_date": "2026-09-07",
+      "next_release_estimate": "2026-10-06",
+      "updated_this_run": true,
       "prev_period": "2026-07",
-      "latest_period": "2026-07"
+      "latest_period": "2026-08"
     },
     {
       "id": "anz_sent",
@@ -6354,8 +6358,8 @@
           "value": 75.0
         }
       ],
-      "last_release_date": "2026-09-08",
-      "next_release_estimate": "2026-09-15",
+      "last_release_date": "2026-09-15",
+      "next_release_estimate": "2026-09-22",
       "updated_this_run": false,
       "prev_period": "2026-07",
       "latest_period": "2026-07"
@@ -6578,8 +6582,8 @@
       ],
       "last_release_date": "2026-09-08",
       "next_release_estimate": "2026-10-13",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
+      "updated_this_run": false,
+      "prev_period": "2026-09",
       "latest_period": "2026-09"
     }
   ]

@@ -3,10 +3,11 @@
 R pipeline that produces the **v1** JSON artifacts consumed by the website at
 [nowcast.wlsn.me](https://nowcast.wlsn.me).
 
-> **This is one of two models.** The second, `nowcasting_v2/`, implements RBA RDP 2024-04
-> (Monthly Activity Indicator → U-MIDAS) and emits `data/latest_v2.json` and friends. Both run in
-> the same weekly workflow and both appear on the site. See the root `README.md` for the
-> comparison. `ci_bands.R` and `seed/ci_params*.json` in this directory are **shared with v2**.
+> **This is the legacy v1 model.** `nowcasting_v2/` implements RBA RDP 2024-04
+> (Monthly Activity Indicator → U-MIDAS), while `nowcasting_v3/` ports the NY Fed's
+> Bayesian dynamic factor model. The homepage publishes a v2/v3 combination; v1 still
+> runs in the weekly v1/v2 workflow and supplies a fallback for `/v2`. See the
+> [root README](../README.md). `ci_bands.R` and `seed/ci_params*.json` here are shared with v2.
 
 ## Run locally
 
@@ -63,7 +64,7 @@ Raw ABS/FRED data is cached under `.cache/` (gitignored). Safe to delete — wil
   `nowcasting_v2/R/compute_ci_params_v2.R` instead, which calibrates per stage.
 - `seed/component_metadata.rds` — indicator/component definitions (checked into the repo)
 - `seed/ci_params.json` — v1 interval params; `seed/ci_params_v2*.json` — v2's (per stage)
-- `nab_business_confidence_raw.csv` — monthly NAB index values, updated by James's external Claude scheduled task
+- `nab_business_confidence_raw.csv` — monthly NAB index values, synced from v2's `data_raw/nab_conf.csv` by `03d_sync_nab_from_v2.R` in the weekly workflow
 - `deploy_nowcast.R`, `reconstruct_q1_2026.R`, `recover_reconstruct.R`, `update_trans_codes.R` —
   one-off / operational scripts, not part of the weekly run
 

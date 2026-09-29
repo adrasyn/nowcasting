@@ -58,7 +58,8 @@ def qoq_to_annualised(qoq):
 # The published artefact
 # --------------------------------------------------------------------------- #
 #
-# `data/latest_v3.json`, read by the site's `/v3` route. Two things about its
+# `data/latest_v3.json`, used by the homepage (and its `/v3` alias) as a
+# fallback when the combination payload is unavailable. Two things about its
 # shape are deliberate and worth stating before the fields.
 #
 # THE BANDS ARE PROBABILITY BANDS, IN THE NY FED'S OWN SENSE. Their paper names

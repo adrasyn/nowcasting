@@ -132,8 +132,8 @@ jobs:
 
       # v2 (RBA MAI + MIDAS). RBA/ABS are gov sources (no WAF) and the emit is the
       # v2 model itself, so both belong here in the R cron, NOT on the laptop. The
-      # WAF-blocked surveys (NAB/ANZ/Westpac) are refreshed separately by the local
-      # Cowork task; this step just reads whatever data_raw CSVs are present.
+      # Surveys (NAB/ANZ/Westpac, plus AiG for v3) are refreshed separately by
+      # the Codex cloud task; this step reads the committed data_raw CSVs.
       # continue-on-error so a transient v2 issue can't block the v1 commit/deploy
       # (if v2 fails the prior data/latest_v2.json is still served — stale, not
       # broken). The fetchers now exit non-zero on any failed series (fail-loud),
@@ -170,7 +170,7 @@ jobs:
           # quarters need the v2 backtest re-run to gain a backcast (separate job).
           python gen_performance_v2.py
 
-      # The v2 step is continue-on-error so it can't stale the live v1 site; surface
+      # The v2 step is continue-on-error so it can't block the v1 payload; surface
       # its failure loudly here instead (the job-level "Alert on failure" never
       # fires for a continue-on-error step).
       - name: Alert on v2 failure

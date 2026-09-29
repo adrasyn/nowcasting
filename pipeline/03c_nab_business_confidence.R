@@ -21,8 +21,8 @@ library(glue)
 #' @details NAB releases data on the 2nd Tuesday of each month for the PREVIOUS month.
 #'          Function will error if data is stale and skip_freshness_check = FALSE.
 # SIX DAYS OF GRACE, NOT ZERO. NAB publishes on the second Tuesday, and the
-# scheduled laptop routine that scrapes it (docs/cowork-weekly-refresh.md) runs
-# on Sunday. With no grace, any run between the Tuesday and that Sunday -- a
+# separate scheduled survey routine (docs/weekly-survey-refresh.md) runs
+# before the weekly model job. With no grace, any run between the Tuesday and that refresh -- a
 # manual dispatch, or a quarter-month Tuesday-evening run that lands on the
 # second Tuesday -- demanded data nobody had fetched yet and halted the whole
 # job, v2 emit included (2026-09-12). Tuesday plus six is the following Monday,

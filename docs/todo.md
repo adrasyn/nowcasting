@@ -1,8 +1,8 @@
-# TODO / backlog
+# Historical TODO / backlog
 
-Pending work the user has flagged for later.
+Point-in-time investigation notes from April–August 2026, retained for context. This is **not a current priority list**: several proposals below were later implemented or superseded. Check the current code, [root README](../README.md), and dated measurements before acting on an item.
 
-## URGENT — first thing next session: make each series stationary
+## April 2026 stationarity investigation (historical)
 
 **Context.** We discovered two coupled bugs on 2026-04-17:
 1. `generate_nowcast` was pulling `yfcst[, "in"]` (retrospective Kalman-smoothed fit for the latest OBSERVED quarter) and labelling it as the nowcast for the next quarter. Per the `nowcasting` package's R Journal paper (RJ-2019-020), the correct column is `yfcst[, "out"]` — the proper mixed-frequency nowcast. **Fix landed** in `pipeline/06_generate_nowcast.R`: now matches target_quarter against the ts time index and pulls `out` (falling back to `in` only if the target is already observed — useful for historical backtests).
@@ -27,8 +27,6 @@ Pending work the user has flagged for later.
 **Where we stopped.** Was about to inspect `Bpanel()` source and documentation to confirm trans code semantics. Did not yet run any ADF tests or trial transformations.
 
 ---
-
-## Post-hoc Q1 2026 weekly nowcast reconstruction
 
 ## Post-hoc Q1 2026 weekly nowcast reconstruction
 

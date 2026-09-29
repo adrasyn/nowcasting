@@ -4,8 +4,8 @@
   NOT the scheduled routine. The GitHub Actions weekly cron is now canonical for
   all v2 R work (fetch RBA/ABS, fetch GDP, emit, regenerate the indicator grid).
   Use this only for an ad-hoc local refresh (e.g. the cron is down, or you want a
-  same-day refresh after a data drop). The scheduled local task is surveys-only
-  and R-free — see docs/cowork-weekly-refresh.md.
+  same-day refresh after a data drop). The separate Codex cloud survey task is
+  R-free — see docs/weekly-survey-refresh.md.
 
   Runs the same R + Python steps the cron runs, in the same order:
     1. fetch_rba_panel.R   -> credit, yields, spreads, BBSW, credit_card  (RBA)

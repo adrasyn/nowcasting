@@ -2,7 +2,7 @@
 
 A Python port of the New York Fed Staff Nowcast 2.0 (Almuzara, Baker, O'Keeffe &
 Sbordone, 2023): a Bayesian dynamic factor model with stochastic volatility and
-outlier states, to be refitted to Australian data.
+outlier states, fitted to Australian data.
 
 The port is a translation, not a reimplementation. Where the published MATLAB
 does something surprising — and it does, in several places — the Python does the
@@ -10,13 +10,14 @@ same surprising thing, and says so in a comment. Deviating would break the one
 thing that makes the port checkable: that every function can be compared against
 the original, running, on the same inputs.
 
-**Status: Plans A and B complete.** Both published US headline nowcasts reproduce end
-to end, and every per-series release impact of the week the drop is configured
-for. The other week's per-series table cannot be reproduced from this drop, for
-a reason that is measured rather than assumed. See
-[The end-to-end gate](#the-end-to-end-gate). The engine now also estimates on
-an Australian panel — see [The Australian panel](#the-australian-panel), which
-has no oracle and says so.
+**Current role.** v3 runs weekly on the Australian panel and contributes to the
+v2/v3 combination published on the [homepage](../README.md). A separate
+quarterly workflow re-estimates its saved state. The US reproduction gate and
+Australian panel validation are documented below; the long-form sections also
+record the earlier development stages. Both published US headline nowcasts
+reproduce end to end, as do the per-series release impacts for the week the
+reference drop supports. See [The end-to-end gate](#the-end-to-end-gate) for
+the measured limit of that comparison.
 
 ## Layout
 
@@ -112,8 +113,8 @@ at the command line, so the next new warning cannot pass CI in silence).
 
 ```bash
 cd nowcasting_v3
-.venv/bin/pytest -m "not slow"      # ~25 s, 143 tests: the iteration loop
-.venv/bin/pytest                    # ~30 min, 157 tests, incl. the end-to-end gate
+.venv/bin/pytest -m "not slow"      # iteration loop
+.venv/bin/pytest                    # full suite, including the end-to-end gate
 ```
 
 A stale `nyfed/__pycache__` has faked a red suite twice in this project. Clear it
@@ -469,7 +470,7 @@ missing file ever turns up the test fails and says to add the check.
 
 ## The Australian panel
 
-**Status: Plan B complete.** `nyfed/au/` builds an Australian panel and the
+`nyfed/au/` builds an Australian panel and the
 engine estimates on it. `nyfed/` itself is untouched — the engine reads a spec
 CSV and a standardised `(n, T)` matrix and does not know which country it is
 looking at.
@@ -541,21 +542,14 @@ geometric mean of the overlap so that `pch` does not see a step change.
 ### Three series come from v2, and that is a real dependency
 
 Job ads, the AiG PMI and NAB business conditions originate in media releases and
-PDFs. v3 does not run v2's R code; it reads the CSVs v2's **weekly laptop
-routine** commits to `nowcasting_v2/data_raw/`. If that routine stops, those
-files go stale, and `nyfed/au/freshness.py` is what turns silent staleness into a
-refusal. It has already happened: `aig_pmi.csv` was last committed on 2026-06-11
-with its last observation at 2026-05-01, and from 2026-08-27 — 117 days later,
-its widened budget — **a live build correctly refuses on that series and nothing
-else**.
-
-Ai Group has *not* stopped publishing — sourcing the publication lag turned up
-releases for May, June and July 2026, the last still reporting a separate
-manufacturing headline. What broke is v2's scraper, when the publication changed
-shape. So the fix is a working fetcher, and there is a trap waiting in it: the
-index is now a **net balance centred on zero** (−19.6 in July 2026), not the
-50-centred diffusion index the committed history carries. Repairing the scraper
-without handling that puts a level break into the Soft block.
+PDFs. v3 does not run v2's R code; it reads the CSVs maintained by the
+[separate survey refresh](../docs/weekly-survey-refresh.md) in
+`nowcasting_v2/data_raw/`. If a source stops updating, `nyfed/au/freshness.py`
+turns silent staleness into a refusal. The AiG file caused such a refusal in
+August 2026 and was subsequently backfilled. Its values are first-published,
+zero-centred net balances; later revisions to prior months must not overwrite
+the committed real-time history. The detailed investigation in `sources.py`
+supersedes the original scale-break diagnosis recorded here.
 
 ### Freshness budgets are derived, not typed
 
@@ -919,7 +913,7 @@ the plan is
 
 ## Measured timings
 
-Measured on this project's development machine: Apple Silicon macOS (arm64),
+Measured during development on this project's machine: Apple Silicon macOS (arm64),
 Homebrew CPython 3.13.13, numpy 2.x, single process. Reproduce with:
 
 ```bash
@@ -944,7 +938,7 @@ Every stored parameter is finite. Memory stayed flat; the only large allocation
 is the 390 x 10,000 output array (31 MB), and `need_latents=False` keeps the
 468-period latent arrays out of it.
 
-### What this means for Plan E
+### Capacity assessment recorded for Plan E
 
 * **The quarterly estimation job fits an Actions runner.** 1.5 h here. GitHub's
   hosted `ubuntu-latest` is materially slower than this machine for

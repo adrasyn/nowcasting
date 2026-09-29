@@ -1,4 +1,6 @@
-# Weekly v2 data refresh — local survey routine + the R cron
+# Archived local survey routine (August 2026)
+
+> **Historical record, not the current setup guide.** This page documents the former local Claude Code routine and includes a copied prompt that drifted from the later Codex cloud task. The current repository guidance is [weekly-survey-refresh.md](weekly-survey-refresh.md). Check the task in Codex for its live prompt and schedule. In particular, the Ai Group final-summary instruction below about reconciling a point change is obsolete: first vintages must not be reconciled to revised prior-month prose.
 
 Post-cutover everything lives on **`main`**. Two mechanisms keep the inputs fresh:
 

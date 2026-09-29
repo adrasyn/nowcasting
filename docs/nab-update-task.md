@@ -95,8 +95,8 @@ a documented gap is success, a guessed number is failure.
 
 ## Related
 
-- `docs/cowork-weekly-refresh.md` — the weekly routine that is now the single NAB fetcher
-- **Known pre-existing bug, not fixed here:** the v1 CSV has duplicate rows for
-  2008-10, 2009-02 and 2010-02 with differing values, and the loader does not
-  dedupe, so those months are double-weighted. Fixing it means re-running the v1
-  backtest.
+- [Current survey refresh guide](weekly-survey-refresh.md) — the separate routine that maintains v2's NAB input
+
+The duplicate v1 rows described in the original issue were removed by the mirror
+described above; the old warning is retained in git history rather than as a
+current defect claim.

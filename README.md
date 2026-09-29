@@ -1,208 +1,56 @@
-# nowcasting
+# Australian GDP nowcast
 
-Australian GDP nowcast website at **[nowcast.wlsn.me](https://nowcast.wlsn.me)**.
+[nowcast.wlsn.me](https://nowcast.wlsn.me) publishes a weekly research nowcast of Australian quarterly GDP growth, its input indicators, and a backtested track record. It is a personal research project, **not an official forecast**.
 
-A weekly-updated single-page dashboard showing a nowcast of Australian GDP, the underlying
-high-frequency indicators, and the model's track record.
+## What the site publishes
 
-## Two models
+The homepage headline is an equal-weight combination of the **v2** and **v3** current-quarter nowcasts. The combination also carries a next-quarter horizon. Its input panel is the union of both models' indicators, and its uncertainty bands are calibrated from the combination's own backtest errors. The site reads committed JSON under `data/`; it does not run a model in the browser.
 
-The repo runs **two independent nowcasting models** against the same target. Both are emitted
-weekly and both appear on the site.
+| Model | Implementation | Role | Main output |
+| --- | --- | --- | --- |
+| **v1** | `pipeline/` — R dynamic factor model | Legacy weekly pipeline and fallback for `/v2` when v2 data is absent | `data/latest.json` |
+| **v2** | `nowcasting_v2/` — RBA Monthly Activity Indicator and U-MIDAS | Weekly component; standalone dashboard at [`/v2`](https://nowcast.wlsn.me/v2) | `data/latest_v2.json` |
+| **v3** | `nowcasting_v3/` — Python port of the NY Fed Bayesian dynamic factor model, fitted to Australian data | Weekly component and homepage fallback if combination data is absent | `data/latest_v3.json` |
+| **Combination** | `nowcasting_v3/tools/emit_combination.py` | Homepage headline and track record | `data/latest_combo.json` |
 
-| | **v1** | **v2** |
-|---|---|---|
-| Location | `pipeline/` | `nowcasting_v2/` |
-| Method | Component-based Dynamic Factor Model (3 factors, VAR(1), EM via Kalman filter) | RBA Monthly Activity Indicator → U-MIDAS |
-| Lineage | NY Fed Staff Nowcast; Treasury WP *Nowcasting Australia's GDP* | **RBA RDP 2024-04**, Hartigan & Rosewall |
-| Panel | 12 monthly indicators | ~31 candidates, cut to ~10 by targeted-predictor selection (Wald test vs GDP, α = 0.10 as per the paper) |
-| Outputs | `data/latest.json`, `nowcasts.json`, `indicators.json`, `performance.json` | `data/latest_v2.json`, `vintages_v2.json`, `indicators_v2.json`, `performance_v2.json`, `backcasts.json` |
+`/v3` is retained as an alias of the homepage, so it displays the combination when that payload is available. The v2 headline and its stress specification use different predictor selections and regressions; see [the v2 code and panel registry](nowcasting_v2/). The v2 estimation methods in `nowcasting_v2/R/methods/` and the v3 MATLAB reference in `nowcasting_v3/nyfed_matlab/` are vendored reference code and must remain unchanged.
 
-**v2's estimation code is vendored verbatim from the RBA's own replication files.** Everything in
-`nowcasting_v2/R/methods/` is byte-identical to `nowcasting_v2/rba_paper/content/Code/methods/` —
-do not edit it. Our adaptations live in the surrounding glue (`build_panel`, `transform_panel`,
-`build_mai`, `nowcast_midas`, `emit_v2_json`).
+The comparison that motivated the combination, including its sample and limitations, is in the [September 2026 measurement](docs/measurements/2026-09-12-v2-v3-weekly-combination.md). For current published figures, inspect the [combination payload](data/latest_combo.json) and [performance payload](data/performance_combo.json); historical accuracy figures in research notes are point-in-time measurements.
 
-v2 publishes two specifications: a **headline** (`v2_qa_a05`, stricter selection + quarter-average
-regression) and a **stress/volatility** model (`v2_umidas_a20`, looser selection + unrestricted
-regression). They use *different* selections of series and *different* regressions — not the same
-panel with different weights.
+## Refresh and publication
 
-## How it works
+| Job | Schedule (UTC) | Responsibility |
+| --- | --- | --- |
+| [v1 + v2 weekly workflow](.github/workflows/nowcast-weekly.yml) | Sunday 19:00 | Fetch accessible ABS/RBA inputs, run v1 and v2, and commit their JSON. It also has a gated pre-GDP-release run. |
+| [v3 weekly workflow](.github/workflows/nowcast-v3-weekly.yml) | Sunday 20:30 | Run v3, combine it with v2, validate payloads, commit JSON, and trigger deployment. |
+| [v3 estimation workflow](.github/workflows/nowcast-v3-estimate.yml) | Quarterly | Re-estimate the saved v3 model state. |
+| [Pages deployment](.github/workflows/deploy.yml) | On relevant pushes or dispatch | Test and build the Next.js static site, then deploy GitHub Pages. |
 
-```
-Sundays 19:00 UTC  →  GH Actions runs pipeline/run_complete_nowcast.R   (v1)
-(Mon 05:00 AEST /  →  then nowcasting_v2 fetch + emit + indicators      (v2)
- 06:00 AEDT)       →  Emits JSON to data/
-                   →  Commits to main
-                   →  Triggers deploy workflow
-                   →  Next.js static build published to GitHub Pages
-```
+The Sunday jobs run on Monday morning in Sydney. The survey inputs that cannot reliably be fetched in CI have a separate **Codex cloud scheduled task**; its schedule and run history live in Codex, not in this repository. The task updates the survey CSVs on `main`, and the next model run reads those committed values. See the [current survey refresh guide](docs/weekly-survey-refresh.md) for the series, validation rules, and timing dependency. A week with no new monthly release needs no survey commit.
 
-The crons fire on Sunday in UTC and Monday morning in Sydney, and that is the point: the whole
-sequence (v2, then v3, then the combination, then the deploy) is finished before 9 am Sydney, year
-round. Both jobs run with `TZ=Australia/Sydney`, so R's `Sys.Date()` and the Python tools' as-of
-date are the Monday the vintages are keyed on, not the Sunday the cron fired in UTC.
+Both v2 and v3 target the ABS **first release** of quarterly GDP rather than a subsequently revised estimate. The v3 weekly run can refuse to publish when its data or fitted state fails checks; the site surfaces that refusal. The combination emitter also records when it carries a recent v2 component forward. See the [v3 implementation notes](nowcasting_v3/README.md) and [first-print measurement](docs/measurements/2026-09-09-first-print-target-ab.md).
 
-A second cron runs in Mar/Jun/Sep/Dec, gated to fire only the day before an ABS GDP release. The v2
-step is `continue-on-error` so a v2 failure cannot stale the v1 headline — it opens a `v2-failure`
-issue instead.
-
-The R pipelines and the website communicate only via JSON files under `data/`. Site and pipelines
-can be developed, deployed, and moved independently.
-
-## The published nowcast
-
-The homepage figure is the equal-weight average of v2 and v3, the repo's second model
-(`nowcasting_v3/`, a Python port of the NY Fed's Bayesian dynamic factor model). The average beats
-either model alone: over 181 Monday vintages scored against the ABS's initial estimates, the
-combination's MAE is 0.13pp against 0.19 for v2 and 0.17 for v3, because the two models' weekly
-errors are close to uncorrelated. At the next-quarter horizon the same holds over 51 Mondays
-(0.16pp against 0.24 and 0.19). See `docs/measurements/2026-09-12-v2-v3-weekly-combination.md` for
-the full backtest. v2 now nowcasts the next quarter as well as the current one, the same two
-horizons v3 already published: RDP 2024-04's U-MIDAS model, run on the next quarter's partial MAI
-months and lagging into the completed current quarter, so the evolution chart carries both
-horizons for both models.
-
-The weekly flow runs the two models separately and combines their outputs at the end. The v2 job
-runs at 19:00 UTC Sunday (05:00 AEST Monday, 06:00 AEDT) on a Windows runner and writes
-`data/latest_v2.json`. The v3 job runs at 20:30 UTC (06:30 AEST, 07:30 AEDT) and takes about 40
-minutes, so the combination is live by roughly 07:15 AEST / 08:15 AEDT. It produces the nowcast and
-its track record, then runs `nowcasting_v3/tools/emit_combination.py`,
-which pairs v3's fresh run with v2's latest run for the same quarter (at most a week old) and writes
-`data/latest_combo.json`, `data/nowcast_history_combo.json` and `data/performance_combo.json` in
-v3's schemas. The same emitter writes `data/indicators_combo.json`, the homepage's indicator panel:
-the union of both models' input panels — v3's 14 series in their own order, then v2's 31 with their
-groups mapped onto v3's names, the six series both models read merged into one entry each (39 in
-all) — because the figure above the panel is the average of the two. The payload checker runs
-against the combination payload the same way it does against v3's own. If v3 refuses to publish, the combination shows v3's refusal rather than half an average;
-if v2's run is missing that week, last week's v2 run is carried for up to 7 days and the payload
-records how old it is (`components.v2.stale_days`).
-
-The published bands are empirical quantiles of the combination's own backtest errors, calculated
-separately for the current and next-quarter horizons and stored in `pipeline/seed/ci_params_combo.json`.
-They are refreshed by `nowcasting_v3/tools/combination_backtest.py`, not read off either model's own
-interval.
-
-## Local development
+## Work locally
 
 ```bash
-# Site (Next.js 15, Tailwind v4, Recharts)
 npm install
-npm run dev            # localhost:3000, hot-reload
+npm run dev            # Next.js dashboard at localhost:3000
+npm test               # Vitest unit tests
+npm run lint
 npm run build          # static export to out/
-npm run test           # unit tests (vitest)
-npm run test:e2e       # Playwright smoke test
-
-# v1 pipeline (R, pinned via renv)
-cd pipeline
-Rscript -e 'renv::restore()'   # one-off: install pinned packages
-Rscript run_complete_nowcast.R # fetches data, estimates DFM, emits JSON
-
-# v2 (run from nowcasting_v2/)
-Rscript R/fetch/fetch_rba_panel.R
-Rscript R/fetch/fetch_abs_panel.R
-Rscript R/fetch_rt_gdp.R
-Rscript R/emit_v2_json.R
-python gen_indicators_v2.py
-python gen_performance_v2.py
+npm run test:e2e       # Playwright checks (requires browser installation)
 ```
 
-> **macOS note.** `R/_setup.R` contains only Windows library paths, so on macOS it silently no-ops
-> and falls back to the system library. CI runs `windows-latest`, so this is not a production
-> fault — but locally you must install the packages yourself. The renv lockfile pins R 4.5.1;
-> `renv::restore()` fails against a newer local R, so install current CRAN binaries instead and
-> never snapshot.
+The R and Python model environments are separate from the site. The v1 entry point is `pipeline/run_complete_nowcast.R`; the v2 weekly entry point is `nowcasting_v2/R/emit_v2_json.R` after its ABS/RBA fetchers; the v3 weekly runner is `nowcasting_v3/tools/run_au_nowcast.py`. Use the workflow files above for production ordering and the model READMEs for environment and test details. Running a model locally can rewrite committed data artifacts, so review the diff before keeping generated JSON.
 
-## Repository layout
+## Repository map
 
-```
-nowcasting/
-├── src/                          # Next.js app (pages, components, data loader)
-├── data/                         # JSON artifacts (committed weekly by CI)
-│   ├── latest.json  nowcasts.json  indicators.json  performance.json   # v1
-│   ├── latest_v2.json  vintages_v2.json  indicators_v2.json            # v2
-│   ├── performance_v2.json  backcasts.json                             # v2 track record
-│   └── gdp.json                                                        # ABS actuals
-├── pipeline/                     # v1 R pipeline + shared CI-band helpers
-│   ├── run_complete_nowcast.R    # entry point (n_factors = 3, VAR(1))
-│   ├── 03*.R 04*.R 05*.R 06*.R 08*.R   # ingest → calendar → estimate → nowcast → vintages
-│   ├── ci_bands.R                # interval construction, shared with v2
-│   ├── seed/ci_params*.json      # calibrated interval parameters
-│   └── renv.lock                 # pinned R packages (R 4.5.1)
-├── nowcasting_v2/                # v2 (RBA MAI + U-MIDAS)
-│   ├── R/methods/                # VENDORED from the RBA — byte-identical, do not edit
-│   ├── R/build_panel.R  transform_panel.R  build_mai.R  nowcast_midas.R
-│   ├── R/emit_v2_json.R  backtest_v2.R  recalib_ci_v2.R  compute_ci_params_v2.R
-│   ├── R/fetch/                  # ABS/RBA fetchers + NAB/ANZ/Westpac scrapers
-│   ├── rba_paper/                # RDP 2024-04 PDF + the RBA's replication bundle
-│   ├── seed/panel_info.csv       # candidate panel + transformation codes
-│   └── data_raw/                 # per-series CSVs (source of truth for v2)
-├── docs/
-│   ├── reviews/                  # code / fidelity review reports
-│   ├── todo.md                   # backlog
-│   └── superpowers/{specs,plans} # historical design docs (point-in-time)
-└── .github/workflows/            # nowcast-weekly.yml, deploy.yml
-```
+- `src/` — Next.js pages, components, and JSON loaders.
+- `data/` — committed site payloads and track records for v1, v2, v3, and the combination.
+- `pipeline/` — v1 R pipeline and interval helpers; see its [README](pipeline/README.md).
+- `nowcasting_v2/` — RBA-based model, raw input CSVs, fetchers, and NAB parser.
+- `nowcasting_v3/` — Python model, Australian panel, combination emitter, tests, and saved model state.
+- `.github/workflows/` — refresh, estimation, and deployment jobs.
+- `docs/measurements/` and `docs/reviews/` — dated research and review evidence. `docs/superpowers/` contains point-in-time design plans, not current operating instructions.
 
-## Data sources
-
-**v1 (12 indicators)**
-
-| Group | Count | Source |
-|---|---|---|
-| Labour | 4 | ABS Labour Force Survey (employment, unemployment rate, participation, hours worked) |
-| Consumer | 2 | ABS Household Spending + OECD Consumer Confidence (via FRED) |
-| Business | 2 | ABS Building Approvals + NAB Business Confidence |
-| External | 4 | ABS International Trade (goods/services × exports/imports) |
-
-**v2 (~31 candidates)** — ABS labour / household spending / trade / approvals, RBA credit and
-yield-spread series, and the NAB, ANZ-Roy Morgan and Westpac-Melbourne Institute surveys. The
-authoritative list, with each series' transformation code, is `nowcasting_v2/seed/panel_info.csv`.
-
-**Target** for both: ABS National Accounts (5206.0) quarterly chain volume GDP.
-
-**v2 targets the ABS's *initial* estimate of each quarter, not the latest vintage** (since
-2026-09). RDP 2024-04 estimates and evaluates on the figure the ABS published on the day, and for
-v2 the target turned out to be most of the error: retrained on the initial estimates, bias against
-the print falls +0.31 → +0.10pp and MAE 0.33 → 0.17pp, with correlation to the print rising 0.12 →
-0.43 — see `docs/measurements/2026-09-11-v2-first-print-ab.md`. `R/fetch_rt_gdp.R` therefore builds
-`data_raw/rt_dgdp_qtr.csv` from the first-release series the v3 pipeline maintains
-(`nowcasting_v3/data/gdp_first_release.csv`) and appends any quarter newer than that file from the
-live ABS fetch. That append matters on one day a quarter: the v2 step runs at 19:00 UTC Sunday and
-the v3 job that writes the new print runs at 20:30, and for a just-printed quarter the latest vintage is
-the initial estimate.
-
-Survey data (NAB, ANZ, Westpac) sits behind WAF-protected sites and cannot be fetched from CI. It
-is refreshed by a separate local task — see `docs/cowork-weekly-refresh.md`.
-
-## Accuracy
-
-**Do not quote accuracy figures from this README** — they go stale. The live numbers are in
-`data/performance.json` (v1) and `data/performance_v2.json` (v2).
-
-Note that `performance_v2.json` is derived from **backtests**, not live nowcasts: the model was
-re-run over past quarters using only the data published at the time. `data/backcasts.json` carries
-the disclaimer, and the site labels the section accordingly.
-
-Interval parameters are calibrated from pseudo-out-of-sample backtest errors, per within-quarter
-information stage, on post-2020 quarters. Regenerate with `nowcasting_v2/R/recalib_ci_v2.R`
-followed by `R/compute_ci_params_v2.R`.
-
-## Phase-1 non-goals
-
-This project deliberately does NOT include:
-- A backend, database, or authentication
-- Real-time data updates (weekly cron is enough)
-- State-level nowcasts
-- Interactive model drill-downs beyond the indicator detail cards
-- Mobile-first design optimisation
-
-If any of these are needed, they're Phase 2.
-
-(Comparison against RBA forecasts *was* originally a non-goal but now ships — see the "Accuracy gap
-vs RBA" tile and `pipeline/04a_fetch_somp.R`.)
-
-## License
-
-Personal research project. **Not an official forecast.**
+The v2 candidate series and transformations are listed in [`nowcasting_v2/seed/panel_info.csv`](nowcasting_v2/seed/panel_info.csv); v3's 14-series panel is defined by [`nowcasting_v3/model_spec_AU.csv`](nowcasting_v3/model_spec_AU.csv). Both use ABS National Accounts (5206.0) quarterly chain-volume GDP as the target.

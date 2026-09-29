@@ -125,7 +125,7 @@ weekly refresh routine on the grounds that v2 does not use it -- that is true an
 not the point.
 
 The fix is therefore a step in v2's weekly survey routine
-(``docs/cowork-weekly-refresh.md``, step D), not code here, and the CSV was
+(``docs/weekly-survey-refresh.md``), not code here, and the CSV was
 backfilled to 2026-07 on 2026-08-27 (Jun -16.8, Jul -19.6).
 
 The trap for whoever maintains it is REVISIONS, not a scale break and not a

@@ -5,8 +5,8 @@
 # ---------------
 # There were two NAB inputs, written by two different automations:
 #
-#   v1: pipeline/nab_business_confidence_raw.csv  <- a monthly Claude Desktop task
-#                                                    that scraped investing.com
+#   v1: pipeline/nab_business_confidence_raw.csv  <- formerly a separate task
+#                                                    scraping investing.com
 #   v2: nowcasting_v2/data_raw/nab_conf.csv       <- the weekly cloud routine, which
 #                                                    reads NAB's own survey PDF
 #

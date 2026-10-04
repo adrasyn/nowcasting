@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-09-27T22:11:02Z",
+  "generated_at": "2026-10-04T22:33:23Z",
   "target_quarter": "2026 Q3",
-  "data_through": "2026-09",
+  "data_through": "2026-10",
   "next_gdp_release_date": "2026-12-02",
   "nowcast": {
-    "gdp_chain_volume_millions": 704001,
-    "qoq_growth_pct": 0.65,
-    "yoy_growth_pct": 2.29,
-    "ci_68_low": 700642,
-    "ci_68_high": 704475,
-    "ci_95_low": 698802,
-    "ci_95_high": 706314
+    "gdp_chain_volume_millions": 703753,
+    "qoq_growth_pct": 0.61,
+    "yoy_growth_pct": 2.25,
+    "ci_68_low": 700393,
+    "ci_68_high": 704227,
+    "ci_95_low": 698553,
+    "ci_95_high": 706066
   },
   "latest_actual": {
     "quarter": "2026 Q2",
@@ -19,30 +19,30 @@
     "released_days_before_next": -91
   },
   "data_updates": {
-    "run_date": "2026-09-27",
+    "run_date": "2026-10-04",
     "nowcast_delta_pp": -0.04,
     "series": [
       {
-        "id": "employment",
-        "name": "Employment",
+        "id": "household_spending",
+        "name": "Household Spending",
         "prev_period": "2026-07",
         "latest_period": "2026-08"
       },
       {
-        "id": "unemp_rate",
-        "name": "Unemployment Rate",
+        "id": "building_approvals",
+        "name": "Building Approvals",
         "prev_period": "2026-07",
         "latest_period": "2026-08"
       },
       {
-        "id": "part_rate",
-        "name": "Participation Rate",
+        "id": "goods_exp",
+        "name": "Goods Exports",
         "prev_period": "2026-07",
         "latest_period": "2026-08"
       },
       {
-        "id": "hours_worked",
-        "name": "Hours Worked",
+        "id": "goods_imp",
+        "name": "Goods Imports",
         "prev_period": "2026-07",
         "latest_period": "2026-08"
       }

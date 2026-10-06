@@ -96,12 +96,21 @@ CI_QA     <- "../pipeline/seed/ci_params_v2.json"
 # Monday cadence: every Monday from the first Monday after the prior quarter's GDP
 # became available (so the target is the current quarter) up to today. Programmatic
 # so the weekly cron advances on its own (Fable review BLOCKER 2).
-.mondays_to_date <- function(gdp_full) {
+.mondays_to_date <- function(gdp_full, now = Sys.time(), as_of = "") {
+  # setup-r exports TZ=UTC through GITHUB_ENV, overriding the workflow's TZ.
+  # Name Sydney here, just as v3's clock does; never inherit the runner's zone.
+  today <- as.Date(format(now, tz = "Australia/Sydney", format = "%Y-%m-%d"))
+  if (nzchar(as_of)) {
+    cutoff <- as.Date(as_of, format = "%Y-%m-%d")
+    if (is.na(cutoff) || format(cutoff, "%Y-%m-%d") != as_of ||
+        format(cutoff, "%u") != "1" || cutoff > today)
+      stop("NOWCAST_AS_OF must be a past or current Monday in YYYY-MM-DD format")
+    today <- cutoff
+  }
   last_q_end    <- lubridate::ceiling_date(max(as.Date(gdp_full$date)), "quarter") - 1
   prior_release <- as.Date(last_q_end) + GDP_LAG
   d <- prior_release
   while (as.integer(format(d, "%u")) != 1L) d <- d + 1   # next Monday on/after
-  today <- Sys.Date()
   if (d > today) return(format(d, "%Y-%m-%d"))
   format(seq(d, today, by = "week"), "%Y-%m-%d")
 }
@@ -206,7 +215,8 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
   cat(sprintf("[1] panel OK: %d series; wmi_sent present, extended NAB (n=%d)\n", ncol(wide_full) - 1L, nab_n))
   gdp_full <- read.csv("data_raw/rt_dgdp_qtr.csv")
   gdp_full$date <- as.Date(gdp_full$date)   # .truncate_gdp needs Date, not character
-  if (is.null(mondays)) mondays <- .mondays_to_date(gdp_full)
+  if (is.null(mondays))
+    mondays <- .mondays_to_date(gdp_full, as_of = Sys.getenv("NOWCAST_AS_OF", ""))
   cat(sprintf("[0] Monday cadence: %s\n", paste(mondays, collapse = ", ")))
 
   jlatest <- tryCatch(jsonlite::fromJSON(file.path(repo_root, "data", "latest.json")), error = function(e) NULL)

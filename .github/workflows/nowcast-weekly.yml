@@ -17,6 +17,15 @@ on:
     # when tomorrow is the first Wednesday of the month (i.e. the ABS GDP release day).
     - cron: "0 21 * 3,6,9,12 2"
   workflow_dispatch:
+    inputs:
+      replay_as_of:
+        description: "Correct a Monday vintage (YYYY-MM-DD); requires replay_data_ref"
+        required: false
+        type: string
+      replay_data_ref:
+        description: "Full commit SHA containing that Monday's recorded input CSVs"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -63,13 +72,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     env:
-      # THE JOB'S "TODAY" IS SYDNEY'S. The cron fires 19:00 UTC Sunday, which is
-      # Monday morning in Sydney, and `emit_v2_json.R` builds its vintage list
-      # from the latest Monday at or before Sys.Date(). With a UTC clock that
-      # date is Sunday and the run re-emits LAST week's vintage. R honours TZ on
-      # Windows as well as on Linux (Sys.Date() reads the local zone), so this
-      # one variable is enough; `date -u` calls in the run blocks below are
-      # explicitly UTC and are unaffected.
+      # The run is Monday in Sydney. setup-r overwrites TZ, so restore it after
+      # setup below; v2 also computes its date explicitly in Australia/Sydney.
       TZ: Australia/Sydney
     defaults:
       run:
@@ -78,6 +82,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Validate replay request
+        env:
+          REPLAY_AS_OF: ${{ inputs.replay_as_of }}
+          REPLAY_DATA_REF: ${{ inputs.replay_data_ref }}
+        run: |
+          python - <<'PY'
+          import datetime, os, re
+          day, ref = os.environ['REPLAY_AS_OF'], os.environ['REPLAY_DATA_REF']
+          if day or ref:
+              cutoff = datetime.date.fromisoformat(day)
+              assert cutoff.isoformat() == day and cutoff.weekday() == 0, 'Replay date must be a Monday'
+              assert re.fullmatch(r'[0-9a-f]{40}', ref), 'Replay requires a full input commit SHA'
+              print(f'Replaying {day} from recorded inputs at {ref}; no live data fetch')
+          PY
 
       # setup-r downloads R + Ghostscript from external mirrors; a transient 504
       # there killed the 2026-06-08 run and staled the site for a week (issue #12).
@@ -97,6 +116,12 @@ jobs:
         with:
           r-version: "4.5.1"
           use-public-rspm: true
+
+      # setup-r writes TZ=UTC into GITHUB_ENV, which beats job.env. Restore it
+      # AFTER both setup attempts for the legacy pipeline and shell date calls.
+      # v2 also names Sydney explicitly, so its cutoff cannot inherit this bug.
+      - name: Restore Sydney timezone after R setup
+        run: echo "TZ=Australia/Sydney" >> "$GITHUB_ENV"
 
       - name: Restore R packages (renv)
         env:
@@ -127,8 +152,26 @@ jobs:
 
       - name: Run nowcast pipeline
         id: nowcast
+        if: inputs.replay_as_of == ''
         working-directory: pipeline
         run: Rscript run_complete_nowcast.R
+
+      - name: Load recorded inputs for the Monday correction
+        if: inputs.replay_as_of != ''
+        env:
+          REPLAY_DATA_REF: ${{ inputs.replay_data_ref }}
+          REPLAY_AS_OF: ${{ inputs.replay_as_of }}
+        run: |
+          git fetch --no-tags origin "$REPLAY_DATA_REF"
+          git restore --source="$REPLAY_DATA_REF" --worktree -- nowcasting_v2/data_raw data/latest.json data/gdp.json data/indicators_v2.json
+          python - <<'PY'
+          import json, pathlib, os, subprocess
+          ref = os.environ['REPLAY_DATA_REF']
+          v3 = json.loads(pathlib.Path('data/latest_v3.json').read_text())
+          snapshot = json.loads(subprocess.check_output(['git', 'show', f'{ref}:data/latest_v3.json']))
+          assert snapshot['as_of'] == os.environ['REPLAY_AS_OF'], 'Snapshot must contain the requested Monday v3 run'
+          assert v3 == snapshot, 'v3 has changed since the recorded Monday; stop rather than mix vintages'
+          PY
 
       # v2 (RBA MAI + MIDAS). RBA/ABS are gov sources (no WAF) and the emit is the
       # v2 model itself, so both belong here in the R cron, NOT on the laptop. The
@@ -142,33 +185,72 @@ jobs:
       - name: Refresh v2 panel + nowcast (RBA/ABS data + emit)
         id: v2
         if: success()
-        continue-on-error: true
+        continue-on-error: ${{ inputs.replay_as_of == '' }}
         working-directory: nowcasting_v2
         env:
           # v2 scripts source R/_setup.R (prepends the pipeline renv library); set
           # R_LIBS too so rlang >= 1.1.7 from renv wins over any base copy.
           R_LIBS: ${{ github.workspace }}/pipeline/renv/library/windows/R-4.5/x86_64-w64-mingw32
+          NOWCAST_AS_OF: ${{ inputs.replay_as_of }}
         run: |
-          Rscript R/fetch/fetch_rba_panel.R
-          Rscript R/fetch/fetch_abs_panel.R
-          # GDP regressand + target-quarter driver for the v2 model — must refresh
-          # or v2 keeps targeting a superseded quarter. Since 2026-09 it reads the
-          # first-release series maintained by the v3 pipeline
-          # (nowcasting_v3/data/gdp_first_release.csv, in this same checkout) and
-          # tops it up from the live ABS fetch. This step runs at 19:00 UTC Sunday
-          # and the v3 job that appends a new print runs at 20:30, so on a print
-          # Monday the top-up is what supplies the just-printed quarter.
-          Rscript R/fetch_rt_gdp.R
+          Rscript tests/test_emit_clock.R
+          if [ -z "$NOWCAST_AS_OF" ]; then
+            Rscript R/fetch/fetch_rba_panel.R
+            Rscript R/fetch/fetch_abs_panel.R
+            # GDP regressand + target-quarter driver — must refresh or v2 keeps
+            # targeting a superseded quarter. A replay uses its recorded CSV.
+            Rscript R/fetch_rt_gdp.R
+          fi
           Rscript R/emit_v2_json.R
           # Refresh the indicator-grid display (data/indicators_v2.json) from the
           # freshly-fetched data_raw. Python stdlib only; reads data_raw, so it
           # picks up both the RBA/ABS fetch above and the survey commits on main.
-          python gen_indicators_v2.py
+          if [ -z "$NOWCAST_AS_OF" ]; then
+            python gen_indicators_v2.py
           # Refresh the v2 track record (data/performance_v2.json) so a newly
           # released GDP actual (now in data/gdp.json from the v1 pipeline above)
           # is scored for any quarter that already has a backcast. NB: brand-new
           # quarters need the v2 backtest re-run to gain a backcast (separate job).
-          python gen_performance_v2.py
+            python gen_performance_v2.py
+          fi
+
+      - name: Replace the Monday combination using its existing v3 run
+        if: inputs.replay_as_of != '' && steps.v2.outcome == 'success'
+        env:
+          NOWCAST_AS_OF: ${{ inputs.replay_as_of }}
+          REPLAY_DATA_REF: ${{ inputs.replay_data_ref }}
+        run: |
+          # Retain Monday's indicator metadata and update badges. Regenerating
+          # them against the same Monday files would clear this week's updates
+          # and stamp Tuesday's release dates into a Monday correction.
+          python - <<'PY'
+          import json, os, pathlib, subprocess
+          path = pathlib.Path('data/latest_v2.json')
+          v2 = json.loads(path.read_text())
+          old = json.loads(subprocess.check_output(['git', 'show', os.environ['REPLAY_DATA_REF'] + ':data/latest_v2.json']))
+          prior = [r for r in v2['vintages'] if r['run_date'] < v2['as_of'] and r['target_quarter'] == v2['target_quarter'] and r.get('horizon', 'current') == 'current']
+          delta = round(v2['models']['headline']['qoq_growth_pct'] - max(prior, key=lambda r: r['run_date'])['qoq_growth_pct'], 2) if prior else None
+          v2['data_updates'] = {**old.get('data_updates', {}), 'run_date': v2['as_of'], 'nowcast_delta_pp': delta}
+          path.write_text(json.dumps(v2, indent=2) + '\n')
+          PY
+          python -m pip install -e nowcasting_v3
+          python nowcasting_v3/tools/emit_combination.py --asof "$NOWCAST_AS_OF"
+          git restore --source="$REPLAY_DATA_REF" --worktree -- data/indicators_combo.json
+          python nowcasting_v3/tools/check_payload.py --file data/latest_combo.json
+          python - <<'PY'
+          import json, os, pathlib
+          day = os.environ['NOWCAST_AS_OF']
+          v2 = json.loads(pathlib.Path('data/latest_v2.json').read_text())
+          combo = json.loads(pathlib.Path('data/latest_combo.json').read_text())
+          assert v2['as_of'] == combo['as_of'] == day
+          assert combo['components']['v2']['run_date'] == day and combo['components']['v2'].get('stale_days', 0) == 0
+          rows = [r for r in combo['vintages'] if r['run_date'] == day and r['target_quarter'] == combo['target_quarter']]
+          assert len(rows) == 1 and rows[0]['v2_run_date'] == day, 'Correction must replace the Monday row'
+          print(f"Corrected {day}: v2 {v2['models']['headline']['qoq_growth_pct']}%, combination {combo['horizons'][0]['qoq_growth_pct']}%")
+          PY
+          # Inputs were a temporary replay snapshot; retain main's current CSVs
+          # and legacy payloads rather than rolling them back in the commit.
+          git restore --source=HEAD --worktree -- nowcasting_v2/data_raw data/latest.json data/gdp.json
 
       # The v2 step is continue-on-error so it can't block the v1 payload; surface
       # its failure loudly here instead (the job-level "Alert on failure" never

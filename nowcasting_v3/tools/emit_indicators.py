@@ -69,7 +69,9 @@ def main() -> int:
             # What the freshness guard is measuring against, surfaced so a reader
             # can see why the model would refuse rather than only that it did.
             "last_release_date": str(
-                (last + pd.Timedelta(days=s.publication_lag_days)).date()),
+                vint.release_dates.get(s.key, {}).get(
+                    last.strftime("%Y-%m-%d"),
+                    str((last + pd.Timedelta(days=s.publication_lag_days)).date()))),
         })
         print(f"  {s.key:22s} {len(obs):3d} pts through {last.date()}", flush=True)
 

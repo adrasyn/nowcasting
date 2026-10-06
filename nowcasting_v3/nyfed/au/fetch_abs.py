@@ -7,7 +7,52 @@ else. Every test in this project exercises the second half only.
 
 from __future__ import annotations
 
+from datetime import datetime
+from html.parser import HTMLParser
+
 import pandas as pd
+
+TRADE_RELEASE_URL = (
+    "https://www.abs.gov.au/statistics/economy/international-trade"
+    "/international-trade-goods/latest-release"
+)
+
+
+def parse_trade_release(html: str) -> tuple[str, str]:
+    """Read the reference month and actual issue date from ABS Dublin Core tags."""
+    class Metadata(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.values = {}
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "meta" and (attrs.get("name") or "").startswith("dcterms."):
+                self.values[attrs["name"]] = attrs.get("content") or ""
+
+    parser = Metadata()
+    parser.feed(html)
+    meta = parser.values
+    try:
+        if meta.get("dcterms.isPartOf") != "5368.0":
+            raise ValueError("not the International Trade in Goods release")
+        month = datetime.strptime(meta["dcterms.temporal"], "%B %Y").date()
+        issued = datetime.strptime(meta["dcterms.issued"].split(", ", 1)[1],
+                                   "%d/%m/%Y - %H:%M").date()
+        if issued <= month:
+            raise ValueError("issue date precedes its reference month")
+    except (KeyError, IndexError, ValueError) as exc:
+        raise ValueError(f"ABS trade release metadata is missing or invalid: {exc}") from exc
+    return month.isoformat(), issued.isoformat()
+
+
+def fetch_trade_release() -> tuple[str, str]:
+    """Fetch one authoritative date for both exports and imports; no guessed fallback."""
+    import requests
+
+    response = requests.get(TRADE_RELEASE_URL, timeout=60)
+    response.raise_for_status()
+    return parse_trade_release(response.text)
 
 # Catalogues ABS has CEASED, mapped to the frozen landing page that still serves
 # their final release.

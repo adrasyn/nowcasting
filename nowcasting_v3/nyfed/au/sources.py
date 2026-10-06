@@ -23,6 +23,13 @@ for the three quarterly ones (``to_timestamp(how="end")``, which is what
 ``panel._align``'s ``{3, 6, 9, 12}`` mask requires). Every lag below was
 measured against that date, whichever convention applies to the series.
 
+Live trade data is the exception to the estimated availability cut: the ABS
+release page supplies the actual publication date of the latest reference
+month. ``Vintage.release_dates`` carries it for exports and imports and saves
+it in recordings, so an early release enters immediately and a delayed release
+stays excluded. Older observations without recorded dates retain these lags;
+the staleness budgets below still use them.
+
 TWO THINGS ARE DERIVED FROM IT, AND BOTH WERE PREVIOUSLY TYPED IN BY HAND
 --------------------------------------------------------------------------
 **The staleness budget.** ``max_age_days`` is not a field any more; it is

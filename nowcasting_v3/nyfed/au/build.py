@@ -26,9 +26,11 @@ standing between the registry's nominal series and the Global factor.
 AS OF MEANS AS OF -- BY RELEASE DATE, NOT BY REFERENCE DATE
 ------------------------------------------------------------
 Every series and every deflator tier is cut at ``asof`` before anything else
-happens, and the cut is on the observation's **release** date --
-``observation date + source.publication_lag_days`` -- not on the observation's
-own date.
+happens, and the cut is on the observation's **release** date, not its reference
+date. Actual dates recorded in ``Vintage.release_dates`` take precedence;
+otherwise ``observation date + source.publication_lag_days`` supplies the
+existing conservative estimate. Live trade fetches record the latest month's
+actual ABS publication date so a shorter-than-usual lag does not delay it.
 
 The distinction is the whole point. An Australian series' panel date runs weeks
 ahead of its release -- a monthly is dated to the first of its reference month
@@ -139,7 +141,7 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -152,7 +154,7 @@ from nyfed.au.deflator import (
     long_monthly_cpi,
     real_household_spending,
 )
-from nyfed.au.fetch_abs import fetch_abs_series
+from nyfed.au.fetch_abs import fetch_abs_series, fetch_trade_release
 from nyfed.au.fetch_rba import fetch_rba_series
 from nyfed.au.fetch_v2 import read_v2_series
 from nyfed.au.first_release import first_release_index, load_first_release
@@ -426,6 +428,9 @@ class Vintage:
     series: dict[str, pd.Series]
     deflator_sources: dict[str, pd.Series]
     recorded_at: str | None = None
+    # ISO observation date -> actual publication date, where fetched from ABS.
+    # Old recordings have no calendar; their conservative lag remains intact.
+    release_dates: dict[str, dict[str, str]] = field(default_factory=dict)
 
     def as_of(self, asof) -> "Vintage":
         """This vintage as it stood on ``asof``, cut by RELEASE date.
@@ -440,12 +445,14 @@ class Vintage:
             series=_as_of(
                 self.series, asof,
                 {s.key: s.publication_lag_days for s in AU_SERIES},
+                self.release_dates,
             ),
             deflator_sources=_as_of(
                 self.deflator_sources, asof,
                 {d.key: d.publication_lag_days for d in DEFLATOR_SOURCES},
             ),
             recorded_at=self.recorded_at,
+            release_dates=self.release_dates,
         )
 
 
@@ -489,12 +496,23 @@ def _with_retries(label: str, call, *, attempts: int = 3, waits: tuple[int, ...]
 
 def fetch_vintage(sources: tuple[SeriesSource, ...] = AU_SERIES) -> Vintage:
     """Retrieve every registered series and every deflator tier. Networked."""
+    series = {s.key: _with_retries(s.key, lambda s=s: _fetch_one(s)) for s in sources}
+    release_dates = {}
+    trade = set(series) & {"exports", "imports"}
+    if trade:
+        month, issued = _with_retries("trade release date", fetch_trade_release)
+        for key in sorted(trade):
+            last = series[key].dropna().index.max()
+            if last != pd.Timestamp(month):
+                raise ValueError(f"{key}: ABS trade release month {month} does not "
+                                 f"match spreadsheet month {last}; retry the fetch")
+            release_dates[key] = {month: issued}
+        print(f"trade: {month} actually released {issued}", flush=True)
     return Vintage(
-        series={
-            s.key: _with_retries(s.key, lambda s=s: _fetch_one(s)) for s in sources
-        },
+        series=series,
         deflator_sources=_with_retries("deflator tiers", fetch_deflator_sources),
         recorded_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        release_dates=release_dates,
     )
 
 
@@ -527,7 +545,7 @@ def _untidy(frame: pd.DataFrame) -> dict[str, pd.Series]:
 
 
 def save_vintage(vintage: Vintage, directory: str | Path) -> Path:
-    """Write a fetched vintage to ``directory`` as three small files.
+    """Write a fetched vintage, including its release dates, as three small files.
 
     The manifest carries the registry locator each series was fetched from, so
     a later locator change in ``sources.py`` makes the recording refuse to load
@@ -543,6 +561,7 @@ def save_vintage(vintage: Vintage, directory: str | Path) -> Path:
         json.dumps(
             {
                 "recorded_at": vintage.recorded_at,
+                "release_dates": vintage.release_dates,
                 "locators": {s.key: s.locator for s in AU_SERIES},
                 "deflator_locators": {d.key: d.locator for d in DEFLATOR_SOURCES},
             },
@@ -592,6 +611,7 @@ def load_vintage(directory: str | Path) -> Vintage:
             pd.read_csv(directory / _DEFLATOR_CSV, parse_dates=["date"])
         ),
         recorded_at=manifest.get("recorded_at"),
+        release_dates=manifest.get("release_dates", {}),
     )
 
 
@@ -604,13 +624,13 @@ def _as_of(
     series: dict[str, pd.Series],
     asof: pd.Timestamp,
     lags: dict[str, int],
+    release_dates: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, pd.Series]:
     """Drop every observation not yet RELEASED at ``asof``.
 
-    ``lags[key]`` is the series' ``publication_lag_days``, so the release date
-    of an observation is its own date plus that. Cutting on the observation date
-    instead is a nine-week look-ahead on the slowest series; see AS OF MEANS
-    AS OF.
+    Recorded actual release dates take precedence. Where none is recorded,
+    ``lags[key]`` supplies the existing conservative publication-date estimate.
+    Cutting on the observation date instead would admit unreleased data.
     """
     missing = sorted(set(series) - set(lags))
     if missing:
@@ -619,10 +639,15 @@ def _as_of(
             "computed without one, and cutting on the observation date instead "
             "would silently admit unreleased data"
         )
-    return {
-        key: s[s.index + pd.Timedelta(days=lags[key]) <= asof]
-        for key, s in series.items()
-    }
+    cut = {}
+    for key, s in series.items():
+        released = pd.Series(s.index + pd.Timedelta(days=lags[key]), index=s.index)
+        for month, date in (release_dates or {}).get(key, {}).items():
+            period = pd.Timestamp(month)
+            if period in released.index:
+                released.loc[period] = pd.Timestamp(date)
+        cut[key] = s[released <= asof]
+    return cut
 
 
 def build_panel(
@@ -673,7 +698,7 @@ def build_panel(
             load_first_release(), v.series["gdp"].dropna()
         )
         v = Vintage(series=series_fp, deflator_sources=v.deflator_sources,
-                    recorded_at=v.recorded_at)
+                    recorded_at=v.recorded_at, release_dates=v.release_dates)
 
     vintage_asof = v.as_of(asof_ts)
     series, deflator_sources = vintage_asof.series, vintage_asof.deflator_sources

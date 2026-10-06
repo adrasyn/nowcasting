@@ -4,7 +4,7 @@
   "basis": "abs_first_print",
   "target": "first_print",
   "method": "equal-weight average of v2 and v3",
-  "generated_at": "2026-10-04T23:28:54+00:00",
+  "generated_at": "2026-10-05T00:00:00+00:00",
   "as_of": "2026-10-05",
   "target_quarter": "2026 Q3",
   "data_through": "2026-09",
@@ -16,20 +16,20 @@
     {
       "quarter": "2026 Q3",
       "kind": "nowcast",
-      "qoq_growth_pct": 0.5214,
-      "model_qoq_growth_pct": 0.5214,
-      "annualised_growth_pct": 2.102,
-      "ci_68_low": 0.3775,
-      "ci_68_high": 0.6653,
-      "ci_95_low": 0.1701,
-      "ci_95_high": 0.8727,
+      "qoq_growth_pct": 0.5164,
+      "model_qoq_growth_pct": 0.5164,
+      "annualised_growth_pct": 2.0817,
+      "ci_68_low": 0.3725,
+      "ci_68_high": 0.6603,
+      "ci_95_low": 0.1651,
+      "ci_95_high": 0.8677,
       "components": {
-        "v2": 0.6,
+        "v2": 0.59,
         "v3": 0.4429
       },
       "months_with_data": 3,
       "release_date": "2026-12-02",
-      "gdp_chain_volume_millions": 703108
+      "gdp_chain_volume_millions": 703073
     },
     {
       "quarter": "2026 Q4",
@@ -184,16 +184,16 @@
       "target_quarter": "2026 Q3",
       "kind": "nowcast",
       "horizon": "current",
-      "qoq_growth_pct": 0.5214,
-      "v2_qoq_growth_pct": 0.6,
-      "v2_run_date": "2026-09-28",
+      "qoq_growth_pct": 0.5164,
+      "v2_qoq_growth_pct": 0.59,
+      "v2_run_date": "2026-10-05",
       "v3_qoq_growth_pct": 0.4429,
       "months_with_data": 3,
       "data_through": "2026-09",
-      "ci_68_low": 0.3775,
-      "ci_68_high": 0.6653,
-      "ci_95_low": 0.1701,
-      "ci_95_high": 0.8727
+      "ci_68_low": 0.3725,
+      "ci_68_high": 0.6603,
+      "ci_95_low": 0.1651,
+      "ci_95_high": 0.8677
     }
   ],
   "next_gdp_release_date": "2026-12-02",
@@ -225,10 +225,9 @@
   },
   "components": {
     "v2": {
-      "as_of": "2026-09-28",
-      "run_date": "2026-09-28",
-      "schema": "v2-staged-2",
-      "stale_days": 7
+      "as_of": "2026-10-05",
+      "run_date": "2026-10-05",
+      "schema": "v2-staged-2"
     },
     "v3": {
       "as_of": "2026-10-05",

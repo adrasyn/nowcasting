@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-28T02:00:00Z",
+  "generated_at": "2026-10-05T02:00:00Z",
   "schema": "v2-staged-2",
-  "as_of": "2026-09-28",
+  "as_of": "2026-10-05",
   "target_quarter": "2026 Q3",
   "data_through": "2026-09",
   "prev_level": {
@@ -16,14 +16,14 @@
       "target_quarter": "2026 Q3",
       "horizon": "current",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 703688,
-      "qoq_growth_pct": 0.6,
-      "qoq_growth_raw_pct": 0.6,
-      "yoy_growth_pct": 2.24,
-      "ci_68_low": 701809,
-      "ci_68_high": 705568,
-      "ci_95_low": 699840,
-      "ci_95_high": 707537,
+      "gdp_chain_volume_millions": 703564,
+      "qoq_growth_pct": 0.59,
+      "qoq_growth_raw_pct": 0.59,
+      "yoy_growth_pct": 2.22,
+      "ci_68_low": 701684,
+      "ci_68_high": 705443,
+      "ci_95_low": 699715,
+      "ci_95_high": 707412,
       "n_months_in_quarter": 3,
       "estimator": "QA-UMIDAS",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -322,6 +322,19 @@
       "ci_95_low": 699840,
       "ci_95_high": 707537,
       "data_through": "2026-09"
+    },
+    {
+      "run_date": "2026-10-05",
+      "target_quarter": "2026 Q3",
+      "horizon": "current",
+      "point": 703564,
+      "qoq_growth_pct": 0.59,
+      "days_until_release": -58,
+      "ci_68_low": 701684,
+      "ci_68_high": 705443,
+      "ci_95_low": 699715,
+      "ci_95_high": 707412,
+      "data_through": "2026-09"
     }
   ],
   "v1_comparison": {
@@ -334,8 +347,8 @@
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
   "data_updates": {
-    "run_date": "2026-09-28",
-    "nowcast_delta_pp": 0.02,
+    "run_date": "2026-10-05",
+    "nowcast_delta_pp": -0.01,
     "series": [
       {
         "id": "household_spending",

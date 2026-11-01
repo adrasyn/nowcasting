@@ -2195,54 +2195,58 @@
         },
         {
           "date": "2025-10",
-          "value": 4064.8
+          "value": 4056.1
         },
         {
           "date": "2025-11",
-          "value": 4090.8
+          "value": 4082.0
         },
         {
           "date": "2025-12",
-          "value": 4121.8
+          "value": 4112.5
         },
         {
           "date": "2026-01",
-          "value": 4135.3
+          "value": 4125.6
         },
         {
           "date": "2026-02",
-          "value": 4157.2
+          "value": 4147.3
         },
         {
           "date": "2026-03",
-          "value": 4193.0
+          "value": 4183.3
         },
         {
           "date": "2026-04",
-          "value": 4226.9
+          "value": 4217.2
         },
         {
           "date": "2026-05",
-          "value": 4256.3
+          "value": 4246.5
         },
         {
           "date": "2026-06",
-          "value": 4301.7
+          "value": 4291.9
         },
         {
           "date": "2026-07",
-          "value": 4319.6
+          "value": 4310.0
         },
         {
           "date": "2026-08",
-          "value": 4330.3
+          "value": 4320.7
+        },
+        {
+          "date": "2026-09",
+          "value": 4348.7
         }
       ],
-      "last_release_date": "2026-09-30",
-      "next_release_estimate": "2026-10-30",
-      "updated_this_run": false,
+      "last_release_date": "2026-10-30",
+      "next_release_estimate": "2026-11-30",
+      "updated_this_run": true,
       "prev_period": "2026-08",
-      "latest_period": "2026-08"
+      "latest_period": "2026-09"
     },
     {
       "id": "credit_housing",
@@ -2429,23 +2433,23 @@
         },
         {
           "date": "2026-01",
-          "value": 2541.3
+          "value": 2540.9
         },
         {
           "date": "2026-02",
-          "value": 2553.3
+          "value": 2553.0
         },
         {
           "date": "2026-03",
-          "value": 2573.3
+          "value": 2572.8
         },
         {
           "date": "2026-04",
-          "value": 2589.2
+          "value": 2588.9
         },
         {
           "date": "2026-05",
-          "value": 2605.1
+          "value": 2604.8
         },
         {
           "date": "2026-06",
@@ -2458,13 +2462,17 @@
         {
           "date": "2026-08",
           "value": 2627.5
+        },
+        {
+          "date": "2026-09",
+          "value": 2637.0
         }
       ],
-      "last_release_date": "2026-09-30",
-      "next_release_estimate": "2026-10-30",
-      "updated_this_run": false,
+      "last_release_date": "2026-10-30",
+      "next_release_estimate": "2026-11-30",
+      "updated_this_run": true,
       "prev_period": "2026-08",
-      "latest_period": "2026-08"
+      "latest_period": "2026-09"
     },
     {
       "id": "credit_business",
@@ -2639,54 +2647,58 @@
         },
         {
           "date": "2025-10",
-          "value": 1413.0
+          "value": 1404.3
         },
         {
           "date": "2025-11",
-          "value": 1421.5
+          "value": 1412.7
         },
         {
           "date": "2025-12",
-          "value": 1433.5
+          "value": 1424.2
         },
         {
           "date": "2026-01",
-          "value": 1434.4
+          "value": 1425.1
         },
         {
           "date": "2026-02",
-          "value": 1443.1
+          "value": 1433.5
         },
         {
           "date": "2026-03",
-          "value": 1457.3
+          "value": 1447.9
         },
         {
           "date": "2026-04",
-          "value": 1473.2
+          "value": 1463.8
         },
         {
           "date": "2026-05",
-          "value": 1486.6
+          "value": 1477.2
         },
         {
           "date": "2026-06",
-          "value": 1509.2
+          "value": 1499.3
         },
         {
           "date": "2026-07",
-          "value": 1520.0
+          "value": 1510.4
         },
         {
           "date": "2026-08",
-          "value": 1534.8
+          "value": 1525.2
+        },
+        {
+          "date": "2026-09",
+          "value": 1543.0
         }
       ],
-      "last_release_date": "2026-09-30",
-      "next_release_estimate": "2026-10-30",
-      "updated_this_run": false,
+      "last_release_date": "2026-10-30",
+      "next_release_estimate": "2026-11-30",
+      "updated_this_run": true,
       "prev_period": "2026-08",
-      "latest_period": "2026-08"
+      "latest_period": "2026-09"
     },
     {
       "id": "fcmygbag3",
@@ -6494,8 +6506,8 @@
           "value": 75.0
         }
       ],
-      "last_release_date": "2026-10-20",
-      "next_release_estimate": "2026-10-27",
+      "last_release_date": "2026-10-27",
+      "next_release_estimate": "2026-11-03",
       "updated_this_run": false,
       "prev_period": "2026-07",
       "latest_period": "2026-07"

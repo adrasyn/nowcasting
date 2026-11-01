@@ -527,6 +527,18 @@
       "ci_95_high": 705703,
       "data_through": "2026-10",
       "days_until_release": -38
+    },
+    {
+      "run_date": "2026-11-01",
+      "target_quarter": "2026 Q3",
+      "point": 703390,
+      "qoq_growth_pct": 0.56,
+      "ci_68_low": 700030,
+      "ci_68_high": 703863,
+      "ci_95_low": 698190,
+      "ci_95_high": 705703,
+      "data_through": "2026-11",
+      "days_until_release": -31
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-26T02:00:00Z",
+  "generated_at": "2026-11-02T02:00:00Z",
   "schema": "v2-staged-2",
-  "as_of": "2026-10-26",
+  "as_of": "2026-11-02",
   "target_quarter": "2026 Q3",
   "data_through": "2026-10",
   "prev_level": {
@@ -16,14 +16,14 @@
       "target_quarter": "2026 Q3",
       "horizon": "current",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 702191,
-      "qoq_growth_pct": 0.39,
-      "qoq_growth_raw_pct": 0.39,
-      "yoy_growth_pct": 2.02,
-      "ci_68_low": 700311,
-      "ci_68_high": 704070,
-      "ci_95_low": 698342,
-      "ci_95_high": 706040,
+      "gdp_chain_volume_millions": 702442,
+      "qoq_growth_pct": 0.43,
+      "qoq_growth_raw_pct": 0.43,
+      "yoy_growth_pct": 2.06,
+      "ci_68_low": 700563,
+      "ci_68_high": 704322,
+      "ci_95_low": 698593,
+      "ci_95_high": 706291,
       "n_months_in_quarter": 3,
       "estimator": "QA-UMIDAS",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -41,14 +41,14 @@
       "target_quarter": "2026 Q4",
       "horizon": "next",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 704137,
-      "qoq_growth_pct": 0.28,
-      "qoq_growth_raw_pct": 0.28,
-      "yoy_growth_pct": 1.38,
-      "ci_68_low": 701605,
-      "ci_68_high": 706670,
-      "ci_95_low": 698936,
-      "ci_95_high": 709338,
+      "gdp_chain_volume_millions": 704793,
+      "qoq_growth_pct": 0.33,
+      "qoq_growth_raw_pct": 0.33,
+      "yoy_growth_pct": 1.48,
+      "ci_68_low": 702260,
+      "ci_68_high": 707327,
+      "ci_95_low": 699590,
+      "ci_95_high": 709996,
       "n_months_in_quarter": 1,
       "estimator": "UMIDAS-full",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -425,6 +425,32 @@
       "ci_95_low": 698936,
       "ci_95_high": 709338,
       "data_through": "2026-10"
+    },
+    {
+      "run_date": "2026-11-02",
+      "target_quarter": "2026 Q3",
+      "horizon": "current",
+      "point": 702442,
+      "qoq_growth_pct": 0.43,
+      "days_until_release": -30,
+      "ci_68_low": 700563,
+      "ci_68_high": 704322,
+      "ci_95_low": 698593,
+      "ci_95_high": 706291,
+      "data_through": "2026-10"
+    },
+    {
+      "run_date": "2026-11-02",
+      "target_quarter": "2026 Q4",
+      "horizon": "next",
+      "point": 704793,
+      "qoq_growth_pct": 0.33,
+      "days_until_release": -120,
+      "ci_68_low": 702260,
+      "ci_68_high": 707327,
+      "ci_95_low": 699590,
+      "ci_95_high": 709996,
+      "data_through": "2026-10"
     }
   ],
   "v1_comparison": {
@@ -437,8 +463,27 @@
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
   "data_updates": {
-    "run_date": "2026-10-26",
+    "run_date": "2026-11-02",
     "nowcast_delta_pp": null,
-    "series": []
+    "series": [
+      {
+        "id": "credit",
+        "name": "Total credit",
+        "prev_period": "2026-08",
+        "latest_period": "2026-09"
+      },
+      {
+        "id": "credit_housing",
+        "name": "Housing credit",
+        "prev_period": "2026-08",
+        "latest_period": "2026-09"
+      },
+      {
+        "id": "credit_business",
+        "name": "Business credit",
+        "prev_period": "2026-08",
+        "latest_period": "2026-09"
+      }
+    ]
   }
 }

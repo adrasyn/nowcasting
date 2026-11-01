@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-25T21:42:20Z",
+  "generated_at": "2026-11-01T22:56:13Z",
   "target_quarter": "2026 Q3",
-  "data_through": "2026-10",
+  "data_through": "2026-11",
   "next_gdp_release_date": "2026-12-02",
   "nowcast": {
     "gdp_chain_volume_millions": 703390,
@@ -19,7 +19,7 @@
     "released_days_before_next": -91
   },
   "data_updates": {
-    "run_date": "2026-10-25",
+    "run_date": "2026-11-01",
     "nowcast_delta_pp": 0,
     "series": []
   }

@@ -400,6 +400,22 @@
       "ci_68_high": 0.5705,
       "ci_95_low": 0.0753,
       "ci_95_high": 0.7779
+    },
+    {
+      "run_date": "2026-11-02",
+      "target_quarter": "2026 Q3",
+      "kind": "nowcast",
+      "horizon": "current",
+      "qoq_growth_pct": 0.4462,
+      "v2_qoq_growth_pct": 0.43,
+      "v2_run_date": "2026-11-02",
+      "v3_qoq_growth_pct": 0.4624,
+      "months_with_data": 3,
+      "data_through": "2026-09",
+      "ci_68_low": 0.3023,
+      "ci_68_high": 0.5901,
+      "ci_95_low": 0.0949,
+      "ci_95_high": 0.7975
     }
   ]
 }

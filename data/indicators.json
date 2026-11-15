@@ -5878,9 +5878,7 @@
       ],
       "last_release_date": "2026-11-04",
       "next_release_estimate": "2026-11-30",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
-      "latest_period": "2026-09"
+      "updated_this_run": false
     },
     {
       "id": "cons_conf",
@@ -8470,11 +8468,9 @@
           "value": 17948
         }
       ],
-      "last_release_date": "2026-11-02",
-      "next_release_estimate": "2026-11-09",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
-      "latest_period": "2026-09"
+      "last_release_date": "2026-11-09",
+      "next_release_estimate": "2026-12-01",
+      "updated_this_run": false
     },
     {
       "id": "bus_conf",
@@ -9750,11 +9746,17 @@
         {
           "date": "2026-09",
           "value": -13
+        },
+        {
+          "date": "2026-10",
+          "value": -15
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
+      "prev_period": "2026-09",
+      "latest_period": "2026-10"
     },
     {
       "id": "goods_exp",
@@ -11050,9 +11052,7 @@
       ],
       "last_release_date": "2026-11-05",
       "next_release_estimate": "2026-12-03",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
-      "latest_period": "2026-09"
+      "updated_this_run": false
     },
     {
       "id": "services_exp",
@@ -12784,9 +12784,7 @@
       ],
       "last_release_date": "2026-11-05",
       "next_release_estimate": "2026-12-03",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
-      "latest_period": "2026-09"
+      "updated_this_run": false
     },
     {
       "id": "services_imp",

@@ -1578,8 +1578,8 @@
       ],
       "last_release_date": "2026-11-04",
       "next_release_estimate": "2026-11-30",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
+      "updated_this_run": false,
+      "prev_period": "2026-09",
       "latest_period": "2026-09"
     },
     {
@@ -1804,8 +1804,8 @@
       ],
       "last_release_date": "2026-11-05",
       "next_release_estimate": "2026-12-03",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
+      "updated_this_run": false,
+      "prev_period": "2026-09",
       "latest_period": "2026-09"
     },
     {
@@ -2028,10 +2028,10 @@
           "value": 17948.0
         }
       ],
-      "last_release_date": "2026-11-02",
-      "next_release_estimate": "2026-11-09",
-      "updated_this_run": true,
-      "prev_period": "2026-08",
+      "last_release_date": "2026-11-09",
+      "next_release_estimate": "2026-12-01",
+      "updated_this_run": false,
+      "prev_period": "2026-09",
       "latest_period": "2026-09"
     },
     {
@@ -2938,8 +2938,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -3168,8 +3168,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -3398,8 +3398,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -3628,8 +3628,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -3858,8 +3858,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -4088,8 +4088,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -4314,8 +4314,8 @@
       ],
       "last_release_date": "2026-11-02",
       "next_release_estimate": "2026-12-02",
-      "updated_this_run": true,
-      "prev_period": "2026-09",
+      "updated_this_run": false,
+      "prev_period": "2026-10",
       "latest_period": "2026-10"
     },
     {
@@ -4327,222 +4327,226 @@
       "series": [
         {
           "date": "2022-04",
-          "value": 30598.6
+          "value": 30596.6
         },
         {
           "date": "2022-05",
-          "value": 30947.1
+          "value": 30943.3
         },
         {
           "date": "2022-06",
-          "value": 31614.7
+          "value": 31617.2
         },
         {
           "date": "2022-07",
-          "value": 31769.9
+          "value": 31769.2
         },
         {
           "date": "2022-08",
-          "value": 31843.0
+          "value": 31844.4
         },
         {
           "date": "2022-09",
-          "value": 32362.2
+          "value": 32373.7
         },
         {
           "date": "2022-10",
-          "value": 33034.6
+          "value": 33032.6
         },
         {
           "date": "2022-11",
-          "value": 32657.3
+          "value": 32655.9
         },
         {
           "date": "2022-12",
-          "value": 32615.7
+          "value": 32617.3
         },
         {
           "date": "2023-01",
-          "value": 32721.4
+          "value": 32718.2
         },
         {
           "date": "2023-02",
-          "value": 33164.4
+          "value": 33163.8
         },
         {
           "date": "2023-03",
-          "value": 32862.7
+          "value": 32858.5
         },
         {
           "date": "2023-04",
-          "value": 33746.2
+          "value": 33743.1
         },
         {
           "date": "2023-05",
-          "value": 33373.0
+          "value": 33370.9
         },
         {
           "date": "2023-06",
-          "value": 33598.5
+          "value": 33599.7
         },
         {
           "date": "2023-07",
-          "value": 34349.4
+          "value": 34347.1
         },
         {
           "date": "2023-08",
-          "value": 33812.7
+          "value": 33812.1
         },
         {
           "date": "2023-09",
-          "value": 34557.3
+          "value": 34579.7
         },
         {
           "date": "2023-10",
-          "value": 34096.4
+          "value": 34094.5
         },
         {
           "date": "2023-11",
-          "value": 34367.6
+          "value": 34362.2
         },
         {
           "date": "2023-12",
-          "value": 34469.6
+          "value": 34474.0
         },
         {
           "date": "2024-01",
-          "value": 34966.0
+          "value": 34959.3
         },
         {
           "date": "2024-02",
-          "value": 35072.3
+          "value": 35069.6
         },
         {
           "date": "2024-03",
-          "value": 35076.2
+          "value": 35068.0
         },
         {
           "date": "2024-04",
-          "value": 35271.3
+          "value": 35260.3
         },
         {
           "date": "2024-05",
-          "value": 35262.0
+          "value": 35264.1
         },
         {
           "date": "2024-06",
-          "value": 35896.2
+          "value": 35902.8
         },
         {
           "date": "2024-07",
-          "value": 35598.5
+          "value": 35598.1
         },
         {
           "date": "2024-08",
-          "value": 35961.4
+          "value": 35961.3
         },
         {
           "date": "2024-09",
-          "value": 36042.3
+          "value": 36074.8
         },
         {
           "date": "2024-10",
-          "value": 36011.9
+          "value": 36012.5
         },
         {
           "date": "2024-11",
-          "value": 36395.7
+          "value": 36385.4
         },
         {
           "date": "2024-12",
-          "value": 36787.8
+          "value": 36787.7
         },
         {
           "date": "2025-01",
-          "value": 36812.4
+          "value": 36799.7
         },
         {
           "date": "2025-02",
-          "value": 37343.7
+          "value": 37339.6
         },
         {
           "date": "2025-03",
-          "value": 37531.2
+          "value": 37515.8
         },
         {
           "date": "2025-04",
-          "value": 37934.2
+          "value": 37918.8
         },
         {
           "date": "2025-05",
-          "value": 38198.5
+          "value": 38206.7
         },
         {
           "date": "2025-06",
-          "value": 38534.7
+          "value": 38542.8
         },
         {
           "date": "2025-07",
-          "value": 38502.4
+          "value": 38507.7
         },
         {
           "date": "2025-08",
-          "value": 38969.9
+          "value": 38980.3
         },
         {
           "date": "2025-09",
-          "value": 39074.1
+          "value": 39108.8
         },
         {
           "date": "2025-10",
-          "value": 39219.3
+          "value": 39220.4
         },
         {
           "date": "2025-11",
-          "value": 39962.4
+          "value": 39948.7
         },
         {
           "date": "2025-12",
-          "value": 38740.3
+          "value": 38738.7
         },
         {
           "date": "2026-01",
-          "value": 40481.0
+          "value": 40459.6
         },
         {
           "date": "2026-02",
-          "value": 39643.3
+          "value": 39634.3
         },
         {
           "date": "2026-03",
-          "value": 40757.3
+          "value": 40732.4
         },
         {
           "date": "2026-04",
-          "value": 39534.0
+          "value": 39507.9
         },
         {
           "date": "2026-05",
-          "value": 40700.9
+          "value": 40719.5
         },
         {
           "date": "2026-06",
-          "value": 40038.4
+          "value": 40048.4
         },
         {
           "date": "2026-07",
-          "value": 40655.8
+          "value": 40667.7
         },
         {
           "date": "2026-08",
-          "value": 41248.0
+          "value": 41272.2
+        },
+        {
+          "date": "2026-09",
+          "value": 41176.6
         }
       ],
-      "last_release_date": "2026-09-30",
-      "next_release_estimate": "2026-10-30",
-      "updated_this_run": false,
+      "last_release_date": "2026-10-30",
+      "next_release_estimate": "2026-11-30",
+      "updated_this_run": true,
       "prev_period": "2026-08",
-      "latest_period": "2026-08"
+      "latest_period": "2026-09"
     },
     {
       "id": "nab_conf",
@@ -4762,13 +4766,17 @@
         {
           "date": "2026-09",
           "value": -13.0
+        },
+        {
+          "date": "2026-10",
+          "value": -15.0
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "nab_cond",
@@ -4988,13 +4996,17 @@
         {
           "date": "2026-09",
           "value": -1.0
+        },
+        {
+          "date": "2026-10",
+          "value": -2.0
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "nab_trade",
@@ -5178,13 +5190,17 @@
         {
           "date": "2026-09",
           "value": 4.0
+        },
+        {
+          "date": "2026-10",
+          "value": -1.0
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "nab_profit",
@@ -5368,13 +5384,17 @@
         {
           "date": "2026-09",
           "value": -5.0
+        },
+        {
+          "date": "2026-10",
+          "value": -8.0
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "nab_emp",
@@ -5558,13 +5578,17 @@
         {
           "date": "2026-09",
           "value": -1.0
+        },
+        {
+          "date": "2026-10",
+          "value": 4.0
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "nab_forward",
@@ -5748,13 +5772,17 @@
         {
           "date": "2026-09",
           "value": -1.0
+        },
+        {
+          "date": "2026-10",
+          "value": -12.0
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "nab_stocks",
@@ -6096,13 +6124,17 @@
         {
           "date": "2026-09",
           "value": 82.3
+        },
+        {
+          "date": "2026-10",
+          "value": 82.1
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-09",
-      "latest_period": "2026-09"
+      "latest_period": "2026-10"
     },
     {
       "id": "anz_ads",
@@ -6546,8 +6578,8 @@
           "value": 75.0
         }
       ],
-      "last_release_date": "2026-11-03",
-      "next_release_estimate": "2026-11-10",
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-11-17",
       "updated_this_run": false,
       "prev_period": "2026-07",
       "latest_period": "2026-07"
@@ -6770,13 +6802,17 @@
         {
           "date": "2026-10",
           "value": 80.4
+        },
+        {
+          "date": "2026-11",
+          "value": 78.2
         }
       ],
-      "last_release_date": "2026-10-13",
-      "next_release_estimate": "2026-11-10",
-      "updated_this_run": false,
+      "last_release_date": "2026-11-10",
+      "next_release_estimate": "2026-12-08",
+      "updated_this_run": true,
       "prev_period": "2026-10",
-      "latest_period": "2026-10"
+      "latest_period": "2026-11"
     }
   ]
 }

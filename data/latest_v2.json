@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-11-09T02:00:00Z",
+  "generated_at": "2026-11-16T02:00:00Z",
   "schema": "v2-staged-2",
-  "as_of": "2026-11-09",
+  "as_of": "2026-11-16",
   "target_quarter": "2026 Q3",
-  "data_through": "2026-10",
+  "data_through": "2026-11",
   "prev_level": {
     "value": 699461,
     "date": "2026 Q2",
@@ -16,14 +16,14 @@
       "target_quarter": "2026 Q3",
       "horizon": "current",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 702418,
+      "gdp_chain_volume_millions": 702425,
       "qoq_growth_pct": 0.42,
       "qoq_growth_raw_pct": 0.42,
       "yoy_growth_pct": 2.06,
-      "ci_68_low": 700538,
-      "ci_68_high": 704297,
-      "ci_95_low": 698569,
-      "ci_95_high": 706267,
+      "ci_68_low": 700545,
+      "ci_68_high": 704304,
+      "ci_95_low": 698576,
+      "ci_95_high": 706273,
       "n_months_in_quarter": 3,
       "estimator": "QA-UMIDAS",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -41,24 +41,24 @@
       "target_quarter": "2026 Q4",
       "horizon": "next",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 704743,
-      "qoq_growth_pct": 0.33,
-      "qoq_growth_raw_pct": 0.33,
-      "yoy_growth_pct": 1.47,
-      "ci_68_low": 702209,
-      "ci_68_high": 707276,
-      "ci_95_low": 699540,
-      "ci_95_high": 709945,
-      "n_months_in_quarter": 1,
+      "gdp_chain_volume_millions": 702838,
+      "qoq_growth_pct": 0.06,
+      "qoq_growth_raw_pct": 0.06,
+      "yoy_growth_pct": 1.19,
+      "ci_68_low": 701062,
+      "ci_68_high": 704614,
+      "ci_95_low": 699190,
+      "ci_95_high": 706486,
+      "n_months_in_quarter": 2,
       "estimator": "UMIDAS-full",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
       "ci_n": 17,
-      "ci_sd_pp": 0.3494,
+      "ci_sd_pp": 0.245,
       "ci_bias_pp": 0,
-      "err_mae_pp": 0.27,
-      "err_bias_pp": 0.06,
+      "err_mae_pp": 0.21,
+      "err_bias_pp": 0.14,
       "err_n": 17,
-      "ci_stage": "1"
+      "ci_stage": "2"
     }
   },
   "vintages": [
@@ -477,6 +477,32 @@
       "ci_95_low": 699540,
       "ci_95_high": 709945,
       "data_through": "2026-10"
+    },
+    {
+      "run_date": "2026-11-16",
+      "target_quarter": "2026 Q3",
+      "horizon": "current",
+      "point": 702425,
+      "qoq_growth_pct": 0.42,
+      "days_until_release": -16,
+      "ci_68_low": 700545,
+      "ci_68_high": 704304,
+      "ci_95_low": 698576,
+      "ci_95_high": 706273,
+      "data_through": "2026-11"
+    },
+    {
+      "run_date": "2026-11-16",
+      "target_quarter": "2026 Q4",
+      "horizon": "next",
+      "point": 702838,
+      "qoq_growth_pct": 0.06,
+      "days_until_release": -106,
+      "ci_68_low": 701062,
+      "ci_68_high": 704614,
+      "ci_95_low": 699190,
+      "ci_95_high": 706486,
+      "data_through": "2026-11"
     }
   ],
   "v1_comparison": {
@@ -484,73 +510,67 @@
     "target_quarter": "2026 Q3",
     "qoq_growth_pct": 0.58,
     "yoy_growth_pct": 2.21,
-    "gdp_chain_volume_millions": 703497,
+    "gdp_chain_volume_millions": 703498,
     "source": "data/latest.json"
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
   "data_updates": {
-    "run_date": "2026-11-09",
+    "run_date": "2026-11-16",
     "nowcast_delta_pp": null,
     "series": [
       {
-        "id": "household_spending",
-        "name": "Household spending",
+        "id": "credit_card",
+        "name": "Credit card spending",
         "prev_period": "2026-08",
         "latest_period": "2026-09"
       },
       {
-        "id": "export",
-        "name": "Exports",
-        "prev_period": "2026-08",
-        "latest_period": "2026-09"
-      },
-      {
-        "id": "building_app",
-        "name": "Building approvals",
-        "prev_period": "2026-08",
-        "latest_period": "2026-09"
-      },
-      {
-        "id": "fcmygbag3",
-        "name": "3yr govt bond yield",
+        "id": "nab_conf",
+        "name": "Business confidence",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "fcmygbag5",
-        "name": "5yr govt bond yield",
+        "id": "nab_cond",
+        "name": "Business conditions",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "fcmygbag10",
-        "name": "10yr govt bond yield",
+        "id": "nab_trade",
+        "name": "Trading conditions",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "scrigbag3",
-        "name": "3yr yield spread",
+        "id": "nab_profit",
+        "name": "Profitability",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "scrigbag5",
-        "name": "5yr yield spread",
+        "id": "nab_emp",
+        "name": "Hiring intentions",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "scrigbag10",
-        "name": "10yr yield spread",
+        "id": "nab_forward",
+        "name": "Forward orders",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "firmmbab90",
-        "name": "Bank bill rate",
+        "id": "nab_cu",
+        "name": "Capacity use",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
+      },
+      {
+        "id": "wmi_sent",
+        "name": "Consumer sentiment (Westpac)",
+        "prev_period": "2026-10",
+        "latest_period": "2026-11"
       }
     ]
   }

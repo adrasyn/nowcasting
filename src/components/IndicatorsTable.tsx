@@ -45,6 +45,7 @@ export default function IndicatorsTable({ indicators, selectedId, onSelect }: Pr
             <th className="py-2 pr-3">Δ m/m (%)</th>
             <th className="py-2 pr-3">Updated</th>
             <th className="py-2 pr-3">Next release</th>
+            <th className="py-2 pr-3">Period</th>
           </tr>
         </thead>
         <tbody>
@@ -72,7 +73,11 @@ export default function IndicatorsTable({ indicators, selectedId, onSelect }: Pr
                     : `${pct > 0 ? "+" : pct < 0 ? "−" : ""}${Math.abs(pct).toFixed(2)}%`}
                 </td>
                 <td className="py-2 pr-3">
-                  {ind.updated_this_run ? (
+                  {ind.source_checked_at ? (
+                    <span title="Date the source was retrieved; the observation period is shown separately">
+                      Checked {formatDayMonth(ind.source_checked_at)}
+                    </span>
+                  ) : ind.updated_this_run ? (
                     <span
                       className="inline-flex items-center gap-1 text-teal"
                       title={
@@ -92,6 +97,10 @@ export default function IndicatorsTable({ indicators, selectedId, onSelect }: Pr
                 </td>
                 <td className="py-2 pr-3">
                   {ind.next_release_estimate ? formatDayMonth(ind.next_release_estimate) : "—"}
+                </td>
+                <td className="py-2 pr-3">
+                  {latest ? formatMonth(latest.date) : "—"}
+                  {latest?.provisional && <span> (provisional)</span>}
                 </td>
               </tr>
             );

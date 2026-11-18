@@ -17,6 +17,14 @@ test("/simple is current static HTML, with only its two GIF requests", async ({ 
   const nowcast = latest.horizons.find((h: { kind: string }) => h.kind === "nowcast");
   await expect(page.locator("#estimates")).toContainText(`${nowcast.qoq_growth_pct.toFixed(2)}%`);
   expect(await page.locator("pre").count()).toBe(indicators.indicators.length);
+  const anz = page.locator("#latest-indicators tr").filter({ hasText: "Consumer confidence (ANZ)" });
+  const source = indicators.indicators.find((i: { id: string }) => i.id === "anz_sent");
+  const point = source.series.at(-1);
+  await expect(anz).toContainText(point.date+(point.provisional ? " (prov.)" : ""));
+  await expect(anz).toContainText(String(point.value));
+  await expect(page.getByText(/Source checked /)).toBeVisible();
+  const provisional = source.series.filter((p: { provisional?: boolean }) => p.provisional).map((p: { date: string }) => p.date);
+  await expect(page.getByText(`Provisional periods: ${provisional.join(", ")}.`)).toBeVisible();
   expect(await page.locator("body > h2").last().textContent()).toBe("Methodology");
   await page.getByRole("link", { name: "Methodology", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Methodology", exact: true })).toBeVisible();

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import comboIndicators from "../data/indicators_combo.json";
 import v2Indicators from "../data/indicators_v2.json";
+import type { Indicator } from "../src/lib/types";
 
 // `/` serves v3 and `/v2` serves v2. Both are published weekly by separate
 // pipelines, so both need covering: the point of keeping v2 running is that it
@@ -164,3 +165,21 @@ test("homepage preserves percentage growth for CPI and ratio-scale levels", asyn
     await expect(row.getByRole("cell").nth(3)).toHaveText(`${sign}${Math.abs(growth).toFixed(2)}%`);
   }
 });
+
+for (const route of ["/", "/v2"]) {
+  test(`${route} distinguishes ANZ monthly period, provisional status and source check`, async ({ page }) => {
+    await page.goto(route);
+    const ind = comboIndicators.indicators.find((r) => r.id === "anz_sent")! as Indicator;
+    const latest = ind.series.at(-1)!;
+    const period = new Date(`${latest.date}-01`).toLocaleDateString("en-AU", { month: "short", year: "2-digit", timeZone: "UTC" });
+    const checked = new Date(ind.source_checked_at!).toLocaleDateString("en-AU", { day: "numeric", month: "long", timeZone: "UTC" });
+    const row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: ind.name, exact: true }) });
+    await expect(row.getByRole("cell").nth(1)).toHaveText(latest.value.toFixed(1));
+    await expect(row.getByRole("cell").nth(6)).toHaveText(period+(latest.provisional ? " (provisional)" : ""));
+    await expect(row.getByRole("cell").nth(4)).toHaveText(`Checked ${checked}`);
+    await expect(row.getByRole("cell").nth(5)).toHaveText("—");
+    await page.getByRole("button", { name: /Consumer confidence \(ANZ\)/ }).click();
+    await expect(page.getByText(/Monthly average; provisional observations are labelled/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Official monthly source" })).toHaveAttribute("href", /monthly-ratings$/);
+  });
+}

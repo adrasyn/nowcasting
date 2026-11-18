@@ -1,0 +1,115 @@
+{
+  "schema": "anz-monthly-vintages-1",
+  "legacy_through": "2026-07-01",
+  "legacy_commit": "8a1379b4ab7a75c778a1a3e11894231a77c15d7a",
+  "policy": "Freeze legacy and final values. Only managed provisional months may change, with each prior version retained in vintages.",
+  "frozen_conflicts": [
+    {
+      "date": "2026-05-01",
+      "stored": 66.5,
+      "source": 66.0
+    },
+    {
+      "date": "2026-07-01",
+      "stored": 75.0,
+      "source": 75.4
+    }
+  ],
+  "observations": {
+    "2026-05-01": {
+      "value": 66.5,
+      "provisional": true,
+      "note": "Legacy indicative monthly value; original panel metadata records the ** flag. Preserved, not replaced by the current table's 66.0."
+    },
+    "2026-07-01": {
+      "value": 75.0,
+      "provisional": true,
+      "note": "Legacy value committed on 20 July, before month end. Exact original aggregation not archived; treated as provisional and preserved rather than replaced by 75.4."
+    },
+    "2026-08-01": {
+      "value": 74.4,
+      "source_marker": "",
+      "provisional": false
+    },
+    "2026-09-01": {
+      "value": 74.6,
+      "source_marker": "",
+      "provisional": false
+    },
+    "2026-10-01": {
+      "value": 67.7,
+      "source_marker": "**",
+      "provisional": true
+    },
+    "2026-11-01": {
+      "value": 65.3,
+      "source_marker": "**",
+      "provisional": true
+    }
+  },
+  "vintages": [
+    {
+      "source_url": "https://www.roymorgan.com/morgan-poll/consumer-confidence-anz-roy-morgan-australian-cc-monthly-ratings",
+      "source_sha256": "ea95cbaa557127edafc79d85380086eb93ce8fe07a709a0b0bf606aaaec17c8b",
+      "source_path": "nowcasting_v2/data_sources/anz_sent/ea95cbaa557127edafc79d85380086eb93ce8fe07a709a0b0bf606aaaec17c8b.txt",
+      "source_format": "browser-extracted-monthly-table",
+      "retrieved_at": "2026-11-18T12:11:09Z",
+      "release_date": null,
+      "changes": [
+        {
+          "date": "2026-08-01",
+          "old": null,
+          "value": 74.4,
+          "source_marker": "",
+          "provisional": false
+        },
+        {
+          "date": "2026-09-01",
+          "old": null,
+          "value": 74.6,
+          "source_marker": "",
+          "provisional": false
+        },
+        {
+          "date": "2026-10-01",
+          "old": null,
+          "value": 67.7,
+          "source_marker": "**",
+          "provisional": true
+        },
+        {
+          "date": "2026-11-01",
+          "old": null,
+          "value": 65.3,
+          "source_marker": "**",
+          "provisional": true
+        }
+      ],
+      "audit": {
+        "compared": 578,
+        "differences": [
+          {
+            "date": "2026-05-01",
+            "stored": 66.5,
+            "source": 66.0
+          },
+          {
+            "date": "2026-07-01",
+            "stored": 75.0,
+            "source": 75.4
+          }
+        ],
+        "checked_at": "2026-11-18T12:11:09Z"
+      }
+    }
+  ],
+  "latest_source": {
+    "source_url": "https://www.roymorgan.com/morgan-poll/consumer-confidence-anz-roy-morgan-australian-cc-monthly-ratings",
+    "source_sha256": "ea95cbaa557127edafc79d85380086eb93ce8fe07a709a0b0bf606aaaec17c8b",
+    "source_path": "nowcasting_v2/data_sources/anz_sent/ea95cbaa557127edafc79d85380086eb93ce8fe07a709a0b0bf606aaaec17c8b.txt",
+    "source_format": "browser-extracted-monthly-table",
+    "retrieved_at": "2026-11-18T12:11:09Z",
+    "release_date": null
+  },
+  "legacy_sha256": "ba88f92b14b75878e5a34b8f5747ed1970206d80c5fd2333434980065d8747bb"
+}

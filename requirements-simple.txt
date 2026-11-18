@@ -1,0 +1,2 @@
+# Build-time only; /simple serves HTML and GIF87a with no runtime dependencies.
+Pillow==12.3.0

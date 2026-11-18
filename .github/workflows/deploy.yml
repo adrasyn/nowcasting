@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "src/**"
+      - "scripts/simple/**"
+      - "requirements-simple.txt"
       - "data/**"
       - "public/**"
       - "package.json"
@@ -41,6 +43,19 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Set up Python for static GIF generation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements-simple.txt
+
+      - name: Install simple-page build dependency
+        run: python -m pip install -r requirements-simple.txt
+
+      - name: Test simple-page generation
+        run: python -m unittest discover -s scripts/simple -p 'test_*.py'
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

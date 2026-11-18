@@ -1,47 +1,13 @@
 "use client";
 
 import type { Indicator } from "@/lib/types";
-import { formatDayMonth, formatMonth, formatRawChange } from "@/lib/format";
+import { formatDayMonth, formatLatestValue, formatMonth, formatRawChange } from "@/lib/format";
+import { hasPercentChange, indicatorDisplayUnit } from "@/lib/indicatorDisplay";
 
 interface Props {
   indicators: Indicator[];
   selectedId: string | null;
   onSelect: (ind: Indicator) => void;
-}
-
-// % change is meaningless for rates, diffusion indices and index levels.
-const NO_PCT_UNITS = new Set(["percent", "index", "%", "net balance"]);
-
-function formatLatestValue(value: number, unit: string): string {
-  switch (unit) {
-    case "$ millions":
-    case "$m":
-      return `$${Math.round(value).toLocaleString("en-AU")}M`;
-    case "$bn":
-      return `$${value.toLocaleString("en-AU", { maximumFractionDigits: 1 })}bn`;
-    case "persons":
-    case "000s persons":
-      return `${value.toLocaleString("en-AU", { maximumFractionDigits: 1 })}k`;
-    // Thousands of hours — see the note in lib/format.ts. Scale for display so
-    // the number carries a unit a reader can parse.
-    case "hours (thousands)": {
-      if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}bn hrs`;
-      if (value >= 1000) return `${(value / 1000).toFixed(1)}m hrs`;
-      return `${Math.round(value).toLocaleString("en-AU")}k hrs`;
-    }
-    case "dwellings":
-    case "count":
-      return Math.round(value).toLocaleString("en-AU");
-    case "percent":
-    case "%":
-      return `${value.toFixed(1)}%`;
-    case "net balance":
-      return value.toFixed(0);
-    case "index":
-      return value.toFixed(1);
-    default:
-      return value.toLocaleString("en-AU");
-  }
 }
 
 function changeClass(delta: number): string {
@@ -57,7 +23,8 @@ export default function IndicatorsTable({ indicators, selectedId, onSelect }: Pr
       const latest = n > 0 ? ind.series[n - 1] : null;
       const prev = n > 1 ? ind.series[n - 2] : null;
       const delta = latest && prev ? latest.value - prev.value : null;
-      const pct = latest && prev && prev.value !== 0 ? ((latest.value - prev.value) / prev.value) * 100 : null;
+      const pct = hasPercentChange(ind) && latest && prev && prev.value !== 0
+        ? ((latest.value - prev.value) / prev.value) * 100 : null;
       return { ind, latest, prev, delta, pct };
     })
     .sort((a, b) => {
@@ -83,7 +50,7 @@ export default function IndicatorsTable({ indicators, selectedId, onSelect }: Pr
         <tbody>
           {rows.map(({ ind, latest, delta, pct }) => {
             const isSelected = selectedId === ind.id;
-            const pctSuppressed = NO_PCT_UNITS.has(ind.unit);
+            const unit = indicatorDisplayUnit(ind);
             return (
               <tr
                 key={ind.id}
@@ -94,13 +61,13 @@ export default function IndicatorsTable({ indicators, selectedId, onSelect }: Pr
               >
                 <td className="py-2 pr-3">{ind.name}</td>
                 <td className="py-2 pr-3">
-                  {latest ? formatLatestValue(latest.value, ind.unit) : "—"}
+                  {latest ? formatLatestValue(latest.value, unit) : "—"}
                 </td>
                 <td className={`py-2 pr-3 ${delta != null ? changeClass(delta) : ""}`}>
-                  {delta != null ? formatRawChange(delta, ind.unit) : "—"}
+                  {delta != null ? formatRawChange(delta, unit) : "—"}
                 </td>
-                <td className={`py-2 pr-3 ${pct != null && !pctSuppressed ? changeClass(pct) : ""}`}>
-                  {pctSuppressed || pct == null
+                <td className={`py-2 pr-3 ${pct != null ? changeClass(pct) : ""}`}>
+                  {pct == null
                     ? "—"
                     : `${pct > 0 ? "+" : pct < 0 ? "−" : ""}${Math.abs(pct).toFixed(2)}%`}
                 </td>

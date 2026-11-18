@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { IndicatorData, Indicator, IndicatorGroup } from "@/lib/types";
 import { formatMonth } from "@/lib/format";
+import { indicatorDisplayUnit } from "@/lib/indicatorDisplay";
 import IndicatorSparkline, { type SparklineMode } from "./IndicatorSparkline";
 import IndicatorDetailCard from "./IndicatorDetailCard";
 import IndicatorsTable from "./IndicatorsTable";
@@ -83,7 +84,7 @@ export default function IndicatorGrid({ indicators }: Props) {
                   />
                 )}
                 <p className="text-xs text-border-heavy pr-3">{ind.name}</p>
-                <p className="text-[10px] text-label-light mb-1">{ind.unit}</p>
+                <p className="text-[10px] text-label-light mb-1">{indicatorDisplayUnit(ind)}</p>
                 <IndicatorSparkline
                   series={ind.series}
                   mode={SPARKLINE_MODE[ind.id] ?? "level"}

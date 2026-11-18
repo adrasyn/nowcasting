@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import type { Indicator } from "@/lib/types";
 import { formatMonth } from "@/lib/format";
+import { indicatorDisplayUnit } from "@/lib/indicatorDisplay";
 import { chartColors, axisTick } from "@/lib/chartTheme";
 
 interface Props {
@@ -18,7 +19,7 @@ export default function IndicatorDetailCard({ indicator, onClose }: Props) {
       <div className="flex items-baseline justify-between mb-2">
         <div>
           <p className="font-headline text-xl text-teal">{indicator.name}</p>
-          <p className="text-[10px] text-label-light">{indicator.group} · {indicator.unit} · {indicator.source}</p>
+          <p className="text-[10px] text-label-light">{indicator.group} · {indicatorDisplayUnit(indicator)} · {indicator.source}</p>
         </div>
         <button
           onClick={onClose}

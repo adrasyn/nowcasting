@@ -54,7 +54,7 @@ export function formatRawChange(delta: number, unit: string): string {
   const abs = Math.abs(delta);
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
 
-  switch (unit) {
+  switch (unit.trim().toLowerCase()) {
     case "$ millions":
     case "$m": {
       if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}bn`;
@@ -90,5 +90,36 @@ export function formatRawChange(delta: number, unit: string): string {
       return `${delta === 0 ? "" : sign}${abs.toFixed(1)} pts`;
     default:
       return `${sign}${abs.toFixed(1)}`;
+  }
+}
+
+export function formatLatestValue(value: number, unit: string): string {
+  switch (unit.trim().toLowerCase()) {
+    case "$ millions":
+    case "$m":
+      return `$${Math.round(value).toLocaleString("en-AU")}M`;
+    case "$bn":
+      return `$${value.toLocaleString("en-AU", { maximumFractionDigits: 1 })}bn`;
+    case "persons":
+    case "000s persons":
+      return `${value.toLocaleString("en-AU", { maximumFractionDigits: 1 })}k`;
+    // Thousands of hours — see formatRawChange above.
+    case "hours (thousands)": {
+      if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}bn hrs`;
+      if (value >= 1000) return `${(value / 1000).toFixed(1)}m hrs`;
+      return `${Math.round(value).toLocaleString("en-AU")}k hrs`;
+    }
+    case "dwellings":
+    case "count":
+      return Math.round(value).toLocaleString("en-AU");
+    case "percent":
+    case "%":
+      return `${value.toFixed(1)}%`;
+    case "net balance":
+      return value.toFixed(0);
+    case "index":
+      return value.toFixed(1);
+    default:
+      return value.toLocaleString("en-AU");
   }
 }

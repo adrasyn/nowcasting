@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import comboIndicators from "../data/indicators_combo.json";
+import v2Indicators from "../data/indicators_v2.json";
 
 // `/` serves v3 and `/v2` serves v2. Both are published weekly by separate
 // pipelines, so both need covering: the point of keeping v2 running is that it
@@ -120,4 +122,45 @@ test("/v3 still resolves, for links made while it was the preview", async ({ pag
   // Same implementation as the homepage, so it must serve v3's data too.
   await indicatorMeta(page);
   await expect(page.getByText(V3_INDICATOR)).toBeVisible();
+});
+
+for (const [route, payload] of [["/", comboIndicators], ["/v2", v2Indicators]] as const) {
+  test(`${route} formats survey points and rates without percentage growth`, async ({ page }) => {
+    await page.goto(route);
+    const ids = route === "/"
+      ? ["nab_conditions", "aig_pmi", "unemployment_rate", "nab_cu", "nab_trade", "nab_emp"]
+      : ["nab_cond", "ue", "nab_cu", "nab_trade", "nab_emp"];
+    for (const id of ids) {
+      const ind = payload.indicators.find((row) => row.id === id)!;
+      const latest = ind.series.at(-1)!.value;
+      const delta = latest - ind.series.at(-2)!.value;
+      const rate = ["unemployment_rate", "ue", "nab_cu"].includes(id);
+      const decimals = rate || ind.unit.toLowerCase() === "index" ? 1 : 0;
+      const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
+      const row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: ind.name, exact: true }) });
+      await expect(row.getByRole("cell").nth(1)).toHaveText(`${latest.toFixed(decimals)}${rate ? "%" : ""}`);
+      await expect(row.getByRole("cell").nth(2)).toHaveText(`${sign}${Math.abs(delta).toFixed(decimals)}${rate ? "pp" : " pts"}`);
+      await expect(row.getByRole("cell").nth(3)).toHaveText("—");
+      if (delta < 0) await expect(row.getByRole("cell").nth(2)).toHaveClass(/text-\[#c0392b\]/);
+      await expect(row.getByRole("cell").nth(3)).not.toHaveClass(/text-teal/);
+    }
+    const capacity = page.getByRole("button", { name: /Capacity use/ });
+    await expect(capacity).toContainText("percent");
+    await capacity.click();
+    const capacityGroup = payload.indicators.find((ind) => ind.id === "nab_cu")!.group;
+    await expect(page.getByText(`${capacityGroup} · percent ·`, { exact: false })).toBeVisible();
+  });
+}
+
+test("homepage preserves percentage growth for CPI and ratio-scale levels", async ({ page }) => {
+  await page.goto("/");
+  for (const id of ["cpi", "commodity_prices", "unit_labour_cost", "job_ads", "credit", "household_spending"]) {
+    const ind = comboIndicators.indicators.find((row) => row.id === id)!;
+    const previous = ind.series.at(-2)!.value;
+    const delta = ind.series.at(-1)!.value - previous;
+    const growth = delta / previous * 100;
+    const sign = growth > 0 ? "+" : growth < 0 ? "−" : "";
+    const row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: ind.name, exact: true }) });
+    await expect(row.getByRole("cell").nth(3)).toHaveText(`${sign}${Math.abs(growth).toFixed(2)}%`);
+  }
 });

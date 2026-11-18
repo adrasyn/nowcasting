@@ -54,3 +54,38 @@ The R and Python model environments are separate from the site. The v1 entry poi
 - `docs/measurements/` and `docs/reviews/` — dated research and review evidence. `docs/superpowers/` contains point-in-time design plans, not current operating instructions.
 
 The v2 candidate series and transformations are listed in [`nowcasting_v2/seed/panel_info.csv`](nowcasting_v2/seed/panel_info.csv); v3's 14-series panel is defined by [`nowcasting_v3/model_spec_AU.csv`](nowcasting_v3/model_spec_AU.csv). Both use ABS National Accounts (5206.0) quarterly chain-volume GDP as the target.
+
+## Lightweight alternate page
+
+[`/simple`](https://nowcast.wlsn.me/simple/) is the plain HTML version: native
+monospaced tables, complete indicator/GDP/nowcast histories, methodology at the
+bottom, and two 288×144 monochrome GIF87a charts. It has no page JavaScript,
+CSS, framework assets, external fonts or runtime dependencies. The normal
+homepage is unchanged.
+
+Every `npm run build` runs `scripts/simple/build.py` after Next's export. It
+reads the same committed `data/` payloads, selects the same combination/v3
+fallback, and writes only `out/simple/`. Data commits already trigger the Pages
+workflow, so the page and charts refresh with the ordinary model publication;
+no additional model job or automation is needed. The build derives dates,
+quarter labels, y/y growth, release markers, counts and model/uncertainty prose
+from those payloads. Refused estimates remove the current-number table and
+nowcast chart rather than retaining a stale image. A next-quarter forecast with
+zero months of data is labelled "No data", matching the main page's guard.
+
+Python 3.12 and Pillow are needed at build time only:
+
+```bash
+python -m pip install -r requirements-simple.txt
+python -m unittest discover -s scripts/simple -p 'test_*.py'
+npm run build
+```
+
+The GIF date axis uses the horizon's own release date, with the same fallback
+and five-day right padding as the live chart. Points and bands stop at the
+last recorded vintage. GIF URLs include a content hash to refresh cached images
+when their bytes change. Y/y growth uses the implied level and the same quarter
+a year earlier; the next-quarter figure chains the current nowcast. The
+`build-commit` meta tag records the deployed source SHA without adding visible
+prose or a network request. This is an early-web treatment, not a claim of
+literal compatibility with the original 1990 browser.

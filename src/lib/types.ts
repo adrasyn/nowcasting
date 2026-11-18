@@ -92,6 +92,7 @@ export type IndicatorGroup = string;
 export interface IndicatorPoint {
   date: string; // "YYYY-MM"
   value: number;
+  provisional?: boolean;
 }
 
 export interface Indicator {
@@ -100,6 +101,9 @@ export interface Indicator {
   group: IndicatorGroup;
   unit: string;
   source: string;
+  source_url?: string;
+  source_checked_at?: string;
+  data_note?: string;
   series: IndicatorPoint[];
   last_release_date?: string;       // ISO "YYYY-MM-DD" — when the latest point was released
   next_release_estimate?: string;   // ISO "YYYY-MM-DD" — when the next point is expected

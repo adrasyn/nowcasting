@@ -20,6 +20,10 @@ export default function IndicatorDetailCard({ indicator, onClose }: Props) {
         <div>
           <p className="font-headline text-xl text-teal">{indicator.name}</p>
           <p className="text-[10px] text-label-light">{indicator.group} · {indicatorDisplayUnit(indicator)} · {indicator.source}</p>
+          {indicator.data_note && <p className="text-xs text-label mt-1">{indicator.data_note}</p>}
+          {indicator.source_url && (
+            <a className="text-xs underline" href={indicator.source_url}>Official monthly source</a>
+          )}
         </div>
         <button
           onClick={onClose}
@@ -36,8 +40,8 @@ export default function IndicatorDetailCard({ indicator, onClose }: Props) {
             <YAxis tick={axisTick} tickFormatter={(v) => v.toLocaleString()} domain={["auto", "auto"]} />
             <Tooltip
               labelFormatter={(l) => formatMonth(String(l))}
-              formatter={(v) => {
-                if (typeof v === "number") return [v.toLocaleString(), ""];
+              formatter={(v, _name, item) => {
+                if (typeof v === "number") return [v.toLocaleString(), item.payload?.provisional ? "Provisional monthly average" : ""];
                 return ["", ""];
               }}
               contentStyle={{ fontSize: 11 }}

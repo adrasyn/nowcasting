@@ -1,0 +1,2 @@
+# Preserve verbatim source snapshots, including a source's trailing blank lines.
+nowcasting_v2/data_sources/anz_sent/*.txt whitespace=-blank-at-eof

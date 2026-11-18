@@ -57,6 +57,9 @@ jobs:
       - name: Test simple-page generation
         run: python -m unittest discover -s scripts/simple -p 'test_*.py'
 
+      - name: Test ANZ monthly refresh guards
+        run: python -m unittest discover -s nowcasting_v2/scrapers -p 'test_anz_monthly.py'
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 

@@ -21,7 +21,10 @@ Design:
     cadence: ABS series reuse v1's scraped dates; survey series (NAB/ANZ/Westpac)
     use SURVEY_SCHEDULE (computed release dates); other series keep the month-shift.
 """
-import json, csv, os, calendar, datetime
+import json, csv, os, calendar, datetime, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scrapers.anz_monthly import read_csv as read_anz_csv, update_indicator as update_anz_indicator
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IND = os.path.join(ROOT, "data", "indicators_v2.json")
@@ -78,15 +81,6 @@ def _monthly_tuesday(offset_months, nth):
     return f
 
 
-def _weekly_tuesday(y, m, today):
-    """Schedule for a WEEKLY survey (ANZ-Roy Morgan, published every Tuesday). The
-    stored series is monthly, but it is refreshed weekly, so "last updated" is the
-    most recent Tuesday on/before today and "next" is the following Tuesday."""
-    last = today - datetime.timedelta(days=(today.weekday() - TUE) % 7)
-    nxt = today + datetime.timedelta(days=((TUE - today.weekday()) % 7) or 7)
-    return last, nxt
-
-
 MON = 0
 
 
@@ -134,7 +128,6 @@ SURVEY_SCHEDULE = {
         "nab_emp", "nab_forward", "nab_stocks", "nab_cu")},
     "wmi_sent": _monthly_tuesday(0, 2),   # Westpac-MI: 2nd Tuesday of the same month.
     "anz_ads":  _anz_jobads,              # ANZ-Indeed Job Ads: 1st Monday of the following month (holiday-adjusted).
-    "anz_sent": _weekly_tuesday,          # ANZ-Roy Morgan Consumer Confidence: weekly (every Tuesday).
 }
 
 
@@ -176,7 +169,7 @@ def load_v1_abs_dates():
 
 
 def main():
-    doc = json.load(open(IND))
+    doc = json.loads(Path(IND).read_text())
     v1_dates = load_v1_abs_dates()
     today = datetime.date.today()
     advanced = []
@@ -208,7 +201,14 @@ def main():
         if adv > 0:
             updated_record.append({"id": sid, "name": ind["name"],
                                    "prev_period": old_latest, "latest_period": new_latest})
-        if sid in SURVEY_SCHEDULE:
+        if sid == "anz_sent":
+            metadata = json.loads(Path(RAW, "anz_sent.meta.json").read_text())
+            update_anz_indicator(ind, read_anz_csv(Path(RAW, "anz_sent.csv")), metadata)
+            # update_anz_indicator supplies provisional flags as well as values.
+            new = ind["series"]
+            if adv > 0:
+                advanced.append(f"{sid} {old_latest}->{new_latest}")
+        elif sid in SURVEY_SCHEDULE:
             # Survey series: compute the real release date from each survey's
             # published cadence, replacing the drifting month-shift heuristic.
             sy, sm = int(new_latest[:4]), int(new_latest[5:7])
@@ -235,7 +235,7 @@ def main():
                 abs_synced.append(sid)
         ind["series"] = new
 
-    json.dump(doc, open(IND, "w"), indent=2)
+    Path(IND).write_text(json.dumps(doc, indent=2))
     print(f"indicators_v2.json regenerated ({len(doc['indicators'])} indicators).")
     if advanced:
         print("Advanced:", ", ".join(advanced))

@@ -60,12 +60,8 @@ for (yy, mm), want in ANZ_JOBADS_TABLE.items():
 _, nxt = sched["anz_ads"](2026, 6, TODAY)
 check("ANZ Job Ads Jun -> next_release", nxt, datetime.date(2026, 8, 4))
 
-# ANZ-Roy Morgan Consumer Confidence: WEEKLY (every Tuesday). Stored monthly, but
-# refreshed weekly -> last Tue <= today, next Tue > today, never in the future.
-last, nxt = sched["anz_sent"](2026, 7, TODAY)
-check("ANZ-RM -> last_release (last Tue <= today)", last, datetime.date(2026, 7, 14))
-check("ANZ-RM -> next_release (next Tue)", nxt, datetime.date(2026, 7, 21))
-check("ANZ-RM last_release not in future", last <= TODAY, True)
+# ANZ monthly observations must not acquire a release date from today's clock.
+check("ANZ-RM has no wall-clock release rule", "anz_sent" in sched, False)
 
 print("\nRESULT:", "ALL PASS" if not fails else f"{len(fails)} FAILURE(S): {fails}")
 sys.exit(1 if fails else 0)

@@ -205,14 +205,9 @@ parse_anz_sent <- function(path) {
 
 fetch_anz_sent <- function(fixtures_dir = "tests/fixtures/anz",
                            cache_dir = "cache", live = TRUE) {
+  if (live) stop("ANZ monthly refresh moved to scrapers/anz_monthly.py; use its guarded vintage ledger.")
   log <- character(); add <- function(...) log[[length(log)+1]] <<- sprintf(...)
   path <- file.path(fixtures_dir, "rm_cc_monthly.html")
-  if (live) {
-    dest <- file.path(cache_dir, "rm_cc_monthly_live.html")
-    p <- .dl(RM_MONTHLY_URL, dest)
-    if (!is.na(p)) { path <- p; add("live HTML: %s", RM_MONTHLY_URL) }
-    else add("live download FAILED, using fixture: %s", RM_MONTHLY_URL)
-  }
   if (!file.exists(path))
     return(list(df = tibble(date=as.Date(character()), value=numeric()),
                 log = c(log, "anz_sent BLOCKED: no monthly-ratings HTML")))
@@ -314,8 +309,10 @@ fetch_ivi <- function(cache_dir = "cache", fixtures_dir = "tests/fixtures/anz",
 # ---------------------------------------------------------------------------
 fetch_anz_ivi_all <- function(dest_dir = "data_raw", live = TRUE) {
   dir.create(dest_dir, recursive = TRUE, showWarnings = FALSE)
+  # ANZ consumer confidence is now owned by scrapers/anz_monthly.py. Its guarded
+  # vintage ledger must not be bypassed by this legacy full-file/fixture writer.
+  # parse_anz_sent remains available for the existing historical fixture tests.
   res <- list(anz_ads = fetch_anz_ads(live = live),
-              anz_sent = fetch_anz_sent(live = live),
               ivi = fetch_ivi(live = live))
   for (id in names(res)) {
     cat(sprintf("\n--- %s ---\n%s\n", id, paste(res[[id]]$log, collapse = "\n")))

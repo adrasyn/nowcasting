@@ -196,7 +196,8 @@ def build_site(data_dir, output, commit=''):
     parts.append('<a name="indicators"></a><h2>Indicators</h2>')
     parts.append(table(['Indicator / unit', 'Latest', 'Period'], [
         (f'<a href="#i{j}">{esc(i["name"])}</a><br>{esc(i["unit"])}',
-         f'{i["series"][-1]["value"]:.6g}' if i['series'] else '-', esc(i['series'][-1]['date']) if i['series'] else '-')
+         f'{i["series"][-1]["value"]:.6g}' if i['series'] else '-',
+         esc(i['series'][-1]['date'])+(' (prov.)' if i['series'][-1].get('provisional') else '') if i['series'] else '-')
         for j, i in enumerate(indicators)], 'latest-indicators'))
     parts.append('<p><a href="#top">Top</a></p><a name="history"></a><h2>History</h2>'
                  '<h3>Final nowcast and ABS first release</h3><p>Quarterly growth (%).</p>')
@@ -220,6 +221,13 @@ def build_site(data_dir, output, commit=''):
         parts.append(f'<a name="i{j}"></a><h3>{esc(i["name"])}</h3><p>{esc(i["unit"])}. Source: {esc(i["source"])}.</p>')
         if i.get('last_release_date'):
             parts.append('<p>Released '+esc(i['last_release_date'])+('. Next (estimate): '+esc(i['next_release_estimate']) if i.get('next_release_estimate') else '')+'.</p>')
+        if i.get('source_checked_at'):
+            parts.append('<p>Source checked '+esc(date(i['source_checked_at']))+'. This is a retrieval date, not an observation or release date.</p>')
+        if i.get('data_note'):
+            parts.append('<p>'+esc(i['data_note'])+'</p>')
+        provisional = [r['date'] for r in i['series'] if r.get('provisional')]
+        if provisional:
+            parts.append('<p>Provisional periods: '+esc(', '.join(provisional))+'.</p>')
         parts.append('<pre>Period   Value\n'+''.join(esc(r['date'])+'  '+num(r['value'])+'\n' for r in i['series'])+'</pre><p><a href="#indicators">Indicators</a></p>')
     parts.append(methodology(latest, errors, indicators, combo))
     parts.append('<hr><p><a href="/">Main nowcast</a> | <a href="https://home.wlsn.me/">James Wilson</a></p></body></html>\n')

@@ -6371,7 +6371,7 @@
       "name": "Consumer confidence (ANZ)",
       "group": "Households",
       "unit": "index",
-      "source": "ANZ",
+      "source": "ANZ\u2013Roy Morgan (monthly)",
       "series": [
         {
           "date": "2022-05",
@@ -6567,7 +6567,8 @@
         },
         {
           "date": "2026-05",
-          "value": 66.5
+          "value": 66.5,
+          "provisional": true
         },
         {
           "date": "2026-06",
@@ -6575,14 +6576,34 @@
         },
         {
           "date": "2026-07",
-          "value": 75.0
+          "value": 75.0,
+          "provisional": true
+        },
+        {
+          "date": "2026-08",
+          "value": 74.4
+        },
+        {
+          "date": "2026-09",
+          "value": 74.6
+        },
+        {
+          "date": "2026-10",
+          "value": 67.7,
+          "provisional": true
+        },
+        {
+          "date": "2026-11",
+          "value": 65.3,
+          "provisional": true
         }
       ],
-      "last_release_date": "2026-11-10",
-      "next_release_estimate": "2026-11-17",
       "updated_this_run": false,
       "prev_period": "2026-07",
-      "latest_period": "2026-07"
+      "latest_period": "2026-11",
+      "source_url": "https://www.roymorgan.com/morgan-poll/consumer-confidence-anz-roy-morgan-australian-cc-monthly-ratings",
+      "source_checked_at": "2026-11-18T12:11:09Z",
+      "data_note": "Monthly average; provisional observations are labelled. Historical vintages are preserved."
     },
     {
       "id": "wmi_sent",

@@ -18,11 +18,20 @@ async function progress(page: import("@playwright/test").Page) {
       fraction:
         getComputedStyle(p).visibility === "hidden" ? 0 : 1 - offset / l,
       state: svg.getAttribute("data-evolution-motion"),
+      visibility: getComputedStyle(p).visibility,
       animations: svg
         .getAnimations({ subtree: true })
         .map((a) => ({ time: a.currentTime, state: a.playState })),
     };
   });
+}
+async function initialized(page: import("@playwright/test").Page) {
+  // A cold WebKit page can expose the intentionally complete SSR fallback
+  // before hydration. Test the animation only after enhancement has initialized.
+  await expect(page.locator(chart)).toHaveAttribute(
+    "data-evolution-motion",
+    /waiting|priming|playing|paused|done/,
+  );
 }
 async function reveal(page: import("@playwright/test").Page) {
   await page.locator(chart).evaluate((el) => {
@@ -35,6 +44,7 @@ test("phone: an offscreen draw holds at zero until its first visible paint, then
 }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
+  await initialized(page);
   await page.evaluate(() => scrollTo(0, 0));
   await page.waitForTimeout(800);
   // The actual plotted line is below an iPhone's visual viewport although the
@@ -50,7 +60,14 @@ test("phone: an offscreen draw holds at zero until its first visible paint, then
       ),
   ).toBe(true);
   const waiting = await progress(page);
-  expect(waiting.fraction).toBeCloseTo(0, 3);
+  expect(
+    waiting.fraction,
+    JSON.stringify({
+      state: waiting.state,
+      visibility: waiting.visibility,
+      time: waiting.animations[0]?.time,
+    }),
+  ).toBeCloseTo(0, 3);
   expect(waiting.animations.length).toBeGreaterThan(0);
   expect(
     waiting.animations.every((a) => a.time === 0 && a.state === "paused"),
@@ -96,6 +113,7 @@ test("slow font/render readiness preserves frame zero, including quarter switchi
   });
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await initialized(page);
   await reveal(page);
   await page.waitForTimeout(800);
   expect((await progress(page)).fraction).toBeCloseTo(0, 3);
@@ -128,6 +146,7 @@ test("desktop draw starts after layout and finishes with exact unmasked data", a
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
+  await initialized(page);
   await expect
     .poll(async () => (await progress(page)).fraction)
     .toBeGreaterThan(0.02);

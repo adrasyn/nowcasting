@@ -1905,3 +1905,22 @@
 .nowcast-monitor .estimate-number > .value-counter {
   font-size: inherit;
 }
+
+/* Progressive enhancement: no-JS/reduced-motion output stays complete. */
+.nowcast-monitor
+  .evolution-block
+  svg:is([data-evolution-motion="waiting"], [data-evolution-motion="priming"])
+  :is(.chart-line, .band-fill) {
+  visibility: hidden;
+}
+.nowcast-monitor
+  .evolution-block
+  svg:is([data-evolution-motion="waiting"], [data-evolution-motion="priming"])
+  .chart-point {
+  opacity: 0;
+}
+
+/* Keep the roving keyboard target visible without interrupting the draw. */
+.nowcast-monitor .evolution-block .chart-point:focus-visible {
+  opacity: 1 !important;
+}

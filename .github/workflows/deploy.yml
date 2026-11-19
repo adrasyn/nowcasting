@@ -35,7 +35,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -70,10 +70,19 @@ jobs:
         run: python -m unittest discover -s nowcasting_v2/scrapers -p 'test_anz_monthly.py'
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run e2e tests
         run: npm run test:e2e
+
+      - name: Save browser QA captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qa
+          path: test-results
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Build Next.js static site
         run: npm run build

@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
@@ -6,12 +6,26 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     headless: true,
-    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
-      : {},
   },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+        launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+          ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+          : {},
+      },
+    },
+    {
+      name: "webkit-iphone",
+      testMatch: "**/evolution-visibility.spec.ts",
+      use: { ...devices["iPhone 13"], browserName: "webkit" },
+    },
+  ],
   webServer: {
-    command: "npm test && npm run build && npx serve out -p 3000 --no-clipboard",
+    command:
+      "npm test && npm run build && npx serve out -p 3000 --no-clipboard",
     port: 3000,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,

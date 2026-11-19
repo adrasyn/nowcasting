@@ -22,7 +22,9 @@ frame opportunities prime the layout, then a zero frame precedes advancement.
 A RAF driver seeks the existing native 1500ms/ease timelines; long paint gaps do
 not consume the beginning of the draw. Offscreen scrolling pauses/resumes the
 same elapsed position, and completion disconnects observers and never replays
-on ordinary scrolling. A deliberate quarter change gets its own first draw.
+on ordinary scrolling. A deliberate quarter change gets its own first draw. Keyboard focus can enter
+the waiting plot and keeps the selected point visible without interrupting or
+resetting the draw.
 Resizing rebuilds measured dash/clip geometry at the same elapsed position.
 
 Server/no-JavaScript and reduced-motion output remains final and unmasked.
@@ -39,3 +41,7 @@ are executed in CI. Chromium and the production build also run locally.
 
 Rollback this correction by reverting its PR through the same Pages workflow;
 keep the previously approved card animation and production data commits.
+
+CI includes sufficient time for both browser engines and their OS dependencies;
+a previous run passed all 33 checks but reached the former 15-minute job limit
+during the final build. No publishing step executed on that cancelled PR run.

@@ -240,3 +240,20 @@ test("no-JavaScript and reduced-motion evolution fallbacks remain complete", asy
     await page.close();
   }
 });
+
+test("keyboard focus can enter an offscreen plot and keeps the selected point visible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+  await initialized(page);
+  await page.getByRole("tab").last().focus();
+  await page.keyboard.press("Tab");
+  const point = page.locator(chart + ' [data-point][tabindex="0"]');
+  await expect(point).toBeFocused();
+  await expect(point).toHaveCSS("opacity", "1");
+  await page.keyboard.press("ArrowLeft");
+  const previous = page.locator(chart + ' [data-point][tabindex="0"]');
+  await expect(previous).toBeFocused();
+  await expect(previous).toHaveCSS("opacity", "1");
+});

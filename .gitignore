@@ -47,6 +47,7 @@ next-env.d.ts
 /.obsidian/
 /.claude/
 /.cache/
+/ci-artifact/
 __pycache__/
 *.pyc
 # local notes / pasted images

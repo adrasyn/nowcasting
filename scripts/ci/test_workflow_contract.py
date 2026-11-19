@@ -38,6 +38,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn(f'mcr.microsoft.com/playwright:v{version}-noble', workflow)
         self.assertIn(f'!== "{version}"', action)
         self.assertIn("cache: ${{ inputs.project == 'chromium' && 'pip' || '' }}", action)
+        self.assertIn('git config --global --add safe.directory "$GITHUB_WORKSPACE"', action)
+        self.assertNotIn('safe.directory "*"', action)
         config = (ROOT/'playwright.config.ts').read_text()
         for name in ['evolution-visibility', 'evolution-legend', 'evolution-axis']:
             self.assertIn(f'**/{name}.spec.ts', config)

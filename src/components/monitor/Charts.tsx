@@ -27,6 +27,7 @@ import {
   type EntranceGroup,
 } from "@/lib/monitor/entrance";
 import { startEntrance } from "./Entrance";
+import { useEvolutionMotion } from "./useEvolutionMotion";
 const teal = "#034159",
   green = "#0cf25d",
   line = "#e2e8f0";
@@ -500,7 +501,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
   const rows = h?.runs ?? [],
     ref = useRef<SVGSVGElement>(null),
     id = useId().replaceAll(":", "");
-  useChartMotion(ref, h?.quarter);
+  useEvolutionMotion(ref, h?.quarter, rows.length);
   const { width: w, height: H } = useSvgSize(ref, 620, 280);
   const select = (n: number) => {
     setTarget(horizons[n].quarter);

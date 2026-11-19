@@ -1905,3 +1905,11 @@
 .nowcast-monitor .estimate-number > .value-counter {
   font-size: inherit;
 }
+
+/* Progressive enhancement: no-JS/reduced-motion output stays complete. */
+.nowcast-monitor
+  .evolution-block
+  svg:is([data-evolution-motion="waiting"], [data-evolution-motion="priming"])
+  :is(.chart-line, .band-fill, .chart-point) {
+  visibility: hidden;
+}

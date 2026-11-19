@@ -1883,3 +1883,25 @@
 .nowcast-monitor .series-chart svg {
   height: 180px;
 }
+
+/* Reserve final numeric metrics; animated generated text is aria-hidden. */
+.nowcast-monitor .value-counter {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+.nowcast-monitor .value-counter-final {
+  opacity: 0;
+}
+.nowcast-monitor .value-counter-visual {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nowcast-monitor .value-counter-visual::after {
+  content: attr(data-display);
+  white-space: nowrap;
+}
+.nowcast-monitor .estimate-number > .value-counter {
+  font-size: inherit;
+}

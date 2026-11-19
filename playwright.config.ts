@@ -19,7 +19,11 @@ export default defineConfig({
     },
     {
       name: "webkit-iphone",
-      testMatch: ["**/evolution-visibility.spec.ts", "**/evolution-legend.spec.ts"],
+      testMatch: [
+        "**/evolution-visibility.spec.ts",
+        "**/evolution-legend.spec.ts",
+        "**/evolution-axis.spec.ts",
+      ],
       use: { ...devices["iPhone 13"], browserName: "webkit" },
     },
   ],

@@ -30,6 +30,7 @@ import { startEntrance } from "./Entrance";
 import { useEvolutionMotion } from "./useEvolutionMotion";
 import { rangeTick } from "@/lib/monitor/rangeScale";
 import { chartColors } from "@/lib/chartTheme";
+import { evolutionAxis, evolutionTick } from "@/lib/monitor/evolutionAxis";
 const teal = "#034159",
   green = "#0cf25d",
   line = "#e2e8f0";
@@ -561,8 +562,10 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
     xmax = Math.max(0, ...ds),
     x = (r: V3Vintage) =>
       m.l + ((days(r) - xmin) / Math.max(1, xmax - xmin)) * (w - m.l - m.r),
-    vals = rows.flatMap((r) => [r.qoq_growth_pct, ...(bandFor(r, 95) ?? [])]),
-    [min, max] = domain(vals.length ? vals : [0], true),
+    vals = rows.flatMap((r) => [
+      r.qoq_growth_pct, ...(bandFor(r, 68) ?? []), ...(bandFor(r, 95) ?? []),
+    ]),
+    { min, max, ticks, step } = evolutionAxis(vals, H - m.t - m.b),
     y = (v: number) => m.t + ((max - v) / (max - min)) * (H - m.t - m.b),
     p = (rs: V3Vintage[], get: (r: V3Vintage) => number) =>
       rs.map((r, j) => `${j ? "L" : "M"}${x(r)},${y(get(r))}`).join(" ");
@@ -630,8 +633,8 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
               role="group"
               aria-label={`${h.quarter} weekly GDP estimates. Full weekly history is below.`}
             >
-              {[min, 0, max].map((v) => (
-                <g key={v}>
+              {ticks.map((v) => (
+                <g key={v} data-evolution-tick={v}>
                   <line
                     x1={m.l}
                     x2={w - m.r}
@@ -646,7 +649,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                     fontSize="11"
                     fill="#6b7280"
                   >
-                    {v.toFixed(1)}
+                    {evolutionTick(v, step)}
                   </text>
                 </g>
               ))}

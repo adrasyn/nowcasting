@@ -26,9 +26,27 @@ def request(base, path, commit):
         return body
 
 
-def verify(base, commit, data):
-    root = request(base, '/', commit)
-    simple = request(base, '/simple/', commit)
+def verify(base, commit, data, manifest=None):
+    if manifest is not None and manifest.get('commit') != commit:
+        raise ValueError('Export manifest belongs to a different commit')
+
+    def fetch(path):
+        body = request(base, path, commit)
+        if manifest is not None:
+            name = path.lstrip('/')
+            if not name or name.endswith('/'):
+                name += 'index.html'
+            elif name in {'v2', 'v3'}:
+                # Next's default export is v2.html; trailingSlash exports use
+                # v2/index.html. Verify the actual candidate's route file.
+                name = name + '.html' if name + '.html' in manifest.get('files', {}) else name + '/index.html'
+            expected = manifest.get('files', {}).get(name)
+            if not expected or hashlib.sha256(body).hexdigest() != expected:
+                raise ValueError(f'{path}: live bytes differ from the smoke-tested export')
+        return body
+
+    root = fetch('/')
+    simple = fetch('/simple/')
     for path, body in [('/', root), ('/simple/', simple)]:
         text = body.decode('utf-8')
         if not re.search(r'<meta[^>]*name="build-commit"[^>]*content="'+re.escape(commit)+r'"', text):
@@ -61,10 +79,10 @@ def verify(base, commit, data):
     assets = {a for a in assets if a.startswith('/_next/')}
     assets.update(['/monitor/fonts/InstrumentSerif-Regular.ttf', '/monitor/fonts/Inter.ttf', '/monitor/NOTICE.txt'])
     for path in sorted(assets):
-        if not request(base, path, commit):
+        if not fetch(path):
             raise ValueError(f'Empty asset: {path}')
     for path in ['/v2', '/v3', '/simple/nowcast.gif', '/simple/record.gif']:
-        body = request(base, path, commit)
+        body = fetch(path)
         if path.endswith('.gif') and not body.startswith(b'GIF'):
             raise ValueError(f'Invalid GIF: {path}')
         if path == '/v3' and b'class="nowcast-monitor"' not in body:
@@ -73,7 +91,9 @@ def verify(base, commit, data):
             'indicator_count': count, 'homepage_sha256': hashlib.sha256(root).hexdigest(),
             'simple_sha256': hashlib.sha256(simple).hexdigest(),
             'checked_routes': ['/', '/simple/', '/v2', '/v3'],
-            'assets_checked': len(assets)+2, 'result': 'passed'}
+            'assets_checked': len(assets)+2,
+            'export_sha256': manifest.get('export_sha256') if manifest else None,
+            'exact_export_verified': manifest is not None, 'result': 'passed'}
 
 
 if __name__ == '__main__':
@@ -82,10 +102,12 @@ if __name__ == '__main__':
     parser.add_argument('--commit', required=True)
     parser.add_argument('--data', type=Path, default=Path('data'))
     parser.add_argument('--attempts', type=int, default=1)
+    parser.add_argument('--manifest', type=Path)
     args = parser.parse_args()
     for attempt in range(args.attempts):
         try:
-            result = verify(args.base, args.commit, args.data)
+            manifest = json.loads(args.manifest.read_text()) if args.manifest else None
+            result = verify(args.base, args.commit, args.data, manifest)
             print(json.dumps(result, indent=2))
             break
         except Exception as error:

@@ -1,0 +1,59 @@
+name: Verify the built candidate in one browser
+description: Reuse the candidate export and unit fixtures; never rebuild or rerun units.
+inputs:
+  project:
+    description: Chromium full suite or focused iPhone WebKit suite
+    required: true
+  artifact_id:
+    description: Immutable artifact ID emitted by the guarded candidate job
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: npm
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: pip
+        cache-dependency-path: requirements-simple.txt
+    - shell: bash
+      run: |
+        npm ci
+        python -m pip install -r requirements-simple.txt
+    - uses: actions/download-artifact@v4
+      with:
+        artifact-ids: ${{ inputs.artifact_id }}
+        merge-multiple: true
+    - name: Verify candidate and fixture identity
+      shell: bash
+      run: python scripts/ci/candidate.py verify --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
+    - name: Install Chromium in its host job
+      if: inputs.project == 'chromium'
+      shell: bash
+      run: npx playwright install --with-deps chromium
+    - name: Check preinstalled WebKit version
+      if: inputs.project == 'webkit-iphone'
+      shell: bash
+      run: node -e 'if(require("@playwright/test/package.json").version !== "1.59.1") process.exit(1)'
+    - name: Test the shared export
+      shell: bash
+      env:
+        QA_PROJECT: ${{ inputs.project }}
+        NOWCAST_PREBUILT: '1'
+        NOWCAST_FIXTURE_DIR: ci-artifact/fixtures
+        NOWCAST_EXPECTED_COMMIT: ${{ github.sha }}
+      run: npx playwright test --project="$QA_PROJECT" --workers=1
+    - name: Confirm QA left the export unchanged
+      shell: bash
+      run: python scripts/ci/candidate.py verify --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
+    - name: Save browser QA evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: browser-qa-${{ inputs.project }}-${{ github.run_attempt }}
+        path: test-results
+        retention-days: 7
+        if-no-files-found: warn

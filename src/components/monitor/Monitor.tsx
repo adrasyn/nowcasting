@@ -28,6 +28,8 @@ import {
 } from "@/lib/monitor/indicatorDates.mjs";
 import { indicatorDisplayUnit } from "@/lib/indicatorDisplay";
 import { RangeChart, Evolution, SeriesChart, bandText } from "./Charts";
+import { AnimatedValue } from "./Entrance";
+import { entranceGroup, type EntranceGroup } from "@/lib/monitor/entrance";
 function Provisional() {
   return (
     <span
@@ -40,7 +42,13 @@ function Provisional() {
     </span>
   );
 }
-function QuarterCard({ h }: { h: MonitorHorizon }) {
+function QuarterCard({
+  h,
+  group,
+}: {
+  h: MonitorHorizon;
+  group: EntranceGroup;
+}) {
   return (
     <article
       className={`estimate ${h.role}`}
@@ -55,13 +63,13 @@ function QuarterCard({ h }: { h: MonitorHorizon }) {
         <div className="quarter-growth">
           <dt>Growth this quarter</dt>
           <dd className="estimate-number" data-value="qoq">
-            {percentage(h.qoq)}
+            <AnimatedValue value={h.qoq} group={group} />
           </dd>
         </div>
         <div className="year-growth">
           <dt>Growth from a year ago</dt>
           <dd className="year-number" data-value="yoy">
-            {percentage(h.yoy)}
+            <AnimatedValue value={h.yoy} group={group} />
           </dd>
         </div>
       </dl>
@@ -101,7 +109,7 @@ function QuarterCard({ h }: { h: MonitorHorizon }) {
         </div>
       </dl>
       <div className="range-graphic">
-        <RangeChart h={h} />
+        <RangeChart h={h} group={group} />
       </div>
       <div className="band-numbers">
         <span>
@@ -558,6 +566,10 @@ export default function Monitor({
         (quarterIndex(b.target_quarter) ?? 0) -
         (quarterIndex(a.target_quarter) ?? 0),
     );
+  const group = useMemo(
+    () => entranceGroup([v.current.qoq, v.current.yoy, v.next.qoq, v.next.yoy]),
+    [v],
+  );
   const [today, setToday] = useState(v.builtAt);
   useEffect(() => setToday(new Date().toISOString()), []);
   const age = v.asOf
@@ -594,8 +606,8 @@ export default function Monitor({
       <div className="overview-grid">
         <section id="readout" aria-label="Quarterly GDP nowcasts">
           <div className="estimate-ledger">
-            <QuarterCard h={v.current} />
-            <QuarterCard h={v.next} />
+            <QuarterCard h={v.current} group={group} />
+            <QuarterCard h={v.next} group={group} />
           </div>
         </section>
         <Evolution horizons={[v.current, v.next]} />

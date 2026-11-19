@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import type { V3Vintage } from "@/lib/types";
 import {
@@ -14,6 +21,12 @@ import {
 } from "@/lib/monitor";
 import type { MonitorHorizon } from "@/lib/monitor";
 import type { IndicatorChart } from "@/lib/monitor/indicators";
+import {
+  rangeFrame,
+  rangeDurations,
+  type EntranceGroup,
+} from "@/lib/monitor/entrance";
+import { startEntrance } from "./Entrance";
 const teal = "#034159",
   green = "#0cf25d",
   line = "#e2e8f0";
@@ -94,16 +107,14 @@ export function useChartMotion(
           ),
         ),
       );
-    host
-      .querySelectorAll(".chart-point")
-      .forEach((p) =>
-        animations.push(
-          p.animate([{ opacity: 0 }, { opacity: 1 }], {
-            duration: 1500,
-            easing: "steps(1, end)",
-          }),
-        ),
-      );
+    host.querySelectorAll(".chart-point").forEach((p) =>
+      animations.push(
+        p.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 1500,
+          easing: "steps(1, end)",
+        }),
+      ),
+    );
     const cancel = () => animations.forEach((a) => a.cancel());
     media.addEventListener("change", cancel);
     return () => {
@@ -162,14 +173,78 @@ function domain(values: number[], zero = false) {
     pad = Math.max((hi - lo) * 0.09, Math.abs(hi) * 0.001, 0.01);
   return [lo - pad, hi + pad];
 }
-export function RangeChart({ h }: { h: MonitorHorizon }) {
+export function RangeChart({
+  h,
+  group,
+}: {
+  h: MonitorHorizon;
+  group: EntranceGroup;
+}) {
   const ref = useRef<SVGSVGElement>(null),
     { width: w, height: H } = useSvgSize(ref, 300, 44);
   const values = [0, h.qoq, ...(h.band95 ?? []), ...(h.band68 ?? [])].filter(
     finite,
   );
-  const [min, max] = domain(values, true),
-    x = (v: number) => 8 + ((v - min) / (max - min)) * (w - 16);
+  const [min, max] = domain(values, true);
+  const x = useCallback(
+    (v: number) => 8 + ((v - min) / (max - min)) * (w - 16),
+    [min, max, w],
+  );
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !finite(h.qoq)) return;
+    const media = matchMedia("(prefers-reduced-motion: reduce)");
+    let raf = 0;
+    const paint = (elapsed: number) => {
+      const frame = rangeFrame(h, elapsed),
+        marker = el.querySelector("[data-estimate-marker]");
+      if (frame.marker !== null) {
+        marker?.setAttribute("x1", String(x(frame.marker)));
+        marker?.setAttribute("x2", String(x(frame.marker)));
+      }
+      for (const n of [68, 95] as const) {
+        const band = n === 68 ? frame.band68 : frame.band95,
+          rect = el.querySelector(`[data-band="${n}"]`);
+        if (band && rect) {
+          rect.setAttribute("x", String(x(band[0])));
+          rect.setAttribute("width", String(x(band[1]) - x(band[0])));
+        }
+      }
+    };
+    const duration = rangeDurations(h.role).band95,
+      finish = () => {
+        cancelAnimationFrame(raf);
+        paint(duration);
+      };
+    if (media.matches) {
+      finish();
+      return;
+    }
+    const start = startEntrance(group),
+      tick = (now: number) => {
+        const elapsed = Math.max(0, now - start);
+        paint(elapsed);
+        if (elapsed < duration) raf = requestAnimationFrame(tick);
+      };
+    tick(performance.now());
+    const changed = () => {
+      if (media.matches) finish();
+    };
+    media.addEventListener("change", changed);
+    return () => {
+      cancelAnimationFrame(raf);
+      media.removeEventListener("change", changed);
+    };
+  }, [h, group, x]);
+  if (!finite(h.qoq))
+    return (
+      <svg
+        ref={ref}
+        viewBox={`0 0 ${w} ${H}`}
+        role="img"
+        aria-label={`${h.quarter}: estimate and uncertainty not yet available`}
+      />
+    );
   return (
     <svg
       ref={ref}

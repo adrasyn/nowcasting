@@ -37,6 +37,7 @@ class WorkflowContractTests(unittest.TestCase):
         version = lock['packages']['node_modules/@playwright/test']['version']
         self.assertIn(f'mcr.microsoft.com/playwright:v{version}-noble', workflow)
         self.assertIn(f'!== "{version}"', action)
+        self.assertIn("cache: ${{ inputs.project == 'chromium' && 'pip' || '' }}", action)
         config = (ROOT/'playwright.config.ts').read_text()
         for name in ['evolution-visibility', 'evolution-legend', 'evolution-axis']:
             self.assertIn(f'**/{name}.spec.ts', config)

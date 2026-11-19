@@ -17,7 +17,8 @@ runs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        cache: pip
+        # The lean WebKit image lacks lsb_release, used only by pip-cache keys.
+        cache: ${{ inputs.project == 'chromium' && 'pip' || '' }}
         cache-dependency-path: requirements-simple.txt
     - shell: bash
       run: |

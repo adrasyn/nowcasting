@@ -29,6 +29,7 @@ import {
 import { startEntrance } from "./Entrance";
 import { useEvolutionMotion } from "./useEvolutionMotion";
 import { rangeTick } from "@/lib/monitor/rangeScale";
+import { chartColors } from "@/lib/chartTheme";
 const teal = "#034159",
   green = "#0cf25d",
   line = "#e2e8f0";
@@ -497,6 +498,42 @@ export function SeriesChart({
     </>
   );
 }
+// Both the plot and legend paint the same layers in the same order. The 68%
+// region is green at .35 over the outer .15 region, not .35 over white.
+const evolutionBandPaint = (band: 68 | 95) => ({
+  fill: chartColors.accent,
+  opacity: band === 95 ? 0.15 : 0.35,
+});
+function EvolutionLegendKey({ band }: { band?: 68 | 95 }) {
+  return (
+    <svg
+      className={`legend-key ${band ? `band${band}-key` : "line-key"}`}
+      width={band ? 9 : 14}
+      height={band ? 9 : 2}
+      viewBox={band ? "0 0 9 9" : "0 0 14 2"}
+      aria-hidden="true"
+      focusable="false"
+    >
+      {band ? (
+        <>
+          <rect width="9" height="9" {...evolutionBandPaint(95)} />
+          {band === 68 && (
+            <rect width="9" height="9" {...evolutionBandPaint(68)} />
+          )}
+        </>
+      ) : (
+        <line
+          x1="0"
+          x2="14"
+          y1="1"
+          y2="1"
+          stroke={chartColors.primary}
+          strokeWidth="2"
+        />
+      )}
+    </svg>
+  );
+}
 export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
   const [target, setTarget] = useState(horizons[0]?.quarter),
     [chosen, setChosen] = useState(-1);
@@ -660,8 +697,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                       key={n}
                       className="band-fill"
                       d={`${p(valid, (r) => bandFor(r, n)![0])} ${p([...valid].reverse(), (r) => bandFor(r, n)![1]).replace(/^M/, "L")} Z`}
-                      fill={green}
-                      opacity={n === 95 ? 0.15 : 0.35}
+                      {...evolutionBandPaint(n)}
                     />
                   ) : null;
                 })}
@@ -670,7 +706,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                 className="chart-line"
                 d={p(rows, (r) => r.qoq_growth_pct)}
                 fill="none"
-                stroke={teal}
+                stroke={chartColors.primary}
                 strokeWidth="1.8"
               />
               {rows.map((r, j) => (
@@ -717,15 +753,15 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
           </span>
           <div className="legend">
             <span>
-              <i className="line-key" />
+              <EvolutionLegendKey />
               Weekly estimate
             </span>
             <span>
-              <i className="band68-key" />
+              <EvolutionLegendKey band={68} />
               68% {h.bandKind} band
             </span>
             <span>
-              <i className="band95-key" />
+              <EvolutionLegendKey band={95} />
               95% {h.bandKind} band
             </span>
           </div>

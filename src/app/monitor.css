@@ -289,22 +289,15 @@
   align-items: center;
   gap: 6px;
 }
-.nowcast-monitor .legend i {
-  display: inline-block;
+.nowcast-monitor .legend .legend-key {
+  display: block;
+  flex: 0 0 auto;
   width: 9px;
   height: 9px;
-  background: var(--green);
 }
 .nowcast-monitor .legend .line-key {
   width: 14px;
   height: 2px;
-  background: var(--teal);
-}
-.nowcast-monitor .legend .band68-key {
-  background: rgba(12, 242, 93, 0.4);
-}
-.nowcast-monitor .legend .band95-key {
-  background: rgba(12, 242, 93, 0.15);
 }
 .nowcast-monitor .section-heading {
   display: flex;
@@ -1843,17 +1836,6 @@
 }
 .nowcast-monitor .record th {
   font-weight: 400;
-}
-.nowcast-monitor .band68-key {
-  background: #0cf25d;
-  opacity: 0.35;
-}
-.nowcast-monitor .band95-key {
-  background: #0cf25d;
-  opacity: 0.15;
-}
-.nowcast-monitor .line-key {
-  background: #034159;
 }
 .nowcast-monitor .observation-list {
   max-height: none;

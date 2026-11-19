@@ -100,3 +100,19 @@ jobs:
       - name: Verify fresh public homepage and simple page
         if: github.event_name != 'pull_request'
         run: python scripts/check_deployed.py --base https://nowcast.wlsn.me/ --commit "$GITHUB_SHA" --attempts 12
+
+      - name: Verify public evolution legend in Chromium and iPhone WebKit
+        if: github.event_name != 'pull_request'
+        env:
+          NOWCAST_PUBLIC_BASE_URL: https://nowcast.wlsn.me/
+          NOWCAST_EXPECTED_COMMIT: ${{ github.sha }}
+        run: npx playwright test tests/evolution-legend.spec.ts
+
+      - name: Save public legend QA captures
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-legend-qa
+          path: test-results
+          retention-days: 7
+          if-no-files-found: warn

@@ -491,7 +491,11 @@ export interface V3Backtest {
   notes: Record<string, string>;
 }
 
+export interface NowcastHistory { schema?: string; runs: V3Vintage[]; }
+
 export interface DashboardData {
+  historyCombo?: NowcastHistory;
+  historyV3?: NowcastHistory;
   latest: LatestNowcast;
   gdp: GdpSeries;
   nowcasts: VintageSeries;

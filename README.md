@@ -60,8 +60,7 @@ The v2 candidate series and transformations are listed in [`nowcasting_v2/seed/p
 [`/simple`](https://nowcast.wlsn.me/simple/) is the plain HTML version: native
 monospaced tables, complete indicator/GDP/nowcast histories, methodology at the
 bottom, and two 288×144 monochrome GIF87a charts. It has no page JavaScript,
-CSS, framework assets, external fonts or runtime dependencies. The normal
-homepage is unchanged.
+CSS, framework assets, external fonts or runtime dependencies.
 
 Every `npm run build` runs `scripts/simple/build.py` after Next's export. It
 reads the same committed `data/` payloads, selects the same combination/v3
@@ -89,3 +88,26 @@ a year earlier; the next-quarter figure chains the current nowcast. The
 `build-commit` meta tag records the deployed source SHA without adding visible
 prose or a network request. This is an early-web treatment, not a claim of
 literal compatibility with the original 1990 browser.
+
+## Homepage presentation and rollover
+
+The approved homepage layout is implemented in `src/components/monitor/`, with
+its production presenter in `src/lib/monitor.ts`. Each ordinary static build
+reads the selected model's latest payload, indicator panel, performance and
+complete saved weekly archive. No preview snapshot is part of the application.
+The original Instrument Serif / Inter assets and their licences are served
+locally under `public/monitor/`; design attribution is in `NOTICE.txt` there.
+
+The current target is the quarter after the latest verified observation in
+`data/gdp.json`. Calendar time alone never advances it. Between an ABS release
+and the next model run, a carried prior forecast is explicitly labelled;
+missing targets and zero-month next-quarter anchors show no invented figure.
+Year-on-year comparisons find the same quarter in the prior year by key.
+Refusal, absent data and stale runs remain visible. The combination and v3
+fallback each retain their own panel, scores and weekly history.
+
+`npm run test:e2e` runs unit contracts and the static build before browser tests.
+Fixtures cover weekly refresh, release rollover, Q4/Q1, refusal, missing/stale
+inputs and panel/model changes; they stay in test memory and a temporary QA
+file, never `data/` or the exported website. See the
+[production handover](docs/reviews/2026-11-19-approved-homepage.md).

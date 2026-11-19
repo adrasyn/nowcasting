@@ -11,6 +11,7 @@ import type {
   BackcastData,
   LatestV3,
   V3Backtest,
+  NowcastHistory,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -91,6 +92,8 @@ export function loadDashboardData(): DashboardData {
     // one line in one component rather than a `??` buried in a file reader,
     // and `latestV3` still means v3's own payload wherever it is read.
     latestCombo: readJsonOptional<LatestV3>("latest_combo.json"),
+    historyCombo: readJsonOptional<NowcastHistory>("nowcast_history_combo.json"),
+    historyV3: readJsonOptional<NowcastHistory>("nowcast_history_v3.json"),
     // The union of the two models' input panels, written by the same emitter.
     // The homepage's figure is half v2's, so its indicator panel must be too.
     indicatorsCombo: readJsonOptional<IndicatorData>("indicators_combo.json"),

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { loadDashboardData } from "../src/lib/data";
-import { buildMonitorView } from "../src/lib/monitor";
+import { buildMonitorView, percentage } from "../src/lib/monitor";
 const production = buildMonitorView(loadDashboardData());
 test.beforeEach(() => {
   test.skip(
@@ -143,7 +144,7 @@ test("slow font/render readiness preserves frame zero, including quarter switchi
 });
 test("desktop draw starts after layout and finishes with exact unmasked data", async ({
   page,
-}) => {
+}, info) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await initialized(page);
@@ -151,16 +152,44 @@ test("desktop draw starts after layout and finishes with exact unmasked data", a
     .poll(async () => (await progress(page)).fraction)
     .toBeGreaterThan(0.02);
   await expect
-    .poll(async () => (await progress(page)).fraction)
-    .toBeCloseTo(1, 3);
-  await expect(page.locator(chart)).toHaveAttribute(
-    "data-evolution-motion",
-    "done",
-  );
+    // The visible-frame clock intentionally caps elapsed time after blocked
+    // paints. Busy WebKit screenshot workers may need more wall time. Require
+    // the exact completed/unmasked state, rather than weakening the endpoint.
+    .poll(() => progress(page), { timeout: 10000, intervals: [100, 200, 300] })
+    .toMatchObject({ fraction: 1, state: "done", animations: [] });
   await expect(page.locator(chart + " .chart-line")).not.toHaveAttribute(
     "style",
     /stroke-dash/,
   );
+  const geometry = await page.locator(chart).evaluate((el) => {
+    const svg = el as SVGSVGElement, view = svg.viewBox.baseVal;
+    const mask = svg.querySelector<SVGRectElement>(".band-reveal")!.getBBox();
+    const point = svg.querySelector('[data-point][aria-pressed="true"]')!;
+    const marker = point.querySelector("circle:last-child")!;
+    const ticks = [...svg.querySelectorAll<SVGGElement>("[data-evolution-tick]")]
+      .map(g => Number(g.dataset.evolutionTick));
+    return { width: view.width, height: view.height, maskWidth: mask.width,
+      maskHeight: mask.height, x: Number(marker.getAttribute("cx")),
+      y: Number(marker.getAttribute("cy")), label: point.getAttribute("aria-label"),
+      min: Math.min(...ticks), max: Math.max(...ticks) };
+  });
+  expect(geometry.maskWidth).toBeCloseTo(geometry.width, 6);
+  expect(geometry.maskHeight).toBeCloseTo(geometry.height, 6);
+  const last = production.current.runs.at(-1)!;
+  expect(geometry.label).toContain(percentage(last.qoq_growth_pct));
+  expect(geometry.y).toBeCloseTo(15 +
+    ((geometry.max - last.qoq_growth_pct) / (geometry.max - geometry.min)) *
+    (geometry.height - 43), 6);
+  // A settled screenshot must contain the actual, fully opaque final marker.
+  // Sampling pixels ignores PNG compression/metadata differences between engines.
+  const png = await page.locator(chart).screenshot({ path: info.outputPath("completed-unmasked.png") });
+  const rgb = JSON.parse(execFileSync("python3", ["-c", `
+import sys,io,json
+from PIL import Image
+p=json.loads(sys.argv[1]); im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGB')
+print(json.dumps(im.getpixel((round(p['x']/p['width']*im.width),round(p['y']/p['height']*im.height)))))
+`, JSON.stringify(geometry)], { input: png }).toString());
+  expect(rgb).toEqual([12, 242, 93]);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

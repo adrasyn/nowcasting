@@ -24,6 +24,10 @@ without creating any source observations. Chromium and iPhone WebKit run it
 alongside all existing checks. After Pages deployment, it runs again against
 fresh public URLs and checks the exact build-commit before sampling colours.
 
+The PR's 20-minute job expired during slow Ubuntu browser-dependency downloads
+before browser tests/build/publication. The allowance is now 30 minutes; no
+test, browser engine or deployment gate is removed or bypassed.
+
 The privately supplied reference JPEG could not be materialized on this
 executor after one supported fresh preparation/transfer retry. Its pixels were
 not assumed, and the image is not present in this source or any distribution.

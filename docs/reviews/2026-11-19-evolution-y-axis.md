@@ -36,5 +36,6 @@ one-point and unavailable-interval states after rollover: it checks the paint
 contract without demanding area pixels from a zero-width one-point polygon.
 Current multi-point views retain the strict chart/swatch pixel comparison.
 
-Rollback is an ordinary tested revert of this PR through Pages. Preserve the
-legend/motion/card-axis fixes and all later data commits.
+Rollback the separable axis change through an ordinary tested PR to retain the
+legend fix; reverting the combined PR undoes both new evolution fixes. Preserve
+the previously published motion/card-axis fixes and all later data commits.

@@ -35,5 +35,6 @@ Diagnosis and validation use source inspection and actual browser rendering.
 Local Chromium chart/legend screenshots were visually inspected; CI supplies
 the mobile WebKit and fresh public-page checks. No physical iPhone is claimed.
 
-Rollback: revert this PR through the ordinary tested Pages path. Preserve all
-forecast/data commits and the separately published motion/shared-axis fixes.
+Rollback the separable legend change through an ordinary tested PR, or revert
+the combined PR to undo both new evolution fixes. Preserve all forecast/data
+commits and the previously published motion/shared-axis fixes.

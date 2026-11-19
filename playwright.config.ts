@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "./tests",
   timeout: 30000,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.NOWCAST_PUBLIC_BASE_URL ?? "http://localhost:3000",
     headless: true,
   },
   projects: [
@@ -19,15 +19,21 @@ export default defineConfig({
     },
     {
       name: "webkit-iphone",
-      testMatch: "**/evolution-visibility.spec.ts",
+      testMatch: [
+        "**/evolution-visibility.spec.ts",
+        "**/evolution-legend.spec.ts",
+        "**/evolution-axis.spec.ts",
+      ],
       use: { ...devices["iPhone 13"], browserName: "webkit" },
     },
   ],
-  webServer: {
-    command:
-      "npm test && npm run build && npx serve out -p 3000 --no-clipboard",
-    port: 3000,
-    timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: process.env.NOWCAST_PUBLIC_BASE_URL
+    ? undefined
+    : {
+        command:
+          "npm test && npm run build && npx serve out -p 3000 --no-clipboard",
+        port: 3000,
+        timeout: 120_000,
+        reuseExistingServer: !process.env.CI,
+      },
 });

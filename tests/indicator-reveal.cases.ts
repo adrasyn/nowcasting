@@ -22,8 +22,11 @@ test.describe("indicator detail reveal", () => {
         }
         const zero = Number(p.getAttribute("data-zero"));
         const finalY = Number(p.getAttribute("y")), height = Number(p.getAttribute("height"));
-        return { kind: "bar", progress, fraction: height ? p.getBBox().height / height : progress,
-          y: p.getBBox().y, expectedY: zero + (finalY - zero) * progress,
+        const box = p.getBBox();
+        // WebKit reports an empty box at zero height, with no drawable origin.
+        // Still check height at zero and both coordinates for every drawn frame.
+        return { kind: "bar", progress, fraction: height ? box.height / height : progress,
+          y: box.height ? box.y : null, expectedY: zero + (finalY - zero) * progress,
           duration: a.effect!.getTiming().duration };
       });
     }, time);
@@ -69,7 +72,7 @@ test.describe("indicator detail reveal", () => {
           for (const point of state) {
             expect(point.duration).toBe(1500);
             expect(point.fraction).toBeCloseTo(point.progress, 4);
-            expect(point.y).toBeCloseTo(point.expectedY, 3);
+            if (point.y !== null) expect(point.y).toBeCloseTo(point.expectedY, 3);
             expect(point.fraction).toBeGreaterThanOrEqual(previous - 0.0001);
           }
           previous = state[0].fraction;

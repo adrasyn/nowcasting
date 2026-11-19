@@ -29,6 +29,7 @@ import {
 import { indicatorDisplayUnit } from "@/lib/indicatorDisplay";
 import { RangeChart, Evolution, SeriesChart, bandText } from "./Charts";
 import { AnimatedValue } from "./Entrance";
+import { sharedQuarterRangeBound } from "@/lib/monitor/rangeScale";
 import { entranceGroup, type EntranceGroup } from "@/lib/monitor/entrance";
 function Provisional() {
   return (
@@ -45,9 +46,11 @@ function Provisional() {
 function QuarterCard({
   h,
   group,
+  bound,
 }: {
   h: MonitorHorizon;
   group: EntranceGroup;
+  bound: number;
 }) {
   return (
     <article
@@ -109,7 +112,7 @@ function QuarterCard({
         </div>
       </dl>
       <div className="range-graphic">
-        <RangeChart h={h} group={group} />
+        <RangeChart h={h} group={group} bound={bound} />
       </div>
       <div className="band-numbers">
         <span>
@@ -566,6 +569,7 @@ export default function Monitor({
         (quarterIndex(b.target_quarter) ?? 0) -
         (quarterIndex(a.target_quarter) ?? 0),
     );
+  const bound = sharedQuarterRangeBound([v.current, v.next]);
   const group = useMemo(
     () => entranceGroup([v.current.qoq, v.current.yoy, v.next.qoq, v.next.yoy]),
     [v],
@@ -606,8 +610,8 @@ export default function Monitor({
       <div className="overview-grid">
         <section id="readout" aria-label="Quarterly GDP nowcasts">
           <div className="estimate-ledger">
-            <QuarterCard h={v.current} group={group} />
-            <QuarterCard h={v.next} group={group} />
+            <QuarterCard h={v.current} group={group} bound={bound} />
+            <QuarterCard h={v.next} group={group} bound={bound} />
           </div>
         </section>
         <Evolution horizons={[v.current, v.next]} />

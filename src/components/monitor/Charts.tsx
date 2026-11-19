@@ -28,6 +28,7 @@ import {
 } from "@/lib/monitor/entrance";
 import { startEntrance } from "./Entrance";
 import { useEvolutionMotion } from "./useEvolutionMotion";
+import { rangeTick } from "@/lib/monitor/rangeScale";
 const teal = "#034159",
   green = "#0cf25d",
   line = "#e2e8f0";
@@ -177,16 +178,16 @@ function domain(values: number[], zero = false) {
 export function RangeChart({
   h,
   group,
+  bound,
 }: {
   h: MonitorHorizon;
   group: EntranceGroup;
+  bound: number;
 }) {
   const ref = useRef<SVGSVGElement>(null),
     { width: w, height: H } = useSvgSize(ref, 300, 44);
-  const values = [0, h.qoq, ...(h.band95 ?? []), ...(h.band68 ?? [])].filter(
-    finite,
-  );
-  const [min, max] = domain(values, true);
+  const min = -bound,
+    max = bound;
   const x = useCallback(
     (v: number) => 8 + ((v - min) / (max - min)) * (w - 16),
     [min, max, w],
@@ -243,6 +244,7 @@ export function RangeChart({
         ref={ref}
         viewBox={`0 0 ${w} ${H}`}
         role="img"
+        data-range-bound={bound}
         aria-label={`${h.quarter}: estimate and uncertainty not yet available`}
       />
     );
@@ -251,7 +253,8 @@ export function RangeChart({
       ref={ref}
       viewBox={`0 0 ${w} ${H}`}
       role="img"
-      aria-label={`${h.quarter}: quarterly growth ${percentage(h.qoq)}; 68% ${h.bandKind} band ${bandText(h.band68)}; 95% ${bandText(h.band95)}`}
+      data-range-bound={bound}
+      aria-label={`${h.quarter}: shared q/q axis ${rangeTick(min)} to ${rangeTick(max)}; quarterly growth ${percentage(h.qoq)}; 68% ${h.bandKind} band ${bandText(h.band68)}; 95% ${bandText(h.band95)}`}
     >
       {[min, 0, max].map((v) => (
         <g key={v}>
@@ -270,7 +273,7 @@ export function RangeChart({
               fontSize="9"
               fill="#6b7280"
             >
-              {v.toFixed(1)}
+              {rangeTick(v)}
             </text>
           )}
         </g>

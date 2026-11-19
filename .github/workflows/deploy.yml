@@ -6,6 +6,10 @@ on:
     paths:
       - "src/**"
       - "scripts/simple/**"
+      - "scripts/check_deployed.py"
+      - "tests/**"
+      - "playwright.config.ts"
+      - "vitest.config.ts"
       - "requirements-simple.txt"
       - "data/**"
       - "public/**"
@@ -15,6 +19,8 @@ on:
       - "postcss.config.mjs"
       - "tsconfig.json"
       - ".github/workflows/deploy.yml"
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +29,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.event.pull_request.number || 'production' }}"
   cancel-in-progress: false
 
 jobs:
@@ -54,6 +60,9 @@ jobs:
       - name: Install simple-page build dependency
         run: python -m pip install -r requirements-simple.txt
 
+      - name: Test site data contracts
+        run: npm test
+
       - name: Test simple-page generation
         run: python -m unittest discover -s scripts/simple -p 'test_*.py'
 
@@ -70,9 +79,15 @@ jobs:
         run: npm run build
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: out
 
       - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
         uses: actions/deploy-pages@v4
+
+      - name: Verify fresh public homepage and simple page
+        if: github.event_name != 'pull_request'
+        run: python scripts/check_deployed.py --base https://nowcast.wlsn.me/ --commit "$GITHUB_SHA" --attempts 12

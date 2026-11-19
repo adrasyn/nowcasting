@@ -1,0 +1,27 @@
+Australia GDP nowcast — design, assets and provenance notices
+
+Original nowcast website and factual reference: James Wilson,
+https://nowcast.wlsn.me/ and https://github.com/adrasyn/nowcasting
+
+Design critique workflow adapted from unslop by Damir Sokolovsky:
+https://github.com/heydamir/unslop
+Licensed under Creative Commons Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+Changes: applied the critique workflow to the Australian GDP nowcast layout,
+information hierarchy, responsive charts and interaction presentation.
+
+Interaction behavior was informed by the Vercel UI SDK:
+https://github.com/vercel-labs/ui
+It was a behavior reference; no SDK code is redistributed in this static site.
+
+Instrument Serif: Copyright 2022 The Instrument Serif Project Authors
+https://github.com/Instrument/instrument-serif
+Inter: Copyright 2020 The Inter Project Authors
+https://github.com/rsms/inter
+Both fonts are licensed under the SIL Open Font License, Version 1.1.
+The full notices and licences accompany the font assets in:
+fonts/InstrumentSerif-OFL.txt and fonts/Inter-OFL.txt.
+
+Production integration
+The approved preview layout was ported into the repository-backed Next.js site.
+The build reads committed production data; no preview snapshot is distributed.

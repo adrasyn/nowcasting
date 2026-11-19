@@ -1,3 +1,4 @@
+import "./indicator-reveal.cases";
 import { test, expect } from "@playwright/test";
 import { buildMonitorView, bandFor } from "../src/lib/monitor";
 import { loadDashboardData } from "../src/lib/data";

@@ -75,7 +75,10 @@ export function useChartMotion(
     if (media.matches) return;
     const animations: Animation[] = [];
     host.querySelectorAll<SVGPathElement>(".chart-line").forEach((p) => {
-      const l = p.getTotalLength();
+      // A normalized dash follows the rendered path when ResizeObserver replaces
+      // the initial SVG geometry. A cached pixel length leaves a gap at the end
+      // on wider charts, which disappears abruptly when the animation releases.
+      const l = p.pathLength.baseVal || p.getTotalLength();
       if (l)
         animations.push(
           p.animate(
@@ -388,6 +391,7 @@ export function SeriesChart({
     ) : (
       <path
         className="chart-line"
+        pathLength="1"
         d={brokenPath(rows, x, y)}
         stroke={teal}
         strokeWidth={mini ? 1.2 : 1.7}

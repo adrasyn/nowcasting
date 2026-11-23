@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-16T02:00:00Z",
+  "generated_at": "2026-11-23T02:00:00Z",
   "schema": "v2-staged-2",
-  "as_of": "2026-11-16",
+  "as_of": "2026-11-23",
   "target_quarter": "2026 Q3",
   "data_through": "2026-11",
   "prev_level": {
@@ -16,14 +16,14 @@
       "target_quarter": "2026 Q3",
       "horizon": "current",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 702425,
+      "gdp_chain_volume_millions": 702427,
       "qoq_growth_pct": 0.42,
       "qoq_growth_raw_pct": 0.42,
       "yoy_growth_pct": 2.06,
-      "ci_68_low": 700545,
-      "ci_68_high": 704304,
-      "ci_95_low": 698576,
-      "ci_95_high": 706273,
+      "ci_68_low": 700548,
+      "ci_68_high": 704307,
+      "ci_95_low": 698578,
+      "ci_95_high": 706276,
       "n_months_in_quarter": 3,
       "estimator": "QA-UMIDAS",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -41,14 +41,14 @@
       "target_quarter": "2026 Q4",
       "horizon": "next",
       "current_quarter": "2026 Q3",
-      "gdp_chain_volume_millions": 702838,
-      "qoq_growth_pct": 0.06,
-      "qoq_growth_raw_pct": 0.06,
-      "yoy_growth_pct": 1.19,
-      "ci_68_low": 701062,
-      "ci_68_high": 704614,
-      "ci_95_low": 699190,
-      "ci_95_high": 706486,
+      "gdp_chain_volume_millions": 703352,
+      "qoq_growth_pct": 0.13,
+      "qoq_growth_raw_pct": 0.13,
+      "yoy_growth_pct": 1.27,
+      "ci_68_low": 701576,
+      "ci_68_high": 705128,
+      "ci_95_low": 699704,
+      "ci_95_high": 707000,
       "n_months_in_quarter": 2,
       "estimator": "UMIDAS-full",
       "ci_basis": "empirical pseudo-out-of-sample error dispersion, by within-quarter information stage (jt = n_months_in_quarter); post-COVID target quarters only (>= 2022-01-01). Pre-2020 errors are significantly tighter (F=2.97, p<0.0001) so pooling them would understate current uncertainty.",
@@ -503,74 +503,82 @@
       "ci_95_low": 699190,
       "ci_95_high": 706486,
       "data_through": "2026-11"
+    },
+    {
+      "run_date": "2026-11-23",
+      "target_quarter": "2026 Q3",
+      "horizon": "current",
+      "point": 702427,
+      "qoq_growth_pct": 0.42,
+      "days_until_release": -9,
+      "ci_68_low": 700548,
+      "ci_68_high": 704307,
+      "ci_95_low": 698578,
+      "ci_95_high": 706276,
+      "data_through": "2026-11"
+    },
+    {
+      "run_date": "2026-11-23",
+      "target_quarter": "2026 Q4",
+      "horizon": "next",
+      "point": 703352,
+      "qoq_growth_pct": 0.13,
+      "days_until_release": -99,
+      "ci_68_low": 701576,
+      "ci_68_high": 705128,
+      "ci_95_low": 699704,
+      "ci_95_high": 707000,
+      "data_through": "2026-11"
     }
   ],
   "v1_comparison": {
     "model_name": "v1 (13-series DFM)",
     "target_quarter": "2026 Q3",
-    "qoq_growth_pct": 0.58,
-    "yoy_growth_pct": 2.21,
-    "gdp_chain_volume_millions": 703498,
+    "qoq_growth_pct": 0.57,
+    "yoy_growth_pct": 2.2,
+    "gdp_chain_volume_millions": 703431,
     "source": "data/latest.json"
   },
   "note": "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval.",
   "data_updates": {
-    "run_date": "2026-11-16",
+    "run_date": "2026-11-23",
     "nowcast_delta_pp": null,
     "series": [
       {
-        "id": "credit_card",
-        "name": "Credit card spending",
-        "prev_period": "2026-08",
-        "latest_period": "2026-09"
-      },
-      {
-        "id": "nab_conf",
-        "name": "Business confidence",
+        "id": "emp",
+        "name": "Employment",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "nab_cond",
-        "name": "Business conditions",
+        "id": "ft_emp",
+        "name": "Full-time employment",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "nab_trade",
-        "name": "Trading conditions",
+        "id": "pt_emp",
+        "name": "Part-time employment",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "nab_profit",
-        "name": "Profitability",
+        "id": "ue",
+        "name": "Unemployment",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "nab_emp",
-        "name": "Hiring intentions",
+        "id": "ud",
+        "name": "Underemployment",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
       },
       {
-        "id": "nab_forward",
-        "name": "Forward orders",
+        "id": "hours",
+        "name": "Hours worked",
         "prev_period": "2026-09",
         "latest_period": "2026-10"
-      },
-      {
-        "id": "nab_cu",
-        "name": "Capacity use",
-        "prev_period": "2026-09",
-        "latest_period": "2026-10"
-      },
-      {
-        "id": "wmi_sent",
-        "name": "Consumer sentiment (Westpac)",
-        "prev_period": "2026-10",
-        "latest_period": "2026-11"
       }
     ]
   }

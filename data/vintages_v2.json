@@ -440,5 +440,31 @@
     "ci_95_low": 699190,
     "ci_95_high": 706486,
     "data_through": "2026-11"
+  },
+  {
+    "run_date": "2026-11-23",
+    "target_quarter": "2026 Q3",
+    "horizon": "current",
+    "point": 702427,
+    "qoq_growth_pct": 0.42,
+    "days_until_release": -9,
+    "ci_68_low": 700548,
+    "ci_68_high": 704307,
+    "ci_95_low": 698578,
+    "ci_95_high": 706276,
+    "data_through": "2026-11"
+  },
+  {
+    "run_date": "2026-11-23",
+    "target_quarter": "2026 Q4",
+    "horizon": "next",
+    "point": 703352,
+    "qoq_growth_pct": 0.13,
+    "days_until_release": -99,
+    "ci_68_low": 701576,
+    "ci_68_high": 705128,
+    "ci_95_low": 699704,
+    "ci_95_high": 707000,
+    "data_through": "2026-11"
   }
 ]

@@ -817,6 +817,53 @@ def test_cpi_next_release_is_the_last_wednesday_two_months_after_latest():
     assert out[0]["next_release_basis"] == "rule"
 
 
+@pytest.mark.parametrize(("latest", "last_release", "next_release"), [
+    ("2026-09", "2026-10-28", "2026-11-25"),
+    ("2026-10", "2026-11-25", "2027-01-06"),
+    ("2026-11", "2027-01-06", "2027-01-27"),
+    ("2026-12", "2027-01-27", "2027-02-24"),
+    ("2027-01", "2027-02-24", "2027-03-24"),
+    ("2027-02", "2027-03-24", "2027-04-28"),
+])
+def test_cpi_official_release_dates_follow_the_reference_month(
+    latest, last_release, next_release
+):
+    row = _row("cpi", series=[latest], last_release_date="2026-10-29")
+    other = _row("nab_conf", series=[latest], last_release_date="2026-10-29")
+    out, out_other = fill_next_release([row, other], next_gdp_release_date=None)
+    assert out["last_release_date"] == last_release
+    assert out["next_release_estimate"] == next_release
+    assert out["next_release_basis"] == "abs_calendar"
+    assert out["series"] == row["series"]
+    assert row["last_release_date"] == "2026-10-29"
+    assert "next_release_estimate" not in row
+    assert out_other == other
+
+
+@pytest.mark.parametrize(("latest", "next_release"), [
+    ("2027-04", "2027-06-23"),  # fourth Wednesday, not the 30th
+    ("2027-10", "2028-01-05"),  # November reference period slips to January
+    ("2024-10", "2025-01-08"),  # do not project a release on New Year's Day
+])
+def test_cpi_calendar_fallback_is_an_estimate_and_keeps_vintage_date(
+    latest, next_release
+):
+    row = _row("cpi", series=[latest], last_release_date="2026-10-29")
+    [out] = fill_next_release([row], next_gdp_release_date=None)
+    assert out["last_release_date"] == row["last_release_date"]
+    assert out["next_release_estimate"] == next_release
+    assert out["next_release_basis"] == "rule"
+
+
+def test_cpi_keeps_existing_next_release_when_fixing_verified_last_release():
+    row = _row("cpi", series=["2026-09"], last_release_date="2026-10-29",
+               next_release_estimate="2026-11-26")
+    [out] = fill_next_release([row], next_gdp_release_date=None)
+    assert out["last_release_date"] == "2026-10-28"
+    assert out["next_release_estimate"] == "2026-11-26"
+    assert "next_release_basis" not in out
+
+
 def test_commodity_prices_next_release_is_the_first_weekday_two_months_after():
     """Latest observation 2026-08, published early September; the next
     observation (2026-09) is due the first business day of October 2026."""

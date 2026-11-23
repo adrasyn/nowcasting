@@ -657,6 +657,42 @@ def _roll_to_weekday(d: _dt.date) -> _dt.date:
     return d + _dt.timedelta(days={5: 2, 6: 1}.get(d.weekday(), 0))
 
 
+# By CPI reference month, not publication month. September's release and the
+# published future dates come from the two ABS pages below. Keep exact dates
+# here rather than applying projected dates to "Last release".
+# https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/sep-2026
+# https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia
+_CPI_ABS_RELEASE_DATES = {
+    (2026, 9): "2026-10-28",
+    (2026, 10): "2026-11-25",
+    (2026, 11): "2027-01-06",
+    (2026, 12): "2027-01-27",
+    (2027, 1): "2027-02-24",
+    (2027, 2): "2027-03-24",
+    (2027, 3): "2027-04-28",
+}
+
+
+def _next_cpi_release(latest: tuple[int, int]) -> tuple[str, str]:
+    reference = _add_months(*latest, 1)
+    if reference in _CPI_ABS_RELEASE_DATES:
+        return _CPI_ABS_RELEASE_DATES[reference], "abs_calendar"
+
+    if reference[1] == 11:
+        # ABS says early January for November data, but does not specify a
+        # weekday. Project a Wednesday in early January, not New Year's Day.
+        start = _dt.date(reference[0] + 1, 1, 2)
+        date = start + _dt.timedelta(days=(2 - start.weekday()) % 7)
+    else:
+        year, month = _add_months(*reference, 1)
+        if (year, month) >= (2027, 2):
+            start = _dt.date(year, month, 22)
+            date = start + _dt.timedelta(days=(2 - start.weekday()) % 7)
+        else:
+            date = _last_weekday_of_month(year, month, weekday=2)
+    return date.isoformat(), "rule"
+
+
 def fill_next_release(indicators: list[dict], *,
                       next_gdp_release_date: str | None) -> list[dict]:
     """Fill `next_release_estimate` for the v3-only series that lack one.
@@ -676,26 +712,32 @@ def fill_next_release(indicators: list[dict], *,
        the ABS's national accounts day, which `latest_v3.json` already carries
        as `next_gdp_release_date` -- v3's own forecast target, not a rule
        re-derived here.
-    3. A PUBLICATION RULE, for the three series with a fixed monthly schedule
-       and no sibling: the ABS's monthly CPI (last Wednesday of the month
-       after next), the RBA's commodity price index (first business day of
-       the month after next) and the Ai Group PMI (one calendar month after
-       its last release, rolled off a weekend).
+    3. A PUBLICATION SCHEDULE, for three series without a sibling: the ABS's
+       monthly CPI calendar (with a cadence estimate beyond known dates), the
+       RBA's commodity price index (first business day of the month after next)
+       and the Ai Group PMI (one month after its last release, rolled off a
+       weekend).
 
     Anything else -- a series with neither a sibling nor a known schedule --
     stays without a date, same as today.
 
     Returns new dicts; ``indicators`` is not modified. Rows the function fills
-    gain `next_release_basis` ("sibling", "national_accounts" or "rule") so a
-    reader of the JSON can tell an estimate from a scraped date.
+    gain `next_release_basis` ("sibling", "national_accounts", "abs_calendar"
+    or "rule") so a reader of the JSON can distinguish an estimate from an
+    official date. For CPI only, a known official date for the last observation
+    also corrects the displayed `last_release_date`, not model vintage data.
     """
     by_id = {e["id"]: e for e in indicators}
     out = []
     for entry in indicators:
-        if entry.get("next_release_estimate"):
-            out.append(dict(entry))
-            continue
+        merged = dict(entry)
         id_ = entry["id"]
+        cpi_latest = _last_series_month(entry) if id_ == "cpi" else None
+        if cpi_latest in _CPI_ABS_RELEASE_DATES:
+            merged["last_release_date"] = _CPI_ABS_RELEASE_DATES[cpi_latest]
+        if entry.get("next_release_estimate"):
+            out.append(merged)
+            continue
         est: str | None = None
         basis: str | None = None
         if id_ in _SIBLING_NEXT_RELEASE:
@@ -706,12 +748,8 @@ def fill_next_release(indicators: list[dict], *,
         elif id_ in _NATIONAL_ACCOUNTS_IDS:
             if next_gdp_release_date:
                 est, basis = next_gdp_release_date, "national_accounts"
-        elif id_ == "cpi":
-            last = _last_series_month(entry)
-            if last:
-                y, m = _add_months(*last, 2)
-                est = _last_weekday_of_month(y, m, weekday=2).isoformat()  # Wed
-                basis = "rule"
+        elif cpi_latest:
+            est, basis = _next_cpi_release(cpi_latest)
         elif id_ == "commodity_prices":
             last = _last_series_month(entry)
             if last:
@@ -726,7 +764,6 @@ def fill_next_release(indicators: list[dict], *,
                 day = min(d.day, _days_in_month(y, m))
                 est = _roll_to_weekday(_dt.date(y, m, day)).isoformat()
                 basis = "rule"
-        merged = dict(entry)
         if est:
             merged["next_release_estimate"] = est
             merged["next_release_basis"] = basis

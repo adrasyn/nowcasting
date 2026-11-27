@@ -109,7 +109,7 @@ function QuarterCard({
           </dd>
         </div>
         <div>
-          <dt>Complete months</dt>
+          <dt>Months of data</dt>
           <dd>{h.months !== null ? `${h.months} / 3` : "—"}</dd>
         </div>
         <div>

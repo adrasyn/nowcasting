@@ -10,7 +10,8 @@ checks the GDP date and prior actual already captured in the pipeline's
 `data/latest.json`. After v2 refreshes its inputs and publishes a final-day
 vintage, the workflow dispatches v3 to combine against that exact vintage. A
 refusal, a late job, a missing observation or a carry cannot generate the label.
-The usual estimate stays in place if the special run cannot finish.
+The usual estimate stays in place if the special run cannot finish. The regular
+Monday run can also certify completion; the special run can pick up revisions.
 
 "Complete" applies to the **model inputs**, not every series shown in the
 indicator table or ABS GDP itself. v2 checks its selected transformed inputs;
@@ -21,12 +22,16 @@ present. The quarterly GDP, GDI and labour-cost rows published in National
 Accounts are not advance inputs for that same quarter. None of these checks
 change the models, their selection rules or the historical vintage cutoffs.
 
-The certification records the target quarter, run date, exact publication and
-the Sydney release instant (11:30 local time). During that window the current
-combination is locked against normal reruns. In an open browser tab the label
-expires at that instant; when the observed GDP quarter advances, the previous
-certification cannot migrate to the new card. The final vintage stays in the
-archive.
+For each quarter, the monthly count is the intersection of the months complete
+in the two models in that same run. A missing or carried certificate shows a
+dash, rather than falling back to the old count of any available observation.
+The status strip turns on with the first complete current-quarter publication.
+Subsequent runs can use revised data or new readings from later months; the
+models' input windows stay unchanged. Old points remain in the archive.
+
+The certificate binds the target, exact publication and official release
+instant (11:30 Sydney time). The label expires at release even on an open tab,
+and cannot migrate to the new current quarter.
 
 The first scheduled use after deployment is not considered verified until the
 v2 and v3 jobs and the Pages deployment finish. Check their Actions logs for a

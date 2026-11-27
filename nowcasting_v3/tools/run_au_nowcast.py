@@ -49,7 +49,7 @@ from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
                            migrate_history_runs_v3, nowcast_payload,
                            refusal_payload)
 from nyfed.au.first_release import load_first_release
-from nyfed.au.finality import missing_monthly_inputs, release_slot
+from nyfed.au.finality import monthly_input_coverage, release_slot
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
@@ -271,20 +271,21 @@ def main() -> int:
 
     # ---- nowcast ---------------------------------------------------------
     t_now = target_periods(panel)
+    observed = {key: {str(panel.dates[j].date())[:7]
+                      for j in np.flatnonzero(np.isfinite(panel.Y[i]))}
+                for i, key in enumerate(panel.series_id)}
+    # Quarterly GDP, GDI and labour costs publish together. Only the
+    # transformed monthly observations can count towards complete months.
+    monthly_keys = [s.key for s in AU_SERIES if s.frequency == "m"]
+    coverage = {int(t): monthly_input_coverage(
+        observed, quarter=_quarter(panel.dates[t]), monthly_keys=monthly_keys)
+        for t in t_now}
     if final:
         if _quarter(panel.dates[t_now[0]]) != final["quarter"]:
             raise ValueError("Final v3 target does not match the ABS release calendar")
         if any(_quarter(d) == final["quarter"] for d in gdp.index):
             raise ValueError("The GDP actual is already available")
-        # Quarterly GDP, GDI and labour costs print together, so they cannot
-        # certify a pre-release estimate. Use the transformed monthly rows
-        # after the same availability cut the model used.
-        observed = {key: {str(panel.dates[j].date())[:7]
-                          for j in np.flatnonzero(np.isfinite(panel.Y[i]))}
-                    for i, key in enumerate(panel.series_id)}
-        missing = missing_monthly_inputs(observed, quarter=final["quarter"],
-                                         monthly_keys=[s.key for s in AU_SERIES
-                                                       if s.frequency == "m"])
+        missing = coverage[int(t_now[0])][1]
         if missing:
             raise ValueError("Final v3 inputs incomplete: " + ", ".join(missing))
     months = [months_with_data(panel, int(t)) for t in t_now]
@@ -357,6 +358,7 @@ def main() -> int:
             "ci_68_high": round(qk[2] - correction.pp, 4),
             "ci_95_high": round(qk[3] - correction.pp, 4),
             "data_through": dthru, "months_with_data": months[k],
+            "complete_months": coverage[int(t_now[k])][0],
             "estimate_asof": meta["asof"],
         })
 
@@ -461,6 +463,8 @@ def main() -> int:
         collapse_floor=floor,
         n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED,
         months_with_data=months, correction=correction)
+    for t, h in zip(t_now, payload["horizons"]):
+        h["complete_months"] = coverage[int(t)][0]
     if final:
         payload["final_input_check"] = final
     payload["estimate"] = {"estimated_at": meta["estimated_at"],

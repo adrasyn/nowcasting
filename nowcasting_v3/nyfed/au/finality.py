@@ -1,4 +1,4 @@
-"""Publication contract for the last combined estimate before ABS GDP.
+"""Model input completeness and publication contract before ABS GDP.
 
 This is separate from model scheduling and release-lag assumptions: a full
 calendar quarter is not evidence that the two models actually used its inputs.
@@ -37,11 +37,25 @@ def release_slot(calendar, now):
             "release_at": datetime.combine(release, time(11, 30), SYDNEY).isoformat()}
 
 
-def missing_monthly_inputs(observed, *, quarter, monthly_keys):
-    """Months consumed by v3, after its lag/transform cut, not display dates."""
+def quarter_months(quarter):
     year, q = quarter_parts(quarter)
-    months = [f"{year}-{m:02d}" for m in range(q * 3 - 2, q * 3 + 1)]
+    return [f"{year}-{m:02d}" for m in range(q * 3 - 2, q * 3 + 1)]
+
+
+def release_instant(quarter, release_date):
+    year, q = quarter_parts(quarter)
+    release = date.fromisoformat(release_date)
+    if (release.year, release.month) != (year + (q == 4), (q % 4 + 1) * 3):
+        raise ValueError("GDP release does not belong to the target quarter")
+    return datetime.combine(release, time(11, 30), SYDNEY)
+
+
+def monthly_input_coverage(observed, *, quarter, monthly_keys):
+    """Months consumed by v3, after its lag/transform cut, not display dates."""
+    year, _ = quarter_parts(quarter)
+    months = quarter_months(quarter)
     missing = []
+    incomplete = set()
     for key in monthly_keys:
         values = observed.get(key, set())
         absent = [m for m in months if m not in values]
@@ -50,8 +64,13 @@ def missing_monthly_inputs(observed, *, quarter, monthly_keys):
         other = {f"{year}-01": f"{year - 1}-12", f"{year}-12": f"{year + 1}-01"}
         if key == "aig_pmi":
             absent = [m for m in absent if other.get(m) not in values]
+        incomplete.update(absent)
         missing.extend(f"{key} ({m})" for m in absent)
-    return missing
+    return [m for m in months if m not in incomplete], missing
+
+
+def missing_monthly_inputs(observed, **kwargs):
+    return monthly_input_coverage(observed, **kwargs)[1]
 
 
 def checked_final_stamp(combo, v2, v3, slot, generated_at):
@@ -94,3 +113,26 @@ def lock_active(payload, gdp, now):
             lock.get("generated_at") == payload.get("generated_at") and
             datetime.fromisoformat(lock["generated_at"]) <= now <
             datetime.fromisoformat(lock["release_at"]))
+
+
+def coverage_stamp(combo, gdp, now):
+    """The latest complete estimate stays eligible for revisions until GDP day."""
+    if combo.get("status") != "ok":
+        return None
+    target, day = combo.get("target_quarter"), combo.get("as_of")
+    components = combo.get("components", {})
+    if (components.get("v2", {}).get("run_date") != day
+            or components.get("v2", {}).get("stale_days", 0)
+            or components.get("v3", {}).get("as_of") != day
+            or now.astimezone(SYDNEY).date().isoformat() != day
+            or any(r.get("quarter") == target for r in gdp)):
+        return None
+    h = next((h for h in combo["horizons"] if h.get("kind") == "nowcast"
+              and h.get("quarter") == target), None)
+    if not h or h.get("complete_months") != quarter_months(target):
+        return None
+    release = release_instant(target, h["release_date"])
+    if now.astimezone(SYDNEY).date() >= release.date():
+        return None
+    return {"quarter": target, "run_date": day, "release_at": release.isoformat(),
+            "generated_at": combo["generated_at"]}

@@ -1929,12 +1929,20 @@
 .nowcast-monitor .final-estimate-strip span {
   font-weight: 450;
 }
-@container (max-width: 116px) {
-  .nowcast-monitor .final-estimate-strip span { display: none; }
+.nowcast-monitor .final-estimate-strip .final-short { display: none; }
+@container (max-width: 166px) {
+  .nowcast-monitor .final-estimate-strip .final-long { display: none; }
+  .nowcast-monitor .final-estimate-strip .final-short { display: inline; }
 }
 @media (max-width: 639px) {
   .nowcast-monitor .final-estimate-strip {
     margin: -10px -10px 10px;
     padding-inline: 10px;
+  }
+}
+@media (max-width: 374px) {
+  .nowcast-monitor .final-estimate-strip {
+    font-size: 8.5px;
+    padding-inline: 7px;
   }
 }

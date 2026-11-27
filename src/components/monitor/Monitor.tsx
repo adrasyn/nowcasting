@@ -60,7 +60,8 @@ function QuarterCard({
     >
       {h.finalEstimate && (
         <div className="final-estimate-strip">
-          Final estimate<span> (no new data)</span>
+          Final estimate<span className="final-long"> (excl. data revisions)</span>
+          <span className="final-short"> (excl. revisions)</span>
         </div>
       )}
       <div className="estimate-heading">
@@ -108,7 +109,7 @@ function QuarterCard({
           </dd>
         </div>
         <div>
-          <dt>Months of data</dt>
+          <dt>Complete months</dt>
           <dd>{h.months !== null ? `${h.months} / 3` : "—"}</dd>
         </div>
         <div>
@@ -509,6 +510,14 @@ function Methodology({ view: v }: { view: MonitorView }) {
               ? " The next-quarter empirical calibration is provisional and uses the pooled current-quarter band, which can understate uncertainty."
               : ""}
           </p>
+          {v.model === "combination" && (
+            <p>
+              A month counts as complete when both models have the data they
+              need for it. After all three months are complete, we mark the
+              estimate final. Revisions or new data from later months can still
+              move it before GDP day.
+            </p>
+          )}
           <p>
             q/q compares the preceding quarter; y/y compares the same quarter a
             year earlier using the run’s GDP level. A next-quarter level can

@@ -246,6 +246,18 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     mondays <- final_day
   }
 
+  input_coverage <- function(tfs, selected, quarter) {
+    year <- as.integer(substr(quarter, 1L, 4L))
+    q <- as.integer(substr(quarter, 7L, 7L))
+    expected <- sprintf("%04d-%02d", year, (q * 3L - 2L):(q * 3L))
+    cells <- tfs[match(expected, format(tfs$date, "%Y-%m")), selected, drop = FALSE]
+    observed <- is.finite(as.matrix(cells))
+    miss <- which(!observed, arr.ind = TRUE)
+    list(complete = as.list(expected[rowSums(!observed) == 0L]),
+         missing = if (nrow(miss)) paste0(selected[miss[, 2L]], " (",
+                                          expected[miss[, 1L]], ")") else character())
+  }
+
   # ---- the MAI at one as_of (both horizons read the same one) ------------------
   # Exclude AiG (dead) and rt (old Retail Trade, superseded by MHSI =
   # household_spending, which the model already uses; rt was never selected).
@@ -349,22 +361,18 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     fit_i   <- mk_mai(tfs_i, gdp_i, "v2_qa_a10", 0.10)
     mai_i   <- fit_i$mai
     qa_i    <- mk(mai_i, gdp_i, "v2_qa_a10", "MAI to per-stage U-MIDAS", "qa", CI_QA)
+    selected <- fit_i$diagnostics$selected
+    # Only exempt the legacy NAB Stocks candidate while it remains discontinued.
+    stocks <- tfs_i$date[is.finite(tfs_i$nab_stocks)]
+    if (!length(stocks) || max(stocks) <= as.Date("2026-05-01"))
+      selected <- setdiff(selected, "nab_stocks")
+    coverage <- input_coverage(tfs_i, selected, qa_i$target_quarter)
+    qa_i$complete_months <- coverage$complete
     if (!is.null(final_check)) {
       if (!identical(qa_i$target_quarter, final_check$quarter))
         stop("Final v2 target does not match the ABS release calendar")
-      year <- as.integer(substr(final_check$quarter, 1L, 4L))
-      q <- as.integer(substr(final_check$quarter, 7L, 7L))
-      expected <- sprintf("%04d-%02d", year, (q * 3L - 2L):(q * 3L))
-      quarter_data <- tfs_i[match(expected, format(tfs_i$date, "%Y-%m")), , drop = FALSE]
-      # NAB has not reported Stocks in its monthly tables since May 2026. This
-      # exemption does not change model selection or rewrite historical values.
-      selected <- setdiff(fit_i$diagnostics$selected, "nab_stocks")
-      missing <- unlist(lapply(selected, function(id) {
-        absent <- expected[!is.finite(quarter_data[[id]])]
-        if (length(absent)) paste0(id, " (", absent, ")") else character()
-      }), use.names = FALSE)
-      if (length(missing))
-        stop("Final v2 inputs incomplete: ", paste(missing, collapse = ", "))
+      if (length(coverage$missing))
+        stop("Final v2 inputs incomplete: ", paste(coverage$missing, collapse = ", "))
     }
     nq_i    <- tryCatch(
       mk(mai_i, gdp_i, "v2_qa_a10", "MAI to per-stage U-MIDAS", "qa", CI_QA,
@@ -374,6 +382,8 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
         msg <- conditionMessage(e)
         if (startsWith(msg, "nowcast_midas(): no MAI month beyond")) NULL else stop(e)
       })
+    if (!is.null(nq_i))
+      nq_i$complete_months <- input_coverage(tfs_i, selected, nq_i$target_quarter)$complete
     list(as_of = as_of_i, data_through = dt_i, current = qa_i, next_quarter = nq_i)
   }
 
@@ -414,7 +424,8 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     point = mdl$gdp_chain_volume_millions, qoq_growth_pct = mdl$qoq_growth_pct,
     days_until_release = if (is.na(rel)) NA_integer_ else as.integer(as_of_i - rel),
     ci_68_low = mdl$ci_68_low, ci_68_high = mdl$ci_68_high,
-    ci_95_low = mdl$ci_95_low, ci_95_high = mdl$ci_95_high, data_through = dt_i)
+    ci_95_low = mdl$ci_95_low, ci_95_high = mdl$ci_95_high, data_through = dt_i,
+    complete_months = mdl$complete_months)
 
   # Upsert on (run_date, target_quarter), not run_date alone: a Monday now carries
   # up to two rows, one per horizon, and they must not evict each other.

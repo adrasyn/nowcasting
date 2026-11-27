@@ -73,3 +73,30 @@ class FinalWindow(unittest.TestCase):
             change(changed)
             with self.assertRaises(ValueError):
                 checked_final_stamp(changed, self.model, self.model, self.slot, self.when.isoformat())
+
+    def test_can_publish_as_soon_as_model_inputs_are_complete_then_revise(self):
+        from nyfed.au.finality import coverage_stamp, quarter_months
+        day = "2026-11-16"
+        now = datetime.fromisoformat(day + "T00:30:00+00:00")
+        h = self.payload["horizons"][0]
+        h.update(release_date="2026-12-02", complete_months=quarter_months("2026 Q3"))
+        self.payload.update(as_of=day, generated_at=now.isoformat())
+        self.payload["components"]["v2"]["run_date"] = day
+        self.payload["components"]["v3"]["as_of"] = day
+        stamp = coverage_stamp(self.payload, [], now)
+        self.assertEqual(stamp["run_date"], day)
+        self.assertEqual(stamp["release_at"], self.slot["release_at"])
+        # A later publication may revise the estimate and remain complete.
+        next_day = "2026-11-23"
+        later = datetime.fromisoformat(next_day + "T00:35:00+00:00")
+        self.payload.update(as_of=next_day, generated_at=later.isoformat())
+        self.payload["components"]["v2"]["run_date"] = next_day
+        self.payload["components"]["v3"]["as_of"] = next_day
+        h["qoq_growth_pct"] = 0.401
+        self.assertEqual(coverage_stamp(self.payload, [], later)["run_date"], next_day)
+        self.assertIsNone(coverage_stamp(self.payload, [{"quarter": "2026 Q3"}], later))
+        h["complete_months"].pop()
+        self.assertIsNone(coverage_stamp(self.payload, [], later))
+        h["complete_months"].append("2026-09")
+        self.payload["components"]["v2"]["run_date"] = day
+        self.assertIsNone(coverage_stamp(self.payload, [], later))

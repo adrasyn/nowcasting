@@ -236,6 +236,13 @@ export function buildMonitorView(
     const source = horizons.find((h) => h.quarter === quarter) ?? null;
     const isReady = ready(source ?? undefined),
       runs = horizonRuns(history, quarter);
+    const n = quarterIndex(quarter ?? undefined);
+    const completeMonths = n !== null && Array.isArray(source?.complete_months)
+      ? new Set(source.complete_months.filter((m) => {
+          const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(m);
+          return match && Number(match[1]) * 4 + Math.floor((Number(match[2]) - 1) / 3) === n;
+        })).size
+      : null;
     const usable = isReady ? source : null,
       level = usable && quarter ? levelFor(quarter) : null;
     const yearBase = quarter
@@ -268,9 +275,7 @@ export function buildMonitorView(
           : null,
       level,
       release: releaseFor(quarter, source, latest),
-      months: finite(source?.months_with_data)
-        ? source!.months_with_data!
-        : null,
+      months: completeMonths,
       carriedForecast:
         role === "current" && isReady && source?.kind === "forecast",
       bandKind: kind,

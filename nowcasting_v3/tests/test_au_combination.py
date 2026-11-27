@@ -976,3 +976,18 @@ def test_certified_final_vintage_uses_recorded_release_not_scheduling_rule():
     rows = pair_runs(v3, v2)
     assert _final_live_rows(rows)["2026 Q3"]["combo"] == 0.45
     assert not _final_live_rows([{**rows[0], "run_date": "2026-12-03"}])
+
+
+def test_complete_months_are_the_same_day_model_intersection():
+    day = "2026-11-09"
+    v3 = [{"run_date": day, "target_quarter": "2026 Q3",
+           "qoq_growth_pct": 0.4, "months_with_data": 3,
+           "complete_months": ["2026-07", "2026-09"]}]
+    v2 = [{"run_date": day, "target_quarter": "2026 Q3",
+           "horizon": "current", "qoq_growth_pct": 0.5,
+           "complete_months": ["2026-07", "2026-08"]}]
+    assert pair_runs(v3, v2)[0]["complete_months"] == ["2026-07"]
+    old = {**v2[0], "run_date": "2026-11-02"}
+    assert "complete_months" not in pair_runs(v3, [old])[0]
+    del v3[0]["complete_months"]
+    assert "complete_months" not in pair_runs(v3, v2)[0]

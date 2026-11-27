@@ -119,6 +119,8 @@ def v2_vintage_rows(v2_latest: dict) -> list[dict]:
         row = {"run_date": v["run_date"], "target_quarter": v["target_quarter"],
                "qoq_growth_pct": float(v["qoq_growth_pct"]),
                "horizon": v.get("horizon") or "current"}
+        if isinstance(v.get("complete_months"), list):
+            row["complete_months"] = v["complete_months"]
         rows[(row["run_date"], row["target_quarter"])] = row
     as_of = v2_latest.get("as_of")
     models = v2_latest.get("models") or {}
@@ -129,6 +131,8 @@ def v2_vintage_rows(v2_latest: dict) -> list[dict]:
         row = {"run_date": as_of, "target_quarter": m["target_quarter"],
                "qoq_growth_pct": float(m["qoq_growth_pct"]),
                "horizon": m.get("horizon") or horizon}
+        if isinstance(m.get("complete_months"), list):
+            row["complete_months"] = m["complete_months"]
         rows[(row["run_date"], row["target_quarter"])] = row
     return sorted(rows.values(), key=lambda r: (r["run_date"], r["target_quarter"]))
 
@@ -212,6 +216,11 @@ def pair_runs(v3_runs: list[dict], v2_vintages: list[dict], *,
             "months_with_data": _months_with_data(r, quarter),
             "data_through": r.get("data_through"),
         }
+        if (partner["run_date"] == run_date
+                and isinstance(r.get("complete_months"), list)
+                and isinstance(partner.get("complete_months"), list)):
+            row["complete_months"] = sorted(set(r["complete_months"])
+                                             & set(partner["complete_months"]))
         if final_row and partner["run_date"] == run_date:
             row["final_release_at"] = final_release
         out.append(row)
@@ -304,6 +313,8 @@ def _horizon_entry(row: dict, *, kind: str, prev_level: float | None) -> dict:
     }
     if row.get("months_with_data") is not None:
         entry["months_with_data"] = int(row["months_with_data"])
+    if "complete_months" in row:
+        entry["complete_months"] = row["complete_months"]
     rel = gdp_release_date(row["target_quarter"])
     if rel:
         entry["release_date"] = rel

@@ -48,9 +48,16 @@ for (const [name, v] of Object.entries(fixtureViews()))
     const marker = page.locator("[data-final-marker]");
     const extension = page.locator("[data-final-extension]");
     if (name === "final") {
-      await expect(page.locator(".estimate.current > .final-estimate-strip")).toHaveText(
-        "Final estimate (no new data)",
-      );
+      await expect(page.locator(".estimate.current > .final-estimate-strip")).toHaveCount(1);
+      await expect(page.getByText("Complete months", {exact: true}).first()).toBeVisible();
+      for (const width of [320, 390, 1440]) {
+        await page.setViewportSize({width, height: 900});
+        const visibleParts = await strip.locator("span:visible").allTextContents();
+        expect(visibleParts).toHaveLength(1);
+        expect(visibleParts[0]).toMatch(/\(excl\. (data )?revisions\)/);
+        const widths = await strip.evaluate(e => [e.scrollWidth, e.clientWidth]);
+        expect(widths[0], `Status strip at ${width}px (${visibleParts[0]})`).toBeLessThanOrEqual(widths[1]);
+      }
       await expect(page.locator(".estimate.next .final-estimate-strip")).toHaveCount(0);
       await expect(page.locator("#path-chart").getByText("Final estimate", {exact: true})).toHaveCount(1);
       await expect(marker).toHaveAttribute("stroke-dasharray", "3 3");

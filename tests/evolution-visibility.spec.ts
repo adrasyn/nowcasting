@@ -148,9 +148,36 @@ test("desktop draw starts after layout and finishes with exact unmasked data", a
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await initialized(page);
-  await expect
-    .poll(async () => (await progress(page)).fraction)
-    .toBeGreaterThan(0.02);
+  if (production.current.finalEstimate) {
+    const sequence = await page.locator(chart).evaluate((svg) => new Promise((resolve) => {
+      const line = svg.querySelector<SVGPathElement>(".chart-line")!;
+      const reveal = svg.querySelector<SVGRectElement>(".trail-reveal")!;
+      const trail = svg.querySelector("[data-final-trail]")!;
+      const deadline = performance.now() + 10000;
+      let solidMoved = false, trailMoved = false, earlyTrail = false;
+      function inspect() {
+        const dash = parseFloat(getComputedStyle(line).strokeDashoffset) || 0;
+        const width = reveal.getBBox().width, full = reveal.width.baseVal.value;
+        if (dash > 0.01 && dash < line.getTotalLength() - 0.01) {
+          solidMoved = true;
+          earlyTrail ||= width > 0.01;
+        }
+        trailMoved ||= dash < 0.01 && width > 0.01 && width < full - 0.01;
+        if (svg.getAttribute("data-evolution-motion") === "done" || performance.now() > deadline) {
+          resolve({ solidMoved, trailMoved, earlyTrail, fullWidth: Math.abs(width - full) < 0.01,
+            dashPattern: trail.getAttribute("stroke-dasharray") });
+        } else requestAnimationFrame(inspect);
+      }
+      inspect();
+    }));
+    expect(sequence).toEqual({
+      solidMoved: true, trailMoved: true, earlyTrail: false, fullWidth: true, dashPattern: "4 3",
+    });
+  } else {
+    await expect
+      .poll(async () => (await progress(page)).fraction)
+      .toBeGreaterThan(0.02);
+  }
   await expect
     // The visible-frame clock intentionally caps elapsed time after blocked
     // paints. Busy WebKit screenshot workers may need more wall time. Require

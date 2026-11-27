@@ -1,7 +1,7 @@
 "use client";
 import { useLayoutEffect } from "react";
 import type { RefObject } from "react";
-const DURATION = 1500;
+const DURATION = 1500, TRAIL_DURATION = 480;
 function plotSpan(a: DOMRect, b: DOMRect) {
   return {
     left: Math.min(a.left, b.left), right: Math.max(a.right, b.right),
@@ -29,6 +29,7 @@ export function useEvolutionMotion(
       fontsReady = false,
       priming = 0,
       elapsed = 0,
+      endTime = DURATION,
       last: number | null = null,
       raf = 0;
     let animations: Animation[] = [];
@@ -67,6 +68,18 @@ export function useEvolutionMotion(
             ),
           ),
         );
+      const trailReveal = svg.querySelector<SVGRectElement>(".trail-reveal");
+      endTime = DURATION;
+      if (trailReveal && trailReveal.width.baseVal.value > 0) {
+        endTime += TRAIL_DURATION;
+        // Reveal the actual dashed stroke rather than animating its dash pattern.
+        animations.push(
+          trailReveal.animate(
+            [{ width: "0px" }, { width: trailReveal.getAttribute("width") + "px" }],
+            { ...timing, delay: DURATION, duration: TRAIL_DURATION, easing: "ease-out" },
+          ),
+        );
+      }
       svg
         .querySelectorAll(".chart-point, .final-estimate-marker")
         .forEach((point) =>
@@ -165,12 +178,12 @@ export function useEvolutionMotion(
       // A long main-thread/paint gap slows the draw instead of skipping its start.
       if (last !== null)
         elapsed = Math.min(
-          DURATION,
+          endTime,
           elapsed + Math.max(0, Math.min(34, time - last)),
         );
       last = time;
       seek();
-      if (elapsed >= DURATION) {
+      if (elapsed >= endTime) {
         finish();
         return;
       }

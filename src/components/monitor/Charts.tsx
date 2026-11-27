@@ -740,6 +740,12 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                 <clipPath id={`band-${id}`}>
                   <rect className="band-reveal" width={w} height={H} />
                 </clipPath>
+                {firstComplete && (
+                  <clipPath id={`trail-${id}`}>
+                    <rect className="trail-reveal" x={markerX}
+                      width={Math.max(0, releaseX - markerX)} height={H} />
+                  </clipPath>
+                )}
               </defs>
               <g clipPath={`url(#band-${id})`}>
                 {([95, 68] as const).map((n) => {
@@ -757,7 +763,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                   ) : null;
                 })}
                 {final && (
-                  <path data-final-trail
+                  <path data-final-trail clipPath={`url(#trail-${id})`}
                     d={`${p(rows.slice(completeIndex), (r) => r.qoq_growth_pct)} L${releaseX},${y(final.qoq_growth_pct)}`}
                     fill="none" stroke={chartColors.primary} strokeWidth="1.8"
                     strokeDasharray="4 3" pointerEvents="none"

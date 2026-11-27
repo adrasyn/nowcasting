@@ -181,7 +181,10 @@ def pair_runs(v3_runs: list[dict], v2_vintages: list[dict], *,
     out = []
     for r in v3_runs:
         quarter, run_date = r["target_quarter"], r["run_date"]
-        horizon = "current" if is_current(run_date, quarter) else "next"
+        final_release = r.get("final_release_at")
+        final_row = (r.get("kind") == "nowcast" and isinstance(final_release, str)
+                     and run_date < final_release[:10])
+        horizon = "current" if final_row or is_current(run_date, quarter) else "next"
         partner = None
         for v in by_quarter.get(quarter, []):
             if (v.get("horizon") or "current") != horizon:
@@ -209,6 +212,8 @@ def pair_runs(v3_runs: list[dict], v2_vintages: list[dict], *,
             "months_with_data": _months_with_data(r, quarter),
             "data_through": r.get("data_through"),
         }
+        if final_row and partner["run_date"] == run_date:
+            row["final_release_at"] = final_release
         out.append(row)
     out.sort(key=lambda x: (x["run_date"], x["target_quarter"]))
     return out
@@ -873,7 +878,7 @@ def _final_live_rows(history_rows: list[dict], *, is_current=None) -> dict[str, 
         if horizon != "current":
             continue
         label = r["target_quarter"]
-        release = gdp_release_date(label)
+        release = (r.get("final_release_at") or "")[:10] or gdp_release_date(label)
         run = r["run_date"]
         if release is None or run >= release:
             continue

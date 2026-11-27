@@ -362,7 +362,16 @@ export interface V3Horizon {
   source?: string;
 }
 
+export interface FinalEstimate {
+  quarter: string;
+  run_date: string;
+  release_at: string;
+  generated_at: string;
+}
+
 export interface LatestV3 {
+  // Written only by the guarded final combination, bound to this publication.
+  final_estimate?: FinalEstimate;
   schema: string;
   // "abs_first_print": the horizons above are nowcasts of the ABS's first
   // print. Absent on payloads emitted before 2026-09-09.

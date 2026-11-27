@@ -61,7 +61,7 @@ export function useEvolutionMotion(
           ),
         );
       svg
-        .querySelectorAll(".chart-point")
+        .querySelectorAll(".chart-point, .final-estimate-marker")
         .forEach((point) =>
           animations.push(
             point.animate([{ opacity: 0 }, { opacity: 1 }], {

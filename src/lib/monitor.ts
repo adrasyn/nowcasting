@@ -1,5 +1,6 @@
 import type {
   DashboardData,
+  FinalEstimate,
   GdpQuarter,
   IndicatorData,
   LatestV3,
@@ -82,6 +83,7 @@ export interface MonitorHorizon {
   runs: V3Vintage[];
   delta: number | null;
   previousRunDate: string | null;
+  finalEstimate?: FinalEstimate;
 }
 export interface MonitorView {
   model: "combination" | "v3" | "unavailable";
@@ -283,6 +285,27 @@ export function buildMonitorView(
   const current = make(currentQuarter, "current"),
     next = make(nextQuarter, "next"),
     warnings: string[] = [];
+  if (model === "combination") {
+    const final = latest?.final_estimate, point = current.runs.at(-1),
+      releaseAt = Date.parse(final?.release_at ?? ""),
+      publishedAt = Date.parse(final?.generated_at ?? "");
+    if (
+      final && latest?.status === "ok" && actualQuarter &&
+      current.state === "ready" && current.source?.kind === "nowcast" &&
+      current.months === 3 && current.band68 && current.band95 &&
+      current.quarter === final.quarter && latest.target_quarter === final.quarter &&
+      latest.as_of === final.run_date && latest.generated_at === final.generated_at &&
+      current.release === isoDay(final.release_at) && final.run_date < current.release! &&
+      finite(publishedAt) && finite(releaseAt) && publishedAt < releaseAt &&
+      latest.components?.v2?.run_date === final.run_date &&
+      (latest.components?.v2?.stale_days ?? 0) === 0 &&
+      latest.components?.v3?.as_of === final.run_date &&
+      point?.run_date === final.run_date && point.v2_run_date === final.run_date &&
+      point.horizon === "current" && point.qoq_growth_pct === current.qoq &&
+      point.ci_68_low === current.band68[0] && point.ci_68_high === current.band68[1] &&
+      point.ci_95_low === current.band95[0] && point.ci_95_high === current.band95[1]
+    ) current.finalEstimate = final;
+  }
   if (latest?.status === "refused")
     warnings.push(
       `No nowcast published: ${latest.refusal_reason ?? "model refusal"}. ${latest.refusal_detail ?? ""}`.trim(),

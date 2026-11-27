@@ -229,6 +229,23 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
   prev_level <- pl$level
   release_date <- if (!is.null(jlatest$next_gdp_release_date)) as.Date(jlatest$next_gdp_release_date) else NA
 
+  final_day <- Sys.getenv("NOWCAST_FINAL_DAY")
+  final_check <- NULL
+  if (nzchar(final_day)) {
+    day <- as.Date(final_day, format = "%Y-%m-%d")
+    if (is.na(day) || final_day != format(day, "%Y-%m-%d") ||
+        final_day != format(Sys.time(), tz = "Australia/Sydney", format = "%Y-%m-%d") ||
+        is.na(release_date) || day != release_date - 1 ||
+        backfill_next || rebuild_vintages || nzchar(Sys.getenv("NOWCAST_AS_OF")))
+      stop("Final v2 run must be live, one Sydney day before the GDP release")
+    release_at <- as.POSIXct(paste(release_date, "11:30:00"), tz = "Australia/Sydney")
+    zone <- format(release_at, "%z", tz = "Australia/Sydney")
+    final_check <- list(quarter = jlatest$target_quarter, run_date = final_day,
+                        release_at = paste0(release_date, "T11:30:00",
+                                            substr(zone, 1, 3), ":", substr(zone, 4, 5)))
+    mondays <- final_day
+  }
+
   # ---- the MAI at one as_of (both horizons read the same one) ------------------
   # Exclude AiG (dead) and rt (old Retail Trade, superseded by MHSI =
   # household_spending, which the model already uses; rt was never selected).
@@ -243,7 +260,7 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     build_mai(tfs = tfs, gdp = gdpt,
               sel_alpha = sel_alpha, dfm_q = 1L, exclude_ids = c(AIG, "rt"),
               out_csv = file.path("cache", paste0("mai_", id, ".csv")),
-              out_rds = file.path("cache", paste0("mai_", id, ".rds")))$mai
+              out_rds = file.path("cache", paste0("mai_", id, ".rds")))
   }
 
   # ---- one model at one as_of, at one horizon ----------------------------------
@@ -329,8 +346,26 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     ids_i   <- setdiff(names(wide_i), "date")
     has_i   <- rowSums(!is.na(as.matrix(wide_i[, ids_i]))) > 0
     dt_i    <- format(max(wide_i$date[has_i]), "%Y-%m")
-    mai_i   <- mk_mai(tfs_i, gdp_i, "v2_qa_a10", 0.10)
+    fit_i   <- mk_mai(tfs_i, gdp_i, "v2_qa_a10", 0.10)
+    mai_i   <- fit_i$mai
     qa_i    <- mk(mai_i, gdp_i, "v2_qa_a10", "MAI to per-stage U-MIDAS", "qa", CI_QA)
+    if (!is.null(final_check)) {
+      if (!identical(qa_i$target_quarter, final_check$quarter))
+        stop("Final v2 target does not match the ABS release calendar")
+      year <- as.integer(substr(final_check$quarter, 1L, 4L))
+      q <- as.integer(substr(final_check$quarter, 7L, 7L))
+      expected <- sprintf("%04d-%02d", year, (q * 3L - 2L):(q * 3L))
+      quarter_data <- tfs_i[match(expected, format(tfs_i$date, "%Y-%m")), , drop = FALSE]
+      # NAB has not reported Stocks in its monthly tables since May 2026. This
+      # exemption does not change model selection or rewrite historical values.
+      selected <- setdiff(fit_i$diagnostics$selected, "nab_stocks")
+      missing <- unlist(lapply(selected, function(id) {
+        absent <- expected[!is.finite(quarter_data[[id]])]
+        if (length(absent)) paste0(id, " (", absent, ")") else character()
+      }), use.names = FALSE)
+      if (length(missing))
+        stop("Final v2 inputs incomplete: ", paste(missing, collapse = ", "))
+    }
     nq_i    <- tryCatch(
       mk(mai_i, gdp_i, "v2_qa_a10", "MAI to per-stage U-MIDAS", "qa", CI_QA,
          horizon = "next", prev_lvl = qa_i$gdp_chain_volume_millions,
@@ -508,6 +543,7 @@ emit_v2_json <- function(repo_root = "..", mondays = NULL, rebuild_vintages = FA
     v1_comparison  = v1,
     note           = "STAGED v2 emit (parallel to live latest.json). Monday cadence; headline = latest Monday. Pending James approval."
   )
+  if (!is.null(final_check)) out$final_input_check <- final_check
   out_path <- file.path(repo_root, "data", "latest_v2.json")
   jsonlite::write_json(out, out_path, pretty = TRUE, auto_unbox = TRUE, na = "null")
   cat(sprintf("\nWROTE %s\n", normalizePath(out_path, mustWork = FALSE)))

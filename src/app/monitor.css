@@ -1906,3 +1906,35 @@
 .nowcast-monitor .evolution-block .chart-point:focus-visible {
   opacity: 1 !important;
 }
+
+/* Only the certified current estimate gets the top strip. Align both titles. */
+.nowcast-monitor .estimate-ledger[data-final="true"] {
+  align-items: stretch;
+}
+.nowcast-monitor .estimate-ledger[data-final="true"] .estimate.next {
+  margin-top: 24px;
+}
+.nowcast-monitor .final-estimate-strip {
+  margin: -12px -12px 12px;
+  padding: 5px 12px;
+  border-bottom: 1px solid #ccdee3;
+  background: #edf5f6;
+  color: #034159;
+  font-weight: 650;
+  font-size: 10px;
+  line-height: 13px;
+  white-space: nowrap;
+  container-type: inline-size;
+}
+.nowcast-monitor .final-estimate-strip span {
+  font-weight: 450;
+}
+@container (max-width: 116px) {
+  .nowcast-monitor .final-estimate-strip span { display: none; }
+}
+@media (max-width: 639px) {
+  .nowcast-monitor .final-estimate-strip {
+    margin: -10px -10px 10px;
+    padding-inline: 10px;
+  }
+}

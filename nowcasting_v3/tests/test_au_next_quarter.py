@@ -425,3 +425,18 @@ def test_the_track_record_scores_against_published_gdp_not_a_fixture():
         f"the newest live-scored quarter is {scored}, at or before the "
         f"recording's last GDP observation ({fixture_last}) — the emitter is "
         "almost certainly reading the fixture again")
+
+
+def test_record_does_not_rewrite_a_certified_final_vintage(tmp_path, monkeypatch):
+    import json
+    from tools import run_au_nowcast
+
+    path = tmp_path / "history.json"
+    monkeypatch.setattr(run_au_nowcast, "HISTORY", path)
+    day, target = "2026-12-01", "2026 Q3"
+    row = {"run_date": day, "target_quarter": target, "qoq_growth_pct": 0.43,
+           "final_release_at": "2026-12-02T11:30:00+11:00"}
+    path.write_text(json.dumps({"schema": "v3-history-3", "runs": [row]}))
+    later = {key: value for key, value in row.items() if key != "final_release_at"}
+    later["qoq_growth_pct"] = 0.99
+    assert run_au_nowcast._record([later], [target], day) == [row]

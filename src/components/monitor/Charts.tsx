@@ -553,6 +553,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
     setChosen(-1);
   };
   if (!h) return null;
+  const final = h.finalEstimate ? rows.at(-1) : undefined;
   const active =
       rows[Math.min(chosen < 0 ? rows.length - 1 : chosen, rows.length - 1)],
     m = { l: 40, r: 24, t: 15, b: 28 };
@@ -564,8 +565,11 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
     ds = rows.map(days),
     xmin = Math.min(-120, ...ds),
     xmax = Math.max(0, ...ds),
-    x = (r: V3Vintage) =>
-      m.l + ((days(r) - xmin) / Math.max(1, xmax - xmin)) * (w - m.l - m.r),
+    xDay = (day: number) =>
+      m.l + ((day - xmin) / Math.max(1, xmax - xmin)) * (w - m.l - m.r),
+    x = (r: V3Vintage) => xDay(days(r)),
+    finalX = final ? x(final) : 0,
+    releaseX = xDay(0),
     vals = rows.flatMap((r) => [
       r.qoq_growth_pct, ...(bandFor(r, 68) ?? []), ...(bandFor(r, 95) ?? []),
     ]),
@@ -635,7 +639,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
               ref={ref}
               viewBox={`0 0 ${w} ${H}`}
               role="group"
-              aria-label={`${h.quarter} weekly GDP estimates. Full weekly history is below.`}
+              aria-label={`${h.quarter} weekly GDP estimates.${final ? " Final estimate held through release day." : ""} Full weekly history is below.`}
             >
               {ticks.map((v) => (
                 <g key={v} data-evolution-tick={v}>
@@ -691,6 +695,8 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                   </g>
                 );
               })}
+              {final && <line x1={releaseX} x2={releaseX} y1={m.t} y2={H - m.b}
+                stroke="#94a3b8" strokeDasharray="3 4" />}
               <defs>
                 <clipPath id={`band-${id}`}>
                   <rect className="band-reveal" width={w} height={H} />
@@ -699,15 +705,21 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
               <g clipPath={`url(#band-${id})`}>
                 {([95, 68] as const).map((n) => {
                   const valid = rows.filter((r) => bandFor(r, n));
+                  const hold = final && bandFor(final, n);
+                  const lower = hold ? ` L${releaseX},${y(hold[0])}` : "",
+                    upper = hold ? ` L${releaseX},${y(hold[1])}` : "";
                   return valid.length ? (
                     <path
                       key={n}
                       className="band-fill"
-                      d={`${p(valid, (r) => bandFor(r, n)![0])} ${p([...valid].reverse(), (r) => bandFor(r, n)![1]).replace(/^M/, "L")} Z`}
+                      d={`${p(valid, (r) => bandFor(r, n)![0])}${lower}${upper} ${p([...valid].reverse(), (r) => bandFor(r, n)![1]).replace(/^M/, "L")} Z`}
                       {...evolutionBandPaint(n)}
                     />
                   ) : null;
                 })}
+                {final && <line data-final-extension x1={finalX} x2={releaseX}
+                  y1={y(final.qoq_growth_pct)} y2={y(final.qoq_growth_pct)}
+                  stroke={chartColors.primary} strokeWidth="1.8" strokeDasharray="4 3" />}
               </g>
               <path
                 className="chart-line"
@@ -716,6 +728,16 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                 stroke={chartColors.primary}
                 strokeWidth="1.8"
               />
+              {final && <g className="final-estimate-marker" pointerEvents="none">
+                <line data-final-marker x1={finalX} x2={finalX} y1={m.t} y2={H - m.b}
+                  stroke="#0a7d99" strokeDasharray="3 3" />
+                <text x={finalX > m.l + 94 ? finalX - 6 : finalX + 6}
+                  y={m.t + 15} textAnchor={finalX > m.l + 94 ? "end" : "start"}
+                  fontSize="11" fontWeight="650" fill={chartColors.primary}
+                  paintOrder="stroke" stroke="white" strokeWidth="3" strokeLinejoin="round">
+                  Final estimate
+                </text>
+              </g>}
               {rows.map((r, j) => (
                 <g
                   key={r.run_date}

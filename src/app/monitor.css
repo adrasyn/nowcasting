@@ -1892,7 +1892,7 @@
 .nowcast-monitor
   .evolution-block
   svg:is([data-evolution-motion="waiting"], [data-evolution-motion="priming"])
-  :is(.chart-line, .band-fill) {
+  :is(.chart-line, .band-fill, [data-final-trail]) {
   visibility: hidden;
 }
 .nowcast-monitor

@@ -1941,6 +1941,10 @@
   }
 }
 @media (max-width: 374px) {
+  .nowcast-monitor .estimate-meta {
+    grid-template-columns: minmax(max-content, 1fr) minmax(max-content, 1fr);
+    column-gap: 3px;
+  }
   .nowcast-monitor .final-estimate-strip {
     font-size: 8.5px;
     padding-inline: 7px;

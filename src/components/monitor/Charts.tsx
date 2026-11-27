@@ -643,13 +643,15 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
             >
               {ticks.map((v) => (
                 <g key={v} data-evolution-tick={v}>
-                  <line
-                    x1={m.l}
-                    x2={w - m.r}
-                    y1={y(v)}
-                    y2={y(v)}
-                    stroke={line}
-                  />
+                  {v !== 0 && (
+                    <line
+                      x1={m.l}
+                      x2={w - m.r}
+                      y1={y(v)}
+                      y2={y(v)}
+                      stroke={line}
+                    />
+                  )}
                   <text
                     x={m.l - 6}
                     y={y(v) + 3}
@@ -721,6 +723,16 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                   y1={y(final.qoq_growth_pct)} y2={y(final.qoq_growth_pct)}
                   stroke={chartColors.primary} strokeWidth="1.8" strokeDasharray="4 3" />}
               </g>
+              <line
+                data-evolution-zero
+                x1={m.l}
+                x2={w - m.r}
+                y1={y(0)}
+                y2={y(0)}
+                stroke="#000"
+                strokeWidth="1"
+                pointerEvents="none"
+              />
               <path
                 className="chart-line"
                 d={p(rows, (r) => r.qoq_growth_pct)}

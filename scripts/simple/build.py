@@ -174,7 +174,7 @@ def build_site(data_dir, output, commit=''):
         rows = [['Growth q/q'] + [pct(h['qoq_growth_pct']) if ready else 'No data' for h, ready in zip(shown, has_data)], ['Growth y/y'] + [pct(v) for v in yoy]]
         for n in [68, 95]:
             rows.append([f'{n}% band'] + [fixed(h[f'ci_{n}_low'])+' to '+fixed(h[f'ci_{n}_high']) if ready else '-' for h, ready in zip(shown, has_data)])
-        rows += [['Complete months'] + [
+        rows += [['Months of data'] + [
             f"{len(set(h['complete_months']))}/3" if isinstance(h.get('complete_months'), list)
             else '—' for h in shown],
                  ['ABS release'] + [date(h.get('release_date') or (latest.get('next_gdp_release_date') if h is a else None)) for h in shown]]

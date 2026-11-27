@@ -30,6 +30,16 @@ for (const width of [375, 390, 1440])
       await expect.poll(() => svg.evaluate(el => Math.abs(
         el.getBoundingClientRect().width - (el as SVGSVGElement).viewBox.baseVal.width,
       ))).toBeLessThan(0.75);
+      const zero = svg.locator("[data-evolution-zero]");
+      await expect(zero).toHaveCount(1);
+      await expect(zero).toHaveAttribute("stroke", "#000");
+      const atZero = await zero.evaluate(el => {
+        const label = el.parentElement!.querySelector('[data-evolution-tick="0"] text')!;
+        return Number(el.getAttribute("y1")) === Number(el.getAttribute("y2")) &&
+          Number(el.getAttribute("y1")) + 3 === Number(label.getAttribute("y")) &&
+          Number(el.getAttribute("x2")) > Number(el.getAttribute("x1"));
+      });
+      expect(atZero).toBe(true);
       const axis = await svg.evaluate(el => {
         const chart = el.getBoundingClientRect();
         const ticks = [...el.querySelectorAll<SVGGElement>("[data-evolution-tick]")].map(g => {

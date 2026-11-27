@@ -49,9 +49,19 @@ for (const [name, v] of Object.entries(fixtureViews()))
     const extension = page.locator("[data-final-extension]");
     if (name === "final") {
       await expect(page.locator(".estimate.current > .final-estimate-strip")).toHaveCount(1);
-      await expect(page.getByText("Complete months", {exact: true}).first()).toBeVisible();
+      await expect(page.getByText("Months of data", {exact: true}).first()).toBeVisible();
       for (const width of [320, 390, 1440]) {
         await page.setViewportSize({width, height: 900});
+        for (const cardLabel of await page.getByText("Months of data", {exact: true}).all()) {
+          const fits = await cardLabel.evaluate(el => {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            const lines = range.getClientRects();
+            const cell = el.parentElement!.getBoundingClientRect();
+            return lines.length === 1 && lines[0].right <= cell.right + 0.5;
+          });
+          expect(fits, `Months of data fits at ${width}px`).toBe(true);
+        }
         const visibleParts = await strip.locator("span:visible").allTextContents();
         expect(visibleParts).toHaveLength(1);
         expect(visibleParts[0]).toMatch(/\(excl\. (data )?revisions\)/);

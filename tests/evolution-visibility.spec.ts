@@ -165,11 +165,12 @@ test("desktop draw starts after layout and finishes with exact unmasked data", a
     const svg = el as SVGSVGElement, view = svg.viewBox.baseVal;
     const mask = svg.querySelector<SVGRectElement>(".band-reveal")!.getBBox();
     const point = svg.querySelector('[data-point][aria-pressed="true"]')!;
-    const marker = point.querySelector("circle:last-child")!;
+    const marker = point.querySelector("circle")!;
     const ticks = [...svg.querySelectorAll<SVGGElement>("[data-evolution-tick]")]
       .map(g => Number(g.dataset.evolutionTick));
     return { width: view.width, height: view.height, maskWidth: mask.width,
-      maskHeight: mask.height, x: Number(marker.getAttribute("cx")),
+      maskHeight: mask.height, hasDot: !!point.querySelector("[data-visible-point]"),
+      x: Number(marker.getAttribute("cx")),
       y: Number(marker.getAttribute("cy")), label: point.getAttribute("aria-label"),
       min: Math.min(...ticks), max: Math.max(...ticks) };
   });
@@ -180,7 +181,11 @@ test("desktop draw starts after layout and finishes with exact unmasked data", a
   expect(geometry.y).toBeCloseTo(15 +
     ((geometry.max - last.qoq_growth_pct) / (geometry.max - geometry.min)) *
     (geometry.height - 43), 6);
-  // A settled screenshot must contain the actual, fully opaque final marker.
+  const finalMarker = page.locator(chart + " [data-final-marker]");
+  const completedOn = await finalMarker.count() ? await finalMarker.getAttribute("data-final-marker") : null;
+  expect(geometry.hasDot).toBe(!completedOn || last.run_date <= completedOn);
+  // The active dot, when present, has to be fully opaque after the draw.
+  // Post-completion runs instead retain their hit target without a dot.
   // Sampling pixels ignores PNG compression/metadata differences between engines.
   const png = await page.locator(chart).screenshot({ path: info.outputPath("completed-unmasked.png") });
   const rgb = JSON.parse(execFileSync("python3", ["-c", `
@@ -189,7 +194,8 @@ from PIL import Image
 p=json.loads(sys.argv[1]); im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGB')
 print(json.dumps(im.getpixel((round(p['x']/p['width']*im.width),round(p['y']/p['height']*im.height)))))
 `, JSON.stringify(geometry)], { input: png }).toString());
-  expect(rgb).toEqual([12, 242, 93]);
+  if (geometry.hasDot) expect(rgb).toEqual([12, 242, 93]);
+  else expect(rgb).not.toEqual([12, 242, 93]);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

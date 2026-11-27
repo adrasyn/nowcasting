@@ -557,13 +557,15 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
   if (!h) return null;
   const final = h.finalEstimate ? rows.at(-1) : undefined;
   const completeMonths = h.source?.complete_months ?? [];
-  // Mark when the quarter first became complete. Later published points can
-  // still move; the dashed hold starts from the latest actual model run.
+  // The dashed trail starts at the first complete run and still follows any
+  // later revisions. Only the portion beyond the last run is held flat.
   const firstComplete = final && (rows.find((r) =>
     r.horizon === "current" && r.run_date === r.v2_run_date &&
     completeMonths.length === 3 && r.complete_months?.length === 3 &&
     completeMonths.every((month) => r.complete_months!.includes(month))
   ) ?? final);
+  const completeIndex = firstComplete ? rows.indexOf(firstComplete) : -1;
+  const solidRows = completeIndex < 0 ? rows : rows.slice(0, completeIndex + 1);
   const selected = rows[Math.min(chosen < 0 ? rows.length - 1 : chosen, rows.length - 1)],
     active = rows[hovered] ?? selected,
     m = { l: 40, r: 24, t: 15, b: 28 };
@@ -578,7 +580,6 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
     xDay = (day: number) =>
       m.l + ((day - xmin) / Math.max(1, xmax - xmin)) * (w - m.l - m.r),
     x = (r: V3Vintage) => xDay(days(r)),
-    finalX = final ? x(final) : 0,
     markerX = firstComplete ? x(firstComplete) : 0,
     releaseX = xDay(0),
     vals = rows.flatMap((r) => [
@@ -673,7 +674,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
               role="group"
               onPointerMove={hover}
               onPointerLeave={() => setHovered(-1)}
-              aria-label={`${h.quarter} weekly GDP estimates.${final ? " Final estimate held through release day." : ""} Full weekly history is below.`}
+              aria-label={`${h.quarter} weekly GDP estimates.${final ? " The dashed line shows estimates after data completion and carries the latest estimate to release day." : ""} Full weekly history is below.`}
             >
               <rect x={m.l} y={m.t} width={w - m.l - m.r} height={H - m.t - m.b}
                 fill="transparent" aria-hidden="true" />
@@ -755,9 +756,13 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                     />
                   ) : null;
                 })}
-                {final && <line data-final-extension x1={finalX} x2={releaseX}
-                  y1={y(final.qoq_growth_pct)} y2={y(final.qoq_growth_pct)}
-                  stroke={chartColors.primary} strokeWidth="1.8" strokeDasharray="4 3" />}
+                {final && (
+                  <path data-final-trail
+                    d={`${p(rows.slice(completeIndex), (r) => r.qoq_growth_pct)} L${releaseX},${y(final.qoq_growth_pct)}`}
+                    fill="none" stroke={chartColors.primary} strokeWidth="1.8"
+                    strokeDasharray="4 3" pointerEvents="none"
+                  />
+                )}
               </g>
               <line
                 data-evolution-zero
@@ -771,7 +776,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
               />
               <path
                 className="chart-line"
-                d={p(rows, (r) => r.qoq_growth_pct)}
+                d={p(solidRows, (r) => r.qoq_growth_pct)}
                 fill="none"
                 stroke={chartColors.primary}
                 strokeWidth="1.8"
@@ -806,13 +811,16 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                     r="11"
                     fill="transparent"
                   />
-                  <circle
-                    cx={x(r)}
-                    cy={y(r.qoq_growth_pct)}
-                    r={active === r ? 4 : 2.1}
-                    stroke={teal}
-                    fill={active === r ? green : teal}
-                  />
+                  {(completeIndex < 0 || j <= completeIndex) && (
+                    <circle
+                      data-visible-point
+                      cx={x(r)}
+                      cy={y(r.qoq_growth_pct)}
+                      r={active === r ? 4 : 2.1}
+                      stroke={teal}
+                      fill={active === r ? green : teal}
+                    />
+                  )}
                 </g>
               ))}
             </svg>

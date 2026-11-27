@@ -2,6 +2,13 @@
 import { useLayoutEffect } from "react";
 import type { RefObject } from "react";
 const DURATION = 1500;
+function plotSpan(a: DOMRect, b: DOMRect) {
+  return {
+    left: Math.min(a.left, b.left), right: Math.max(a.right, b.right),
+    top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom),
+    width: Math.max(a.right, b.right) - Math.min(a.left, b.left),
+  };
+}
 // Keep the native easing, but seek a paused timeline only on visible frames.
 // An offscreen mount, Safari paint stall or late font must not consume the draw.
 export function useEvolutionMotion(
@@ -87,7 +94,10 @@ export function useEvolutionMotion(
     };
     const visible = () => {
       if (document.visibilityState !== "visible") return false;
-      const r = line.getBoundingClientRect(),
+      const trail = svg.querySelector("[data-final-trail]"),
+        solid = line.getBoundingClientRect(),
+        dashed = trail?.getBoundingClientRect(),
+        r = dashed ? (solid.width ? plotSpan(solid, dashed) : dashed) : solid,
         v = window.visualViewport,
         left = v?.offsetLeft ?? 0,
         top = v?.offsetTop ?? 0,

@@ -46,7 +46,7 @@ for (const [name, v] of Object.entries(fixtureViews()))
     }
     const strip = page.locator(".final-estimate-strip");
     const marker = page.locator("[data-final-marker]");
-    const extension = page.locator("[data-final-extension]");
+    const trail = page.locator("[data-final-trail]");
     if (name === "final") {
       await expect(page.locator(".estimate.current > .final-estimate-strip")).toHaveCount(1);
       await expect(page.getByText("Months of data", {exact: true}).first()).toBeVisible();
@@ -71,17 +71,25 @@ for (const [name, v] of Object.entries(fixtureViews()))
       await expect(page.locator(".estimate.next .final-estimate-strip")).toHaveCount(0);
       await expect(page.locator("#path-chart").getByText("Final estimate", {exact: true})).toHaveCount(1);
       await expect(marker).toHaveAttribute("stroke-dasharray", "3 3");
-      await expect(extension).toHaveAttribute("stroke-dasharray", "4 3");
-      const start = Number(await extension.getAttribute("x1"));
-      const end = Number(await extension.getAttribute("x2"));
-      expect(end).toBeGreaterThan(start);
+      await expect(trail).toHaveAttribute("stroke-dasharray", "4 3");
       await expect(marker).toHaveAttribute("data-final-marker", "2026-11-16");
-      expect(Number(await marker.getAttribute("x1"))).toBeLessThan(start);
-      const firstDot = page.locator('#path-chart [data-run-date="2026-11-16"] circle').first();
-      expect(await marker.getAttribute("x1")).toBe(await firstDot.getAttribute("cx"));
-      const latestDot = page.locator('#path-chart [data-run-date="2026-12-01"] circle').first();
-      expect(await extension.getAttribute("x1")).toBe(await latestDot.getAttribute("cx"));
-      expect(await extension.getAttribute("y1")).toEqual(await extension.getAttribute("y2"));
+      const point = (date: string) => page.locator(`#path-chart [data-run-date="${date}"]`);
+      const coords = (date: string) => point(date).locator("circle").first().evaluate(el =>
+        [Number(el.getAttribute("cx")), Number(el.getAttribute("cy"))],
+      );
+      const before = await coords("2026-11-09");
+      const first = await coords("2026-11-16");
+      const last = await coords("2026-12-01");
+      const end = Number(await page.locator("[data-evolution-zero]").getAttribute("x2"));
+      expect(Number(await marker.getAttribute("x1"))).toBe(first[0]);
+      expect(last[1]).not.toBe(first[1]); // The revision is drawn before the flat carry.
+      await expect(page.locator("#path-chart .chart-line")).toHaveAttribute(
+        "d", `M${before} L${first}`,
+      );
+      await expect(trail).toHaveAttribute("d", `M${first} L${last} L${end},${last[1]}`);
+      await expect(point("2026-11-09").locator("[data-visible-point]")).toHaveCount(1);
+      await expect(point("2026-11-16").locator("[data-visible-point]")).toHaveCount(1);
+      await expect(point("2026-12-01").locator("[data-visible-point]")).toHaveCount(0);
       await expect(page.locator("#path-chart .band-fill")).toHaveCount(2);
       for (const shape of await page.locator("#path-chart .band-fill").all())
         expect((await shape.getAttribute("d"))?.split(` L${end},`)).toHaveLength(3);
@@ -89,7 +97,8 @@ for (const [name, v] of Object.entries(fixtureViews()))
     } else {
       await expect(strip).toHaveCount(0);
       await expect(marker).toHaveCount(0);
-      await expect(extension).toHaveCount(0);
+      await expect(trail).toHaveCount(0);
+      await expect(page.locator("#path-chart [data-visible-point]")).toHaveCount(v.current.runs.length);
     }
     if (name === "rolled")
       await expect(page.locator(".estimate.current h2")).toHaveText("Q4 2026: GDP nowcast");

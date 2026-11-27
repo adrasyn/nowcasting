@@ -145,6 +145,11 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - name: Enforce required coverage
@@ -161,11 +166,47 @@ jobs:
         if: success() && needs.candidate.outputs.publish == 'true' && github.ref == 'refs/heads/main'
         run: python3 scripts/ci/candidate.py verify --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
       - name: Upload the smoke-tested export to Pages
+        id: pages_upload
         if: success() && needs.candidate.outputs.publish == 'true' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           name: pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: out
+      # Upload completion can precede artifact registration. Pages searches
+      # its own Actions index by name; don't immediately call it after upload.
+      - name: Wait for this run's Pages artifact
+        if: success() && needs.candidate.outputs.publish == 'true' && github.ref == 'refs/heads/main'
+        timeout-minutes: 2
+        uses: actions/github-script@v7
+        env:
+          ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}
+          ARTIFACT_NAME: pages-${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          script: |
+            const name = process.env.ARTIFACT_NAME;
+            const artifactId = Number(process.env.ARTIFACT_ID);
+            if (!Number.isSafeInteger(artifactId) || artifactId <= 0) {
+              throw new Error(`Upload didn't return an artifact ID for ${name}`);
+            }
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            for (let attempt = 1; attempt <= 10; attempt++) {
+              let artifacts = [];
+              try {
+                ({ data: { artifacts } } = await github.rest.actions.listWorkflowRunArtifacts({
+                  ...context.repo, run_id: context.runId, name
+                }));
+              } catch (error) {
+                if (![404, 429, 500, 502, 503, 504].includes(error.status)) throw error;
+                core.info(`Artifact lookup returned ${error.status}; waiting`);
+              }
+              if (artifacts.some(a => a.id === artifactId && a.name === name && !a.expired)) {
+                core.info(`Found ${name} (artifact ${artifactId}); allowing the Pages index to catch up`);
+                await wait(12000);
+                return;
+              }
+              if (attempt < 10) await wait(5000);
+            }
+            throw new Error(`Artifact ${artifactId} (${name}) never registered for this run`);
       - name: Deploy to GitHub Pages
         if: success() && needs.candidate.outputs.publish == 'true' && github.ref == 'refs/heads/main'
         uses: actions/deploy-pages@v4

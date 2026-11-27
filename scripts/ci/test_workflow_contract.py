@@ -8,10 +8,24 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WorkflowContractTests(unittest.TestCase):
-    def test_permissions_and_model_dispatches_are_unchanged(self):
+    def test_artifact_lookup_is_read_only_and_scoped_to_publication(self):
         workflow = (ROOT/'.github/workflows/deploy.yml').read_text()
         self.assertIn('permissions:\n  contents: read\n  pages: write\n  id-token: write', workflow)
-        self.assertEqual(workflow.count('permissions:'), 1)
+        before_deploy, deploy = workflow.split('\n  deploy:\n')
+        self.assertEqual(before_deploy.count('permissions:'), 1)
+        self.assertNotIn('actions:', before_deploy)
+        self.assertEqual(deploy.count('permissions:'), 1)
+        self.assertIn('permissions:\n      contents: read\n      actions: read\n'
+                      '      pages: write\n      id-token: write', deploy)
+        self.assertNotIn('actions: write', workflow)
+        lookup = deploy.split("      - name: Wait for this run's Pages artifact")[1].split(
+            '      - name: Deploy to GitHub Pages')[0]
+        self.assertIn("github.ref == 'refs/heads/main'", lookup)
+        self.assertIn('steps.pages_upload.outputs.artifact_id', lookup)
+        self.assertIn('run_id: context.runId, name', lookup)
+        self.assertIn('a.id === artifactId && a.name === name && !a.expired', lookup)
+
+    def test_model_dispatches_are_unchanged(self):
         for name in ['nowcast-weekly.yml', 'nowcast-v3-weekly.yml']:
             self.assertIn('gh workflow run deploy.yml --ref main', (ROOT/'.github/workflows'/name).read_text())
 

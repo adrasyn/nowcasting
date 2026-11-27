@@ -541,7 +541,8 @@ function EvolutionLegendKey({ band }: { band?: 68 | 95 }) {
 }
 export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
   const [target, setTarget] = useState(horizons[0]?.quarter),
-    [chosen, setChosen] = useState(-1);
+    [chosen, setChosen] = useState(-1),
+    [hovered, setHovered] = useState(-1);
   const h = horizons.find((h) => h.quarter === target) ?? horizons[0];
   const rows = h?.runs ?? [],
     ref = useRef<SVGSVGElement>(null),
@@ -551,11 +552,20 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
   const select = (n: number) => {
     setTarget(horizons[n].quarter);
     setChosen(-1);
+    setHovered(-1);
   };
   if (!h) return null;
   const final = h.finalEstimate ? rows.at(-1) : undefined;
-  const active =
-      rows[Math.min(chosen < 0 ? rows.length - 1 : chosen, rows.length - 1)],
+  const completeMonths = h.source?.complete_months ?? [];
+  // Mark when the quarter first became complete. Later published points can
+  // still move; the dashed hold starts from the latest actual model run.
+  const firstComplete = final && (rows.find((r) =>
+    r.horizon === "current" && r.run_date === r.v2_run_date &&
+    completeMonths.length === 3 && r.complete_months?.length === 3 &&
+    completeMonths.every((month) => r.complete_months!.includes(month))
+  ) ?? final);
+  const selected = rows[Math.min(chosen < 0 ? rows.length - 1 : chosen, rows.length - 1)],
+    active = rows[hovered] ?? selected,
     m = { l: 40, r: 24, t: 15, b: 28 };
   const release = h.release ? Date.parse(h.release + "T00:00:00Z") : null,
     days = (r: V3Vintage) =>
@@ -569,6 +579,7 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
       m.l + ((day - xmin) / Math.max(1, xmax - xmin)) * (w - m.l - m.r),
     x = (r: V3Vintage) => xDay(days(r)),
     finalX = final ? x(final) : 0,
+    markerX = firstComplete ? x(firstComplete) : 0,
     releaseX = xDay(0),
     vals = rows.flatMap((r) => [
       r.qoq_growth_pct, ...(bandFor(r, 68) ?? []), ...(bandFor(r, 95) ?? []),
@@ -577,6 +588,27 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
     y = (v: number) => m.t + ((max - v) / (max - min)) * (H - m.t - m.b),
     p = (rs: V3Vintage[], get: (r: V3Vintage) => number) =>
       rs.map((r, j) => `${j ? "L" : "M"}${x(r)},${y(get(r))}`).join(" ");
+  const hover = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (event.pointerType !== "mouse" && !(event.pointerType === "pen" && !event.buttons))
+      return;
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    const px = (event.clientX - box.left) * w / box.width;
+    const py = (event.clientY - box.top) * H / box.height;
+    if (px < m.l || px > w - m.r || py < m.t || py > H - m.b) {
+      setHovered(-1);
+      return;
+    }
+    let index = -1, distance = Infinity;
+    for (const [j, row] of rows.entries()) {
+      const d = Math.abs(px - x(row));
+      if (d < distance) {
+        index = j;
+        distance = d;
+      }
+    }
+    setHovered(index);
+  };
   return (
     <section className="evolution-block" aria-labelledby="evolution-title">
       <div className="block-heading">
@@ -639,8 +671,12 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
               ref={ref}
               viewBox={`0 0 ${w} ${H}`}
               role="group"
+              onPointerMove={hover}
+              onPointerLeave={() => setHovered(-1)}
               aria-label={`${h.quarter} weekly GDP estimates.${final ? " Final estimate held through release day." : ""} Full weekly history is below.`}
             >
+              <rect x={m.l} y={m.t} width={w - m.l - m.r} height={H - m.t - m.b}
+                fill="transparent" aria-hidden="true" />
               {ticks.map((v) => (
                 <g key={v} data-evolution-tick={v}>
                   {v !== 0 && (
@@ -740,11 +776,11 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                 stroke={chartColors.primary}
                 strokeWidth="1.8"
               />
-              {final && <g className="final-estimate-marker" pointerEvents="none">
-                <line data-final-marker x1={finalX} x2={finalX} y1={m.t} y2={H - m.b}
+              {firstComplete && <g className="final-estimate-marker" pointerEvents="none">
+                <line data-final-marker={firstComplete.run_date} x1={markerX} x2={markerX} y1={m.t} y2={H - m.b}
                   stroke="#0a7d99" strokeDasharray="3 3" />
-                <text x={finalX > m.l + 94 ? finalX - 6 : finalX + 6}
-                  y={m.t + 15} textAnchor={finalX > m.l + 94 ? "end" : "start"}
+                <text x={markerX > m.l + 94 ? markerX - 6 : markerX + 6}
+                  y={m.t + 15} textAnchor={markerX > m.l + 94 ? "end" : "start"}
                   fontSize="11" fontWeight="650" fill={chartColors.primary}
                   paintOrder="stroke" stroke="white" strokeWidth="3" strokeLinejoin="round">
                   Final estimate
@@ -755,15 +791,15 @@ export function Evolution({ horizons }: { horizons: MonitorHorizon[] }) {
                   key={r.run_date}
                   className="chart-point"
                   data-point
+                  data-run-date={r.run_date}
                   role="button"
-                  tabIndex={active === r ? 0 : -1}
-                  aria-pressed={active === r}
+                  tabIndex={selected === r ? 0 : -1}
+                  aria-pressed={selected === r}
                   aria-label={`${dayLabel(r.run_date, true)}: ${percentage(r.qoq_growth_pct)}; 68% ${bandText(bandFor(r, 68))}; 95% ${bandText(bandFor(r, 95))}`}
                   onClick={() => setChosen(j)}
                   onFocus={() => setChosen(j)}
                   onKeyDown={(e) => chooseKey(e, j, rows.length, setChosen)}
                 >
-                  <title>{`${dayLabel(r.run_date, true)}: ${percentage(r.qoq_growth_pct)}`}</title>
                   <circle
                     cx={x(r)}
                     cy={y(r.qoq_growth_pct)}

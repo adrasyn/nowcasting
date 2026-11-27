@@ -33,7 +33,12 @@
       "err_mae_pp": 0.21,
       "err_bias_pp": 0.13,
       "err_n": 18,
-      "ci_stage": "3"
+      "ci_stage": "3",
+      "complete_months": [
+        "2026-07",
+        "2026-08",
+        "2026-09"
+      ]
     },
     "next_quarter": {
       "model_id": "v2_qa_a10",
@@ -489,7 +494,12 @@
       "ci_68_high": 704304,
       "ci_95_low": 698576,
       "ci_95_high": 706273,
-      "data_through": "2026-11"
+      "data_through": "2026-11",
+      "complete_months": [
+        "2026-07",
+        "2026-08",
+        "2026-09"
+      ]
     },
     {
       "run_date": "2026-11-16",
@@ -515,7 +525,12 @@
       "ci_68_high": 704307,
       "ci_95_low": 698578,
       "ci_95_high": 706276,
-      "data_through": "2026-11"
+      "data_through": "2026-11",
+      "complete_months": [
+        "2026-07",
+        "2026-08",
+        "2026-09"
+      ]
     },
     {
       "run_date": "2026-11-23",

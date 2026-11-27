@@ -1942,8 +1942,11 @@
 }
 @media (max-width: 374px) {
   .nowcast-monitor .estimate-meta {
-    grid-template-columns: minmax(max-content, 1fr) minmax(max-content, 1fr);
-    column-gap: 3px;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    column-gap: 2px;
+  }
+  .nowcast-monitor .estimate-meta > div:last-child dd {
+    font-size: 9px;
   }
   .nowcast-monitor .final-estimate-strip {
     font-size: 8.5px;

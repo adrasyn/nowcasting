@@ -75,7 +75,12 @@ for (const [name, v] of Object.entries(fixtureViews()))
       const start = Number(await extension.getAttribute("x1"));
       const end = Number(await extension.getAttribute("x2"));
       expect(end).toBeGreaterThan(start);
-      expect(await marker.getAttribute("x1")).toEqual(await extension.getAttribute("x1"));
+      await expect(marker).toHaveAttribute("data-final-marker", "2026-11-16");
+      expect(Number(await marker.getAttribute("x1"))).toBeLessThan(start);
+      const firstDot = page.locator('#path-chart [data-run-date="2026-11-16"] circle').first();
+      expect(await marker.getAttribute("x1")).toBe(await firstDot.getAttribute("cx"));
+      const latestDot = page.locator('#path-chart [data-run-date="2026-12-01"] circle').first();
+      expect(await extension.getAttribute("x1")).toBe(await latestDot.getAttribute("cx"));
       expect(await extension.getAttribute("y1")).toEqual(await extension.getAttribute("y2"));
       await expect(page.locator("#path-chart .band-fill")).toHaveCount(2);
       for (const shape of await page.locator("#path-chart .band-fill").all())

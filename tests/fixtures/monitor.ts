@@ -66,6 +66,11 @@ export function finalFixtureData() {
   latest.components = { v2: { as_of: run, run_date: run }, v3: { as_of: run } };
   const h = latest.horizons[0];
   h.complete_months = ["2026-07", "2026-08", "2026-09"];
+  const early = latest.vintages!.find(r =>
+    r.target_quarter === "2026 Q3" && r.run_date === "2026-11-16")!;
+  early.horizon = "current";
+  early.v2_run_date = early.run_date;
+  early.complete_months = h.complete_months;
   latest.vintages!.push({
     ...h, target_quarter: h.quarter, run_date: run, horizon: "current",
     v2_run_date: run, data_through: "2026-10",

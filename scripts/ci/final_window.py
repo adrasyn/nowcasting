@@ -15,7 +15,8 @@ def main():
     combo = json.loads((data / "latest_combo.json").read_text())
     gdp = json.loads((data / "gdp.json").read_text())["series"]
     slot = release_slot(json.loads((data / "latest.json").read_text()), now)
-    if not slot or lock_active(combo, gdp, now) or any(
+    already_ran = slot and (combo.get("final_estimate") or {}).get("run_date") == slot["run_date"]
+    if not slot or (already_ran and lock_active(combo, gdp, now)) or any(
             row.get("quarter") == slot["quarter"] for row in gdp):
         return
     print(slot["run_date"])

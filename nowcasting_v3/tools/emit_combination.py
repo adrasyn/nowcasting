@@ -46,7 +46,7 @@ from nyfed.au.combination import (HISTORY_SCHEMA, _spaced, fill_next_release,
                                   refusal_payload, track_record,
                                   v2_vintage_rows, with_bands)
 from nyfed.au.emit import gdp_release_date
-from nyfed.au.finality import checked_final_stamp, lock_active, release_slot
+from nyfed.au.finality import checked_final_stamp, coverage_stamp, release_slot
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -199,12 +199,6 @@ def main() -> int:
 
     now = datetime.now(timezone.utc)
     generated_at = f"{asof}T00:00:00+00:00" if asof else now.isoformat(timespec="seconds")
-    published = out / "latest_combo.json"
-    if out.resolve() == DATA and published.is_file():
-        previous = json.loads(published.read_text())
-        if lock_active(previous, gdp, now):
-            print(f"Keeping {previous['target_quarter']}'s locked final estimate")
-            return 0
     final = None
     if args.final_day:
         if asof:
@@ -283,10 +277,21 @@ def main() -> int:
         return 0
 
     if final:
-        latest["final_estimate"] = checked_final_stamp(latest, v2, v3, final, generated_at)
+        checked_final_stamp(latest, v2, v3, final, generated_at)
         rel = final["release_at"][:10]
         latest["horizons"][0]["release_date"] = latest["next_gdp_release_date"] = rel
         emit_indicators(out, next_gdp_release_date=rel)
+    elif not asof:
+        # Prefer the actual scheduled date carried by the live v3 payload over
+        # the generic first-Wednesday rule, as the special run already does.
+        rel = v3.get("next_gdp_release_date")
+        h = latest["horizons"][0]
+        if rel and rel[:7] == h.get("release_date", "")[:7]:
+            h["release_date"] = latest["next_gdp_release_date"] = rel
+    if not asof:
+        stamp = coverage_stamp(latest, gdp, now)
+        if stamp:
+            latest["final_estimate"] = stamp
     perf = track_record(backtest, rows, gdp, read_first_release(), read_somp(),
                         is_current=is_current)
 

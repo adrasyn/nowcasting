@@ -329,6 +329,8 @@ export interface V3Horizon {
   // quarter with zero is the model's unconditional anchor and nothing else,
   // which is why the page refuses to headline it.
   months_with_data?: number;
+  // Validated calendar months with every required transformed input.
+  complete_months?: string[];
   // First Wednesday of the month three months after the quarter ends — the
   // ABS's scheduling rule. Emitted per horizon so each chart can plot its own
   // countdown without re-deriving the release calendar in the browser.
@@ -451,6 +453,8 @@ export interface V3Vintage {
   target_quarter: string;
   kind?: "nowcast" | "forecast";
   months_with_data?: number;
+  // Validated calendar months with every required transformed input.
+  complete_months?: string[];
   qoq_growth_pct: number;
   ci_68_low: number;
   ci_68_high: number;

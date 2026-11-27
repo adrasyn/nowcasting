@@ -58,6 +58,11 @@ function QuarterCard({
       data-quarter={h.quarter}
       data-state={h.state}
     >
+      {h.finalEstimate && (
+        <div className="final-estimate-strip">
+          Final estimate<span> (no new data)</span>
+        </div>
+      )}
       <div className="estimate-heading">
         <h2>{quarterLabel(h.quarter)}: GDP nowcast</h2>
         <span>{quarterMonths(h.quarter)}</span>
@@ -575,7 +580,23 @@ export default function Monitor({
     [v],
   );
   const [today, setToday] = useState(v.builtAt);
-  useEffect(() => setToday(new Date().toISOString()), []);
+  const final = v.current.finalEstimate;
+  useEffect(() => {
+    const updateClock = () => setToday(new Date().toISOString());
+    updateClock();
+    if (!final) return;
+    const remaining = Date.parse(final.release_at) - Date.now();
+    const timer = remaining > 0 ? window.setTimeout(updateClock, remaining) : undefined;
+    // A suspended mobile tab may not have run the release-time timer yet.
+    document.addEventListener("visibilitychange", updateClock);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", updateClock);
+    };
+  }, [final]);
+  const showFinal = final && Date.parse(today) >= Date.parse(final.generated_at) &&
+    Date.parse(today) < Date.parse(final.release_at);
+  const current = showFinal ? v.current : { ...v.current, finalEstimate: undefined };
   const age = v.asOf
     ? (Date.parse(today) - Date.parse(v.asOf)) / 86400000
     : null;
@@ -590,7 +611,8 @@ export default function Monitor({
           This nowcast is a real-time estimate of GDP growth for the latest
           quarter, produced before the ABS publishes the official figure with a
           roughly 3-month lag after the end of the quarter. Estimates are
-          updated every Monday morning, Sydney time.
+          updated every Monday morning, Sydney time, with a final update before
+          the ABS release when the model inputs are complete.
         </p>
         <p>Last updated: {dayLabel(v.asOf, true)}</p>
       </header>
@@ -609,12 +631,12 @@ export default function Monitor({
       )}
       <div className="overview-grid">
         <section id="readout" aria-label="Quarterly GDP nowcasts">
-          <div className="estimate-ledger">
-            <QuarterCard h={v.current} group={group} bound={bound} />
+          <div className="estimate-ledger" data-final={showFinal ? "true" : undefined}>
+            <QuarterCard h={current} group={group} bound={bound} />
             <QuarterCard h={v.next} group={group} bound={bound} />
           </div>
         </section>
-        <Evolution horizons={[v.current, v.next]} />
+        <Evolution horizons={[current, v.next]} />
       </div>
       <section id="indicators" aria-labelledby="indicators-title">
         <div className="section-heading">

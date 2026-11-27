@@ -46,6 +46,7 @@ from nyfed.au.combination import (HISTORY_SCHEMA, _spaced, fill_next_release,
                                   refusal_payload, track_record,
                                   v2_vintage_rows, with_bands)
 from nyfed.au.emit import gdp_release_date
+from nyfed.au.finality import checked_final_stamp, lock_active, release_slot
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -184,6 +185,7 @@ def main() -> int:
                     help="pretend today is this date (YYYY-MM-DD): drop later "
                          "runs, so the page shows the quarter in force then")
     ap.add_argument("--out", default=str(DATA))
+    ap.add_argument("--final-day", help="Certified final vintage (Sydney date)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -191,18 +193,35 @@ def main() -> int:
 
     v3 = json.loads((DATA / "latest_v3.json").read_text())
 
-    emit_indicators(out, next_gdp_release_date=v3.get("next_gdp_release_date"))
-
     v2 = json.loads((DATA / "latest_v2.json").read_text())
     history = json.loads((DATA / "nowcast_history_v3.json").read_text())["runs"]
     gdp = json.loads((DATA / "gdp.json").read_text())["series"]
 
-    generated_at = (f"{asof}T00:00:00+00:00" if asof else
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"))
+    now = datetime.now(timezone.utc)
+    generated_at = f"{asof}T00:00:00+00:00" if asof else now.isoformat(timespec="seconds")
+    published = out / "latest_combo.json"
+    if out.resolve() == DATA and published.is_file():
+        previous = json.loads(published.read_text())
+        if lock_active(previous, gdp, now):
+            print(f"Keeping {previous['target_quarter']}'s locked final estimate")
+            return 0
+    final = None
+    if args.final_day:
+        if asof:
+            ap.error("A historical replay cannot certify a final estimate")
+        final = release_slot(json.loads((DATA / "latest.json").read_text()), now)
+        if final is None or final["run_date"] != args.final_day:
+            ap.error("Final combination is outside the pre-release window")
+        if any(r.get("quarter") == final["quarter"] for r in gdp):
+            ap.error("The GDP actual is already available")
+    else:
+        emit_indicators(out, next_gdp_release_date=v3.get("next_gdp_release_date"))
 
     # A refusal is an outcome, not an error: half a combination is v3 published
     # under another name, so the page declines for v3's reason.
     if v3.get("status") != "ok":
+        if final:
+            raise ValueError(f"Final v3 run refused: {v3.get('refusal_reason')}")
         payload = refusal_from_v3(v3, generated_at=generated_at)
         (out / "latest_combo.json").write_text(json.dumps(payload, indent=2) + "\n")
         print(f"refused: {payload['refusal_reason']} -- {payload['refusal_detail']}")
@@ -238,6 +257,8 @@ def main() -> int:
                                 is_current=is_current),
                       params, is_current=is_current)
     if not rows:
+        if final:
+            raise ValueError("No rows to build the final combination")
         payload = refusal_payload(
             reason="no combination", generated_at=generated_at,
             detail="no run date has both models nowcasting the same quarter",
@@ -252,6 +273,8 @@ def main() -> int:
                                 is_current=is_current,
                                 current_quarter=current_quarter)
     except ValueError as exc:
+        if final:
+            raise
         payload = refusal_payload(
             reason="no v2 figure for the current quarter", detail=str(exc),
             generated_at=generated_at, asof=v3["as_of"])
@@ -259,6 +282,11 @@ def main() -> int:
         print(f"refused: {payload['refusal_detail']}")
         return 0
 
+    if final:
+        latest["final_estimate"] = checked_final_stamp(latest, v2, v3, final, generated_at)
+        rel = final["release_at"][:10]
+        latest["horizons"][0]["release_date"] = latest["next_gdp_release_date"] = rel
+        emit_indicators(out, next_gdp_release_date=rel)
     perf = track_record(backtest, rows, gdp, read_first_release(), read_somp(),
                         is_current=is_current)
 

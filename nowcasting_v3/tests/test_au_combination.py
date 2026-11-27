@@ -961,3 +961,18 @@ def test_input_lists_are_not_mutated():
     before = [dict(r) for r in current]
     mark_updated(current, previous)
     assert current == before
+
+
+def test_certified_final_vintage_uses_recorded_release_not_scheduling_rule():
+    from nyfed.au.combination import _final_live_rows, pair_runs
+
+    # A shifted release makes the actual final run fall on the rule's
+    # would-be GDP day. The date-only history still rejects the real GDP day.
+    v3 = [{"run_date": "2026-12-02", "target_quarter": "2026 Q3",
+           "kind": "nowcast", "qoq_growth_pct": 0.4, "months_with_data": 3,
+           "final_release_at": "2026-12-03T11:30:00+11:00"}]
+    v2 = [{"run_date": "2026-12-02", "target_quarter": "2026 Q3",
+           "horizon": "current", "qoq_growth_pct": 0.5}]
+    rows = pair_runs(v3, v2)
+    assert _final_live_rows(rows)["2026 Q3"]["combo"] == 0.45
+    assert not _final_live_rows([{**rows[0], "run_date": "2026-12-03"}])

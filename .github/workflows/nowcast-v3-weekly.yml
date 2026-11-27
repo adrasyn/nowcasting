@@ -26,6 +26,11 @@ on:
     # sequence before 9 am Sydney.
     - cron: "30 20 * * 0"
   workflow_dispatch:
+    inputs:
+      final_day:
+        type: string
+        required: false
+        description: "Certified v2 vintage for the last estimate (Sydney date)"
 
 permissions:
   contents: write
@@ -47,6 +52,7 @@ jobs:
       # blocks below, and anything else that reads the system clock, on the same
       # Monday the payloads are keyed to.
       TZ: Australia/Sydney
+      FINAL_DAY: ${{ inputs.final_day }}
     defaults:
       run:
         working-directory: nowcasting_v3
@@ -97,7 +103,10 @@ jobs:
         run: python -u tools/record_first_print.py
 
       - name: Nowcast
-        run: python -u tools/run_au_nowcast.py
+        run: |
+          args=()
+          if [ -n "$FINAL_DAY" ]; then args+=(--final-day "$FINAL_DAY"); fi
+          python -u tools/run_au_nowcast.py "${args[@]}"
 
       - name: Refresh the indicator panel
         run: python -u tools/emit_indicators.py
@@ -134,7 +143,10 @@ jobs:
       # v2 figure for the current quarter), so a non-zero exit here is a bug.
       - name: Combine with v2
         continue-on-error: false
-        run: python -u tools/emit_combination.py
+        run: |
+          args=()
+          if [ -n "$FINAL_DAY" ]; then args+=(--final-day "$FINAL_DAY"); fi
+          python -u tools/emit_combination.py "${args[@]}"
 
       # The failure handler below covers a step that THROWS. This covers a run
       # that succeeds and publishes something incoherent — above all a target

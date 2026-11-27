@@ -49,6 +49,7 @@ from nyfed.au.emit import (annualised_to_qoq, gdp_release_date,
                            migrate_history_runs_v3, nowcast_payload,
                            refusal_payload)
 from nyfed.au.first_release import load_first_release
+from nyfed.au.finality import missing_monthly_inputs, release_slot
 from nyfed.au.freshness import StaleSeriesError
 from nyfed.au.restrict import build_restrict
 from nyfed.au.sources import AU_SERIES, SPEC_PATH
@@ -97,6 +98,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--vintage", action="store_true")
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--final-day", help="Live final vintage (Sydney date)")
     ap.add_argument("--backfill", action="store_true",
                     help="also recompute this quarter's earlier weeks, "
                          "for a chart that has no history yet")
@@ -111,6 +113,14 @@ def main() -> int:
     now = datetime.now(UTC).isoformat(timespec="seconds")
     asof = today_str()
     out = Path(args.out)
+    final = None
+    if args.final_day:
+        if args.quick or args.vintage or args.backfill:
+            ap.error("A final run must use live inputs and full density")
+        final = release_slot(json.loads((SITE_DATA / "latest.json").read_text()),
+                             datetime.fromisoformat(now))
+        if final is None or final["run_date"] != asof or asof != args.final_day:
+            ap.error("Not in the final pre-release window")
 
     def write(payload: dict) -> None:
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -261,6 +271,22 @@ def main() -> int:
 
     # ---- nowcast ---------------------------------------------------------
     t_now = target_periods(panel)
+    if final:
+        if _quarter(panel.dates[t_now[0]]) != final["quarter"]:
+            raise ValueError("Final v3 target does not match the ABS release calendar")
+        if any(_quarter(d) == final["quarter"] for d in gdp.index):
+            raise ValueError("The GDP actual is already available")
+        # Quarterly GDP, GDI and labour costs print together, so they cannot
+        # certify a pre-release estimate. Use the transformed monthly rows
+        # after the same availability cut the model used.
+        observed = {key: {str(panel.dates[j].date())[:7]
+                          for j in np.flatnonzero(np.isfinite(panel.Y[i]))}
+                    for i, key in enumerate(panel.series_id)}
+        missing = missing_monthly_inputs(observed, quarter=final["quarter"],
+                                         monthly_keys=[s.key for s in AU_SERIES
+                                                       if s.frequency == "m"])
+        if missing:
+            raise ValueError("Final v3 inputs incomplete: " + ", ".join(missing))
     months = [months_with_data(panel, int(t)) for t in t_now]
     loc = float(panel.y_location[panel.i_now, 0])
     scl = float(panel.y_scale[panel.i_now, 0])
@@ -333,6 +359,9 @@ def main() -> int:
             "data_through": dthru, "months_with_data": months[k],
             "estimate_asof": meta["asof"],
         })
+
+    if final:
+        written[0]["final_release_at"] = final["release_at"]
 
     if args.backfill:
         print(f"backfilling earlier weeks of {label}...", flush=True)
@@ -432,6 +461,8 @@ def main() -> int:
         collapse_floor=floor,
         n_gs=meta["n_gs"], n_burn=meta["n_burn"], seed=SEED,
         months_with_data=months, correction=correction)
+    if final:
+        payload["final_input_check"] = final
     payload["estimate"] = {"estimated_at": meta["estimated_at"],
                            "asof": meta["asof"], "age_days": age}
     write(payload)
@@ -504,9 +535,14 @@ def _record(entries: list[dict], labels: list[str], asof: str) -> list[dict]:
     # warns about.
     live = {(r["run_date"], r.get("target_quarter"))
             for r in hist["runs"] if not r.get("backfilled")}
+    # A successful final run fixes this target/date for the live archive too;
+    # a same-day manual rerun cannot replace the row underlying the lock.
+    final = {(r["run_date"], r.get("target_quarter"))
+             for r in hist["runs"] if r.get("final_release_at")}
     entries = [e for e in entries
-               if not (e.get("backfilled")
-                       and (e["run_date"], e["target_quarter"]) in live)]
+               if (e["run_date"], e["target_quarter"]) not in final
+               and not (e.get("backfilled")
+                        and (e["run_date"], e["target_quarter"]) in live)]
     keys = {(e["run_date"], e["target_quarter"]) for e in entries}
     runs = [r for r in hist["runs"]
             if (r["run_date"], r.get("target_quarter")) not in keys] + entries

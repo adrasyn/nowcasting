@@ -19,7 +19,7 @@ for (const [name, v] of Object.entries(fixtureViews()))
         "</style>" +
         fixtureHtml[name],
     );
-    for (const width of [375, 390, 1440]) {
+    for (const width of name === "final" ? [320, 390, 1440] : [375, 390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect(
         await page.evaluate(
@@ -44,6 +44,33 @@ for (const [name, v] of Object.entries(fixtureViews()))
           ),
       ).toBe(true);
     }
+    const strip = page.locator(".final-estimate-strip");
+    const marker = page.locator("[data-final-marker]");
+    const extension = page.locator("[data-final-extension]");
+    if (name === "final") {
+      await expect(page.locator(".estimate.current > .final-estimate-strip")).toHaveText(
+        "Final estimate (no new data)",
+      );
+      await expect(page.locator(".estimate.next .final-estimate-strip")).toHaveCount(0);
+      await expect(page.locator("#path-chart").getByText("Final estimate", {exact: true})).toHaveCount(1);
+      await expect(marker).toHaveAttribute("stroke-dasharray", "3 3");
+      await expect(extension).toHaveAttribute("stroke-dasharray", "4 3");
+      const start = Number(await extension.getAttribute("x1"));
+      const end = Number(await extension.getAttribute("x2"));
+      expect(end).toBeGreaterThan(start);
+      expect(await marker.getAttribute("x1")).toEqual(await extension.getAttribute("x1"));
+      expect(await extension.getAttribute("y1")).toEqual(await extension.getAttribute("y2"));
+      await expect(page.locator("#path-chart .band-fill")).toHaveCount(2);
+      for (const shape of await page.locator("#path-chart .band-fill").all())
+        expect((await shape.getAttribute("d"))?.split(` L${end},`)).toHaveLength(3);
+      await expect(page.locator("#path-chart [data-point]")).toHaveCount(v.current.runs.length);
+    } else {
+      await expect(strip).toHaveCount(0);
+      await expect(marker).toHaveCount(0);
+      await expect(extension).toHaveCount(0);
+    }
+    if (name === "rolled")
+      await expect(page.locator(".estimate.current h2")).toHaveText("Q4 2026: GDP nowcast");
     if (name === "component") {
       await expect(page.locator(".estimate.next")).toContainText(
         "Awaiting both model estimates",

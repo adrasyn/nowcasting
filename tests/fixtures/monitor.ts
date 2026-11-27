@@ -53,6 +53,26 @@ export function fixtureData() {
   }
   return d;
 }
+export const finalBuiltAt = "2026-12-01T07:40:00Z";
+export function finalFixtureData() {
+  const d = fixtureData(), latest = d.latestCombo!;
+  const run = "2026-12-01";
+  latest.as_of = run;
+  latest.generated_at = "2026-12-01T07:30:00Z";
+  latest.final_estimate = {
+    quarter: latest.target_quarter!, run_date: run,
+    generated_at: latest.generated_at, release_at: "2026-12-02T11:30:00+11:00",
+  };
+  latest.components = { v2: { as_of: run, run_date: run }, v3: { as_of: run } };
+  const h = latest.horizons[0];
+  latest.vintages!.push({
+    ...h, target_quarter: h.quarter, run_date: run, horizon: "current",
+    v2_run_date: run, data_through: "2026-10",
+    ci_68_low: h.ci_68_low!, ci_68_high: h.ci_68_high!,
+    ci_95_low: h.ci_95_low!, ci_95_high: h.ci_95_high!,
+  });
+  return d;
+}
 const fresh = fixtureData;
 const view = (d: DashboardData) => buildMonitorView(d, "2026-11-19T10:00:00Z");
 function addActual(d: DashboardData, q: string, value = 704000) {
@@ -175,7 +195,14 @@ export function fixtureViews() {
       },
     ],
   };
+  const final = finalFixtureData();
+  const expired = buildMonitorView(final, "2026-12-02T00:30:00Z");
+  const rolled = finalFixtureData();
+  addActual(rolled, "2026 Q3");
   return {
+    final: buildMonitorView(final, finalBuiltAt),
+    expired,
+    rolled: buildMonitorView(rolled, "2026-12-02T01:00:00Z"),
     component: view(component),
     v3: view(v3),
     selection: view(selection),

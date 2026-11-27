@@ -29,7 +29,12 @@
       },
       "months_with_data": 3,
       "release_date": "2026-12-02",
-      "gdp_chain_volume_millions": 702511
+      "gdp_chain_volume_millions": 702511,
+      "complete_months": [
+        "2026-07",
+        "2026-08",
+        "2026-09"
+      ]
     },
     {
       "quarter": "2026 Q4",
@@ -46,7 +51,8 @@
         "v3": 0.4432
       },
       "months_with_data": 1,
-      "release_date": "2027-03-03"
+      "release_date": "2027-03-03",
+      "complete_months": []
     }
   ],
   "vintages": [
@@ -426,5 +432,12 @@
     "estimated_at": "2026-09-11T03:43:25+00:00",
     "asof": "2026-09-11",
     "age_days": 73
-  }
+  },
+  "final_estimate": {
+    "quarter": "2026 Q3",
+    "run_date": "2026-11-23",
+    "release_at": "2026-12-02T11:30:00+11:00",
+    "generated_at": "2026-11-23T01:06:13+00:00"
+  },
+  "coverage_verified_at": "2026-11-27T06:16:37+00:00"
 }
